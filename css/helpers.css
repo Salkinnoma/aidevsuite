@@ -1,0 +1,80 @@
+.hide, .loading {
+    display: none !important;
+}
+
+*, ::after, ::before {
+    box-sizing: border-box;
+}
+
+.w-100 {
+    width: 100%;
+}
+
+.h-100 {
+    height: 100%;
+}
+
+.wh-100 {
+    width: 100%;
+    height: 100%;
+}
+
+.scrollable {
+    overflow: auto;
+}
+
+.brand-text {
+    color: var(--brand-color);
+}
+  
+.danger-text {
+    color: var(--danger-color);
+}
+  
+.success-text {
+    color: var(--success-color);
+}
+
+.unselectable {
+    user-select: none;
+    -webkit-user-select: none; /* Safari */
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* IE10+/Edge */
+}
+
+.vr {
+    height: 100%;
+    border-left: 1px solid var(--border-color);
+}
+
+.fixText {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+b {
+    font-weight: bold;
+}
+  
+.xl-font {
+    font-size: 1.25rem;
+}
+  
+.xxl-font {
+    font-size: 1.5rem;
+}
+  
+.xxxl-font {
+    font-size: 2rem;
+}
+.xl-title {
+    font-size: 3.5rem;
+}
+  
+.children-h-100 > * {
+    height: 100%;
+}
+  
+.children-w-100 > * {
+    width: 100%;
+}

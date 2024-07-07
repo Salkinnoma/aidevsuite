@@ -1,0 +1,37 @@
+.element {
+    border-radius: 5px;
+    padding: 4px;
+    background: inherit;
+}
+
+.minimalElement {
+    border-radius: 5px;
+    background: inherit;
+}
+
+.largeElement {
+    border-radius: 10px;
+    padding: 8px 16px;
+    background: inherit;
+}
+
+.giantElement {
+    border-radius: 10px;
+    padding: 20px 32px;
+}
+
+.bordered {
+    border: 1px solid var(--border-color);
+}
+
+.raised {
+    background: var(--raised-background-color);
+}
+
+.interactive {
+    cursor: pointer;
+}
+
+.hoverable:hover {
+    background: var(--hover-background-color);
+}

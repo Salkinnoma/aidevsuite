@@ -1,0 +1,19 @@
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+a:hover, a:focus, a:active {
+    color:inherit
+}
+
+.text-link {
+    color: var(--stress-color);
+    cursor: pointer;
+}
+  
+.text-link:hover {
+    color: var(--stress-hover-color);
+    cursor: pointer;
+}

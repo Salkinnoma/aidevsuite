@@ -1,0 +1,87 @@
+/* Text color palette */
+/* https://coolors.co/palette/222222-006daa-008ee0-70cbff-ade1ff */
+:root {
+    color-scheme: light;
+}
+
+/* The variabels should work with multiple levels of abstractions. */
+/* First generic color definitions, then more and more element specific. */
+[color-scheme="dark"] {
+    color-scheme: dark;
+    /* Generic Colors */
+    --brand-color: #BDAACB;
+    --danger-color: #d97263;
+    --success-color: #63da86;
+    /* Text Colors */
+    --text-color: #EEE;
+    --raised-text-color: #BBB;
+    --stress-color: #78bfc1;
+    /* Background Colors */
+    --background-color: #222;
+    --raised-background-color: #333;
+    --disabled-background-color: #777;
+    --lowered-background-color: #111;
+    --active-background-color: #444;
+    --hover-background-color: #555;
+    /* Other Colors */
+    --border-color: #444;
+    --raised-border-color: #888;
+    --shadow-color: #000;
+    --overlay-color: var(--shadow-color);
+    --caret-color: var(--text-color);
+    /* Headers */
+    --h1-color: var(--text-color);
+    --h2-color: var(--text-color);
+    --h3-color: var(--text-color);
+    --h4-color: var(--text-color);
+    --h5-color: var(--text-color);
+    --h6-color: var(--text-color);
+    /* Specific Elements */
+    --sidebar-background-color: var(--background-color);
+    --navbar-background-color: var(--background-color);
+}
+
+/* The variabels should work with multiple levels of abstractions. */
+/* First generic color definitions, then more and more element specific. */
+[color-scheme="light"] {
+    color-scheme: light;
+    /* Generic Colors */
+    --brand-color: #BDAACB;
+    --danger-color: #8a291b;
+    --success-color: #209b43;
+    /* Text Colors */
+    --text-color: #111;
+    --raised-text-color: #333;
+    --stress-color: #30765a;
+    /* Background Colors */
+    --background-color: #FFF;
+    --raised-background-color: #F9F9F9;
+    --disabled-background-color: #777;
+    --lowered-background-color: #FFF;
+    --active-background-color: #DDD;
+    --hover-background-color: #DDD;
+    /* Other Colors */
+    --border-color: #CCC;
+    --raised-border-color: #777;
+    --shadow-color: #FFF;
+    --overlay-color: var(--shadow-color);
+    --caret-color: var(--text-color);
+    /* Headers */
+    --h1-color: var(--text-color);
+    --h2-color: var(--text-color);
+    --h3-color: var(--text-color);
+    --h4-color: var(--text-color);
+    --h5-color: var(--text-color);
+    --h6-color: var(--text-color);
+    /* Specific Elements */
+    --sidebar-background-color: var(--background-color);
+    --navbar-background-color: var(--background-color);
+}
+
+[color-scheme="dark"] .lightModeOnly {
+    display: none;
+}
+
+[color-scheme="light"] .darkModeOnly {
+    display: none;
+}

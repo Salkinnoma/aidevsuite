@@ -1,0 +1,20 @@
+button, .fakeButton {
+    cursor: pointer;
+    align-items: center;
+    border: 0;
+    background: inherit;
+    padding: 0;
+}
+
+.complexButton {
+    cursor: pointer;
+    align-items: center;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--raised-background-color);
+}
+
+.complexButton:hover {
+    background: var(--hover-background-color);
+}

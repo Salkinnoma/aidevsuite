@@ -1,0 +1,15 @@
+
+.dropArea {
+    border: 2px dashed var(--border-color);
+    border-radius: 10px;
+    background: inherit;
+    padding: 20px;
+}
+
+.dropArea.dragover {
+    border-color: var(--success-color);
+}
+
+.dropArea.invalidFiles {
+    border-color: var(--danger-color);
+}
