@@ -1,0 +1,90 @@
+.tooltipContainer {
+    display: none !important;
+  }
+  
+  #tooltip {
+    position: absolute;
+    top: 2px;
+    z-index: 9999;
+    height: 100%;
+    min-width: 0px;
+    border-radius: 10px;
+    display: block;
+    height: max-content;
+    max-width: calc(100vw - 12px);
+    background-color: var(--tooltip-background-color);
+  }
+  
+  .cardTooltip {
+    border-radius: 10px;
+    padding: 32px;
+    width: 450px;
+  }
+  
+  @media (max-width: 450px) {
+    .cardTooltip {
+      padding: 12px 12px 16px 16px;
+    }
+  }
+  
+  .smallTooltip {
+    border-radius: 5px;
+    padding: 8px;
+    width: min(max-content, 400px);
+  }
+  
+    #tooltip[tooltip-position="top"]::after {
+      content: " ";
+      position: absolute;
+      top: 100%; /* At the bottom of the tooltip */
+      left: 50%;
+      margin-left: -5px;
+      border-width: 5px;
+      border-style: solid;
+      border-color: var(--tooltip-background-color) transparent transparent transparent;
+    }
+  
+    #tooltip[tooltip-position="bottom"]::after {
+      content: " ";
+      position: absolute;
+      bottom: 100%; /* At the top of the tooltip */
+      left: 50%;
+      margin-left: -5px;
+      border-width: 5px;
+      border-style: solid;
+      border-color: transparent transparent var(--tooltip-background-color) transparent;
+    }
+  
+    #tooltip[tooltip-position="left"]::after {
+      content: " ";
+      position: absolute;
+      top: 50%;
+      left: 100%; /* To the right of the tooltip */
+      margin-top: -5px;
+      border-width: 5px;
+      border-style: solid;
+      border-color: transparent transparent transparent var(--tooltip-background-color);
+    }
+  
+    #tooltip[tooltip-position="right"]::after {
+      content: " ";
+      position: absolute;
+      top: 50%;
+      right: 100%; /* To the left of the tooltip */
+      margin-top: -5px;
+      border-width: 5px;
+      border-style: solid;
+      border-color: transparent var(--tooltip-background-color) transparent transparent;
+    }
+  
+  .colorTooltips .replaceTooltips .tooltipTarget {
+    color: var(--stress-color);
+  }
+  
+  .underlineTooltips .replaceTooltips .tooltipTarget {
+    text-decoration: underline 2px;
+  }
+  
+  .highlightTooltips .replaceTooltips .tooltipTarget {
+    background-color: var(--highlight-color);
+  }

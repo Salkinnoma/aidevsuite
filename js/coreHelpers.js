@@ -1,10 +1,10 @@
 
-keysPressed = {};
+pressedKeys = {};
 function onKeyDown(event) {
-    keysPressed[event.key] = true;
+    pressedKeys[event.key] = true;
 }
 function onKeyUp(event) {
-    delete keysPressed[event.key];
+    delete pressedKeys[event.key];
 }
 document.addEventListener('keydown', onKeyDown);
 document.addEventListener('keyup', onKeyUp);
