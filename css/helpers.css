@@ -4,6 +4,11 @@
 
 *, ::after, ::before {
     box-sizing: border-box;
+    vertical-align: bottom;
+}
+
+*:disabled {
+    cursor: default;
 }
 
 .w-100 {

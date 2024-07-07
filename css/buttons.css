@@ -15,6 +15,6 @@ button, .fakeButton {
     background: var(--raised-background-color);
 }
 
-.complexButton:hover {
+.complexButton:hover:not(:disabled) {
     background: var(--hover-background-color);
 }

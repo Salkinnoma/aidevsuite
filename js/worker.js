@@ -16,7 +16,6 @@ const setProgressEventType = "setProgressEventType";
 const setStatusEventType = "setStatusEventType";
 
 // Element types
-const containerType = "containerType";
 const codeType = "codeType";
 const breakType = "breakType";
 const imageType = "imageType";
@@ -32,10 +31,15 @@ const navBarType = "navBarType";
 const listBarType = "listBarType";
 const fillBarType = "fillBarType";
 
+// Interactable types
+const buttonType = "buttonType";
+
 // Input element types
 const textInputType = "textInputType";
 const numberInputType = "numberInputType";
+const passwordInputType = "passwordInputType";
 const checkboxInputType = "checkboxInputType";
+const selectInputType = "selectInputType";
 const pasteInputType = "pasteInputType";
 const fileInputType = "fileInputType";
 
@@ -47,9 +51,13 @@ const allTypes = new Set([
     paragraphType,
     titleType,
     subTitleType,
+    barType,
+    buttonType,
     textInputType,
     numberInputType,
+    passwordInputType,
     checkboxInputType,
+    selectInputType,
     pasteInputType,
     fileInputType,
 ]);
@@ -67,7 +75,9 @@ const simpleTypes = new Set([
 const inputTypes = new Set([
     textInputType,
     numberInputType,
+    passwordInputType,
     checkboxInputType,
+    selectInputType,
     pasteInputType,
     fileInputType,
 ]);
@@ -83,16 +93,12 @@ function generateUniqueId() {
     return Date.now() + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
 }
 
-async function log(...data) {
-    return await requireResponse(logRequestType, JSON.stringify(data));
-}
-
 // Event logic to communicate with origin
 function postRequest(type, content, id = null, pingId = null) {
     postMessage({id, pingId, type, content});
 }
 
-function postSuccessResponse(requestEvent, content, message = null) {
+function postSuccessResponse(requestEvent, content = null, message = null) {
     postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: successStatus, content, message });
 }
 
@@ -111,9 +117,9 @@ function requireResponse(type, content, onPing = null){
     
                 try {
                     const result = await onPing(event.data.content);
-                    postSuccessResponseToOrigin(event, result);
+                    postSuccessResponse(event, result);
                 } catch (e) {
-                    postErrorResponseToOrigin(event, e.message);
+                    postErrorResponse(event, e.message);
                 }
             });
         }
@@ -129,30 +135,31 @@ function requireResponse(type, content, onPing = null){
         });
 
 
-        postRequestToOrigin(type, content, id, pingId);
+        postRequest(type, content, id, pingId);
     });
+}
+
+async function log(...data) {
+    return await requireResponse(logEventType, JSON.stringify(data));
 }
 
 async function onEvalRequest(e){
     try {
-        store = e.data.content.store;
         const result = await eval("(async () => {" + e.data.content.code + "})()");  // Evaluate the incoming code
-        const content = {
-            result: result,
-            store: store,
-        };
-        postSuccessResponseToOrigin(e, content);
+        const content = result;
+        postSuccessResponse(e, content);
     } catch (error) {
-        postErrorResponseToOrigin(e, error.stack);
+        postErrorResponse(e, error.stack);
     }
 }
 
-onmessage = function(e){
-    log("Origin Message Received:", e.data);
-    if (e.data.type === evalRequestType) {
+onmessage = async function(e){
+    if (e.data.type !== logEventType) await log("Origin Message Received:", e.data);
+
+    if (e.data.type === evalEventType) {
         onEvalRequest(e);
     } else if (onEvent.has(e.data.id)) {
-        onEvent.get(e.data.id)();
+        onEvent.get(e.data.id)(e);
     }
 };
 
@@ -251,6 +258,12 @@ function createBar(options = null) {
  * When `type` is `numberInputType`, the `options` object can have the following property:
  *
  * - **defaultValue** (number) [optional]: The default number value for the input. Default is 0.
+ * 
+ * ### `passwordInputType`
+ *
+ * When `type` is `passwordInputType`, the `options` object can have the following property:
+ *
+ * - **defaultValue** (string) [optional]: The default number value for the input. Default is an empty string `''`.
  *
  * ### `checkboxInputType`
  *
@@ -259,6 +272,15 @@ function createBar(options = null) {
  * - **defaultValue** (number) [optional]: The default bool value for the input. Default is false.
  *
  * - **description** (string) [optional]: A short description to the left of the checkbox. Default is an empty string `''`.
+ * 
+ * ### `selectInputType`
+ *
+ * When `type` is `selectInputType`, the `options` object can have the following property:
+ *
+ * - **defaultValue** (number) [optional]: The default number value for the input. Default is 0.
+ * - **options** (array): An array of option objects that have the following properties.
+ *     - **value** (string) [optional]: The value of the option. Default is its index.
+ *     - **name** (string) [optional]: The name of the option. Default is its value.
  *
  * ### `fileInputType`
  *
@@ -464,7 +486,7 @@ async function requestFileDownload(name, type, content) {
         type: type,
         content: content,
     }
-    return await requireResponse(fileDownloadRequestType, file);
+    return await requireResponse(fileDownloadEventType, file);
 }
 
 async function requestDataURLDownload(name, dataURL) {
@@ -472,7 +494,7 @@ async function requestDataURLDownload(name, dataURL) {
         name: name,
         dataURL: dataURL,
     }
-    return await requireResponse(dataURLDownloadRequestType, file);
+    return await requireResponse(dataURLDownloadEventType, file);
 }
 
 /**
@@ -482,7 +504,7 @@ async function requestDataURLDownload(name, dataURL) {
  * - **progress** (float): The desired progress. This is clamped between 0 and 0.9. After the program is finished, this is set to 1.
  * */
 async function setProgress(progress) {
-    return await requireResponse(setProgressRequestType, progress);
+    return await requireResponse(setProgressEventType, progress);
 }
 
 /**
@@ -492,7 +514,7 @@ async function setProgress(progress) {
  * - **status** (string): The status message.
  * */
 async function setStatus(status) {
-    return await requireResponse(setStatusRequestType, status);
+    return await requireResponse(setStatusEventType, status);
 }
 
 
@@ -545,7 +567,7 @@ let commonFileTypes = {
 }
 
 function escapeFileName(filename) {
-    return filename.replace(/[^a-zA-Z0-9.- ]/g, "_");
+    return filename.replace(/[^a-zA-Z0-9\.\- ]/g, "_");
 }
 
 function escapeHTML(str) {

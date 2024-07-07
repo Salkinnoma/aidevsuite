@@ -9,3 +9,15 @@
 [contenteditable] {
     overflow-y: auto;
 }
+
+.contenteditableContainer {
+    padding: 10px 32px;
+}
+
+[contenteditable]:focus-visible {
+    outline: 0;
+}
+
+.contenteditableContainer:focus-within {
+    outline: var(--border-color) auto 1px;
+}

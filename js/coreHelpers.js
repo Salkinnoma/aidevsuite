@@ -9,7 +9,7 @@ function onKeyUp(event) {
 document.addEventListener('keydown', onKeyDown);
 document.addEventListener('keyup', onKeyUp);
 
-async function sleep(ms){
+async function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -31,7 +31,7 @@ function isChildLeaveEvent(event) {
     return event.currentTarget.contains(event.toElement) || event.currentTarget === event.toElement;
 }
 
-function clone(obj){
+function clone(obj) {
     return JSON.parse(JSON.stringify(obj));
 }
 
@@ -54,27 +54,42 @@ function setCookie(name, value, days = null) {
     document.cookie = name + "=" + (value || "") + expires + "; path=/";
 }
 
-function jsonEquals(obj1, obj2){
+function jsonEquals(obj1, obj2) {
     return JSON.stringify(obj1) === JSON.stringify(obj2);
 }
 
 /**
  * @param {String} HTML representing a single element.
  * @param {Boolean} flag representing whether or not to trim input whitespace, defaults to true.
- * @return {Element | HTMLCollection | null}
+ * @return {Element | Node | HTMLCollection | null}
  */
-function fromHTML(html, trim = false) {
+function fromHTML(html, trim = true) {
     // Process the HTML string.
     html = trim ? html.trim() : html;
     if (!html) return null;
-  
+
     // Then set up a new template element.
     const template = document.createElement('template');
     template.innerHTML = html;
-    const result = template.content.children;
-  
+    const result = template.content.childNodes;
+
     // Then return either an HTMLElement or HTMLCollection,
     // based on whether the input HTML had one or more roots.
     if (result.length === 1) return result[0];
     return result;
-  }
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text);
+}
+
+function removeHash() {
+    // Get the current URL without the hash
+    const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + window.location.search;
+    // Replace the current history state with the clean URL
+    history.replaceState(null, "", cleanUrl);
+}
+
+function goToUrl(url) {
+    window.location.href = url;
+}

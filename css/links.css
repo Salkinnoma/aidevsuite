@@ -2,18 +2,18 @@
 a {
     text-decoration: none;
     color: inherit;
+    cursor: pointer;
 }
 
-a:hover, a:focus, a:active {
+a:hover, a:focus {
     color:inherit
 }
 
-.text-link {
+.textLink {
     color: var(--stress-color);
     cursor: pointer;
 }
-  
-.text-link:hover {
-    color: var(--stress-hover-color);
-    cursor: pointer;
+
+.textLink, .textLink:hover, .textLink:focus {
+    color: var(--stress-color);
 }

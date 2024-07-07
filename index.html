@@ -7,7 +7,6 @@
 
     <link rel="stylesheet" href="css/colorSchemes.css">
     <link rel="stylesheet" href="css/settings.css">
-    <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/table.css">
     <link rel="stylesheet" href="css/elements.css">
     <link rel="stylesheet" href="css/lists.css">
@@ -25,6 +24,7 @@
     <link rel="stylesheet" href="css/links.css">
     <link rel="stylesheet" href="css/tooltip.css">
 
+    <link rel="stylesheet" href="css/site.css">
     <link rel="stylesheet" href="css/helpers.css">
 
     <script src="js/colorSchemes.js"></script>
@@ -32,9 +32,16 @@
     <script src="js/stringHelpers.js"></script>
     <script src="js/fileHelpers.js"></script>
     <script src="js/currencyHelpers.js"></script>
+    <script src="js/hashHelpers.js"></script>
+    <script src="js/icons.js"></script>
+    <script src="js/breakHelpers.js"></script>
 
     <script src="js/sidebar.js"></script>
     <script src="js/tooltip.js"></script>
+
+    <script src="js/flow.js"></script>
+    <script src="js/pages.js"></script>
+    <script src="js/site.js"></script>
 
     <link rel="icon" href="img/favicon.png" type="image/png">
 </head>
@@ -79,17 +86,17 @@
         </nav>
         <nav class="sidebar listContainerVertical children-w-100">
             <div class="listVertical children-w-100" style="gap: 4px;">
-                <a class="element sidebarElement hoverable" href="/">Home</a>
-                <a class="element sidebarElement hoverable" href="/Rules">Code Flow</a>
+                <a class="element sidebarElement hoverable" href="#">Home</a>
+                <a class="element sidebarElement hoverable" href="#flow">Code Flow</a>
             </div>
-            <div class="listVertical children-w-100" style="gap: 4px; margin-bottom: 8px;">
-                <a class="element sidebarElement hoverable" href="/Help">Help</a>
+            <div class="listVertical children-w-100" style="gap: 4px;">
+                <a class="element sidebarElement hoverable" href="#help">Help</a>
             </div>
         </nav>
         <div id="sidebarOverlay" class="sidebarOpenOnly sidebarControlsEnabledOnly sidebarOverlay" onclick="closeSidebar()"></div>
     </header>
     <div class="container">
-        <main>
+        <main id="pages">
 
         </main>
     </div>
@@ -100,11 +107,15 @@
     <div id="tooltip" class="cardTooltip hide">
 
     </div>
+    <div id="dialogs">
+
+    </div>
 
 
 
     <script src="js/dropArea.js"></script>
     <script src="js/dialog.js"></script>
+    <script src="js/contenteditableHelpers"></script>
 
     </body>
 </html>

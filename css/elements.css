@@ -32,6 +32,6 @@
     cursor: pointer;
 }
 
-.hoverable:hover {
+.hoverable:hover:not(:disabled) {
     background: var(--hover-background-color);
 }

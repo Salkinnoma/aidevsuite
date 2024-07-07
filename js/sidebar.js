@@ -11,7 +11,7 @@ function preSidebar() {
         // Open
         css = '.sidebarClosedOnly { display: none!important; } .sidebarControlsEnabledOnly { display: none!important; }';
     }
-    console.log(css);
+
     let head = document.head || document.getElementsByTagName('head')[0];
     let style = document.createElement('style');
     preSidebarStyleElement = style;
@@ -71,7 +71,7 @@ function closeSidebar() {
     window.dispatchEvent(sidebarClosedEvent);
 }
 
-function OnResize() {
+function updateSidebar() {
     var width = document.documentElement.clientWidth;
 
     if (width <= 1878) {
@@ -106,5 +106,5 @@ function OnResize() {
     }
 }
 
-window.addEventListener("load", () => OnResize());
-window.addEventListener("resize", () => OnResize());
+window.addEventListener("load", () => updateSidebar());
+window.addEventListener("resize", () => updateSidebar());
