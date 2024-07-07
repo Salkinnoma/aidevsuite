@@ -22,13 +22,17 @@ function saveLocalPages() {
     localStorage.setItem('pages', JSON.stringify(localPagesObj));
 }
 
-function addLocalPage(name, code) {
-    localPages.set(name, {name, code});
+function addLocalPage(name, link, code) {
+    localPages.set(link, {name, link, code});
     saveLocalPages();
 }
 
+function suggestNameForPageLink(link) {
+    return escapeFileNameMinimal(link);
+}
+
 function updateLocalPage(page) {
-    localPages.set(page.name, page);
+    localPages.set(page.link, page);
     saveLocalPages();
 }
 
@@ -46,16 +50,16 @@ function loadPage() {
     // Show the section corresponding to the hash
     let newPage;
     console.log(hash);
-    const name = getPathFromHash();
+    const link = getPathFromHash();
     if (hash == '' || hash == '#' || hash == '#home') {
         removeHash();
         newPage = getHomePage();
-    } else if (name == 'flow') {
+    } else if (link == 'flow') {
         newPage = getFlowPage();
-    } else if (name == 'help') {
+    } else if (link == 'help') {
         newPage = getHelpPage();
-    } else if (localPages.has(name)) {
-        newPage = getFlowPage(localPages.get(name).code);
+    } else if (localPages.has(link)) {
+        newPage = getFlowPage(localPages.get(link).code);
     } else {
         window.open('#');
         return;
@@ -63,6 +67,9 @@ function loadPage() {
 
     if (!Array.isArray(newPage)) newPage = [newPage];
     page.replaceChildren(...newPage);
+
+    localPages.values().forEach(
+        p => document.getElementById('topSidebarList').appendChild(fromHTML(`<a class="element sidebarElement hoverable" href="#${p.link}">${p.name}</a>`)));
     updateSidebar();
 
     window.dispatchEvent(pageLoadedEvent);
@@ -73,7 +80,7 @@ function getHomePage() {
     const pages = localPages.values();
     for (let page of pages) {
         const pageElement = fromHTML(`<a class="largeElement raised">`);
-        pageElement.setAttribute('href', '#' + page.name);
+        pageElement.setAttribute('href', '#' + page.link);
         pageElement.textContent = page.name;
         grid.appendChild(pageElement);
     }

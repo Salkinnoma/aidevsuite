@@ -67,6 +67,14 @@ commonFileTypes = {
 function escapeFileName(filename) {
     return filename.replace(/[^a-zA-Z0-9]/g, "_");
 }
+function escapeFileNameMinimal(col) {
+    col = col.toLowerCase(); // Lowercase
+    col = col.replace(/[^a-z0-9_]/g, '_'); // Replace non-alphanumeric characters with an underscore
+    col = col.replace(/_+/g, '_'); // Replace multiple underscores with a single one
+    col = col.replace(/_$/, ''); // Remove trailing underscore
+
+    return col;
+}
 function escapeHTML(str) {
     return str.replace(_htmlStringHelpers.escapeHtmlRegex, function(m) {
         return '&' + _htmlStringHelpers.escapeHtmlChars[m] + ';';
