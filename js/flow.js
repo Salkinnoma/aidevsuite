@@ -1003,7 +1003,7 @@ class Flow {
 
         // Files display
         element.appendChild(hb(4));
-        const filesDisplayElement = fromHTML(`<div class="listVertical">`);
+        const filesDisplayElement = fromHTML(`<div class="listVertical divList">`);
         filesDisplayElement.appendChild(fromHTML(`<i>No file selected.`));
         Flow.importData.filesDisplayElement = filesDisplayElement;
         element.appendChild(filesDisplayElement);
