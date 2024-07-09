@@ -16,12 +16,13 @@ class DropAreaHelpers {
                         } else if (node.classList.contains('dropButton')) {
                             this.initializeDropButton(node);
                         }
-
                     }
 
                     // Check if any child nodes of the added node also have the dropArea class
                     const dropAreas = node.querySelectorAll ? node.querySelectorAll('.dropArea') : [];
                     dropAreas.forEach(d => this.initializeDropArea(d));
+                    const dropButtons = node.querySelectorAll ? node.querySelectorAll('.dropButton') : [];
+                    dropButtons.forEach(d => this.initializeDropButton(d));
                 });
             });
         });

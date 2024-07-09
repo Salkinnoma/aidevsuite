@@ -20,7 +20,7 @@ function saveLocalPages() {
     const localPagesObj = {};
     for (let entry of localPages.entries()) localPagesObj[entry[0]] = entry[1];
     localStorage.setItem('pages', JSON.stringify(localPagesObj));
-    
+
     updateLocalPagesSidebar();
 }
 
@@ -31,12 +31,24 @@ function addLocalPage(name, link, code) {
     saveLocalPages();
 }
 
+function deleteLocalPage(link) {
+    localPages.delete(link);
+    saveLocalPages();
+}
+
 function suggestNameForPageLink(link) {
     return escapeFileNameMinimal(link);
 }
 
 function updateLocalPage(page) {
     localPages.set(page.link, page);
+    saveLocalPages();
+}
+
+function moveLocalPage(page, newLink) {
+    deleteLocalPage(page.link);
+    page.link = newLink;
+    addLocalPage(page);
     saveLocalPages();
 }
 
@@ -86,11 +98,15 @@ function loadPage() {
     window.dispatchEvent(pageLoadedEvent);
 }
 
+function openPage(page = null) {
+    window.location.href = page == null ? '#' : '#' + page;
+}
+
 function getHomePage() {
     const grid = fromHTML(`<div class="listHorizontal">`);
     const pages = localPages.values();
     for (let page of pages) {
-        const pageElement = fromHTML(`<a class="largeElement raised">`);
+        const pageElement = fromHTML(`<a class="giantElement raised xl-font">`);
         pageElement.setAttribute('href', '#' + page.link);
         pageElement.textContent = page.name;
         grid.appendChild(pageElement);

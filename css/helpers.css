@@ -51,6 +51,11 @@
     -ms-user-select: none; /* IE10+/Edge */
 }
 
+.centeredVertical {
+    margin-left: auto;
+    margin-right: auto;
+}
+
 .vr {
     height: 100%;
     border-left: 1px solid var(--border-color);

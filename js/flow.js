@@ -38,6 +38,20 @@ class Flow {
         }
     }
 
+    static getPage() {
+        const name = getPathFromHash();
+        if (name == 'flow') {
+            const item = {
+                prompt: localStorage.getItem('lastPrompt'),
+                code: localStorage.getItem('lastCode'),
+            };
+            return item;
+        } else {
+            console.log(localPages.get(name), name);
+            return localPages.get(name);
+        }
+    }
+
     static getCode() {
         const name = getPathFromHash();
         if (name == 'flow') {
@@ -446,7 +460,7 @@ class Flow {
                 settings.files = [];
                 settings.allowedMimeTypes = options.allowedMimeTypes ?? [];
                 settings.allowedExtensions = options.allowedExtensions ?? [];
-                settings.dropDescription = options.dropDescription ?? ("Drag and drop valid files (" + (part.allowedMimeTypes.length === 0 ? "any type" : part.allowedMimeTypes.join(', ')) + ").");
+                settings.dropDescription = options.dropDescription ?? ("Drag and drop valid files (" + (settings.allowedMimeTypes.length === 0 ? "any type" : settings.allowedMimeTypes.join(', ')) + ").");
                 settings.selectDescription = options.selectDescription ?? 'Or select files';
                 settings.noFileSelectedMessage = options.noFileSelectedMessage ?? 'No file selected.';
                 settings.multiple = options.multiple ?? false;
@@ -856,6 +870,8 @@ class Flow {
         const settings = Flow.extractSettingsFromGroup(content.group);
         settings.event = e;
         Flow.spliceOutput(content.insertAt, content.deleteAfter, settings);
+        const inputs = Flow.extractInputElements(settings);
+        if (inputs.length == 0) Flow.postSuccessResponse(e);
     }
 
     static import(){
@@ -934,21 +950,22 @@ class Flow {
 
             nameInputElement.addEventListener('input', e => {
                 fileInfo.item.name = e.srcElement.value;
-                if (e.srcElement.value.trim() == '') e.srcElement.value = fileInfo.item.name = fileInfo.item.link;
+                if (fileInfo.item.name.trim() == '') e.srcElement.value = fileInfo.item.name = fileInfo.item.link;
                 else if (!fileInfo.hasChanged) {
                     linkInputElement.value = fileInfo.item.link = escapeFileNameMinimal(fileInfo.item.name);
                 }
 
             });
             linkInputElement.addEventListener('input', e => {
-                if (e.srcElement.value.trim() == '') {
+                fileInfo.item.link = e.srcElement.value;
+                if (fileInfo.item.link.trim() == '') {
                     fileInfo.hasChanged = false;
                     //e.srcElement.value = escapeFileNameMinimal(fileInfo.item.name);
                     nameInputElement.value = fileInfo.item.name = '';
                 }
-                else if (fileInfo.link != e.srcElement.value) {
+                else if (fileInfo.item.link != e.srcElement.value) {
                     fileInfo.hasChanged = true;
-                    fileInfo.item.link = e.srcElement.value;
+                    fileInfo.item.link = e.srcElement.value = escapeFileNameMinimal(e.srcElement.value);;
                     if (fileInfo.item.name.trim() == '') nameInputElement.value = fileInfo.item.name = fileInfo.item.link;
                 }
             });
@@ -1048,12 +1065,127 @@ class Flow {
         downloadJson(fileName, json);
     }
 
-    static star() {
+    static closeStarDialog() {
+        Flow.starDialog.classList.add('hide');
+    }
 
+    static openStarDialog() {
+        const page = Flow.getPage();
+        Flow.starData.name = page.name ?? '';
+        Flow.starData.link = page.link ?? '';
+        Flow.starData.hasChanged = false;
+
+        Flow.starData.nameInputElement.value = Flow.starData.name;
+        Flow.starData.linkInputElement.value = Flow.starData.link;
+
+        Flow.starDialog.classList.remove('hide');
+    }
+
+    static saveStarSettings() {
+        const page = Flow.getPage();
+        if (page.link) {
+            if (Flow.starData.link.trim() == '') {
+                // Delete bookmark
+                deleteLocalPage(page.link);
+                openPage();
+            } else {
+                // Move bookmark
+                page.name = Flow.starData.name;
+                moveLocalPage(page, Flow.starData.link);
+                openPage(page.link);
+            }
+        } else {
+            if (Flow.starData.link.trim() != '') {
+                // Add bookmark
+                addLocalPage(Flow.starData.name, Flow.starData.link, page.code);
+            }
+        }
+        Flow.closeStarDialog();
+    }
+
+    static updateSaveButton() {
+        const page = Flow.getPage();
+        if (Flow.starData.link == page.link && Flow.starData.name == page.name) {
+            Flow.starData.saveButton.setAttribute('disabled', '');
+            Flow.starData.saveButton.setAttribute('tooltip', 'No changes');
+        } else {
+            Flow.starData.saveButton.removeAttribute('disabled');
+            Flow.starData.saveButton.setAttribute('tooltip', 'Save changes');
+        }
     }
 
     static setupStarDialog() {
-        
+        const dialogsContainer = document.getElementById('dialogs');
+        const dialogElement = fromHTML(`<div class="dialog hide">`);
+        const contentElement = fromHTML(`<div class="dialogContent">`);
+    
+        const element = fromHTML(`<div class="dialogInnerContent largeElement bordered grounded">`);
+        const titleBar = fromHTML(`<div class="listContainerHorizontal">`);
+        titleBar.appendChild(fromHTML(`<h1>Edit Bookmark`));
+        element.appendChild(titleBar);
+        element.appendChild(hb(7));
+
+        // Star settings
+        Flow.starData = {};
+        const settingsElement = fromHTML(`<div class="listHorizontal">`);
+        const fileNameElement = fromHTML(`<div>`);
+        fileNameElement.textContent = 'Bookmark As:';
+        settingsElement.appendChild(fileNameElement);
+        const nameInputElement = fromHTML(`<input type="text" tooltip="Enter name. Discarded if link is empty." placeholder="Enter name here...">`);
+        settingsElement.appendChild(nameInputElement);
+        const linkInputElement = fromHTML(`<input type="text" placeholder="Enter link here...">`);
+        const linkInputTooltip = `Enter link. An empty link will delete the bookmark. Please export code to json before deleting a bookmark. ` +
+            `Using an existing link will override the existing one.`;
+        linkInputElement.setAttribute('tooltip', linkInputTooltip);
+
+        nameInputElement.addEventListener('input', e => {
+            Flow.starData.name = e.srcElement.value;
+            if (Flow.starData.name.trim() == '') e.srcElement.value = Flow.starData.name = Flow.starData.link;
+            else if (!Flow.starData.hasChanged) {
+                linkInputElement.value = Flow.starData.link = escapeFileNameMinimal(Flow.starData.name);
+            }
+
+            Flow.updateSaveButton();
+        });
+        linkInputElement.addEventListener('input', e => {
+            Flow.starData.link = e.srcElement.value;
+            if (Flow.starData.link.trim() == '') {
+                Flow.starData.hasChanged = false;
+                nameInputElement.value = Flow.starData.name = '';
+            }
+            else if (Flow.starData.link != e.srcElement.value) {
+                Flow.starData.hasChanged = true;
+                Flow.starData.link = e.srcElement.value = escapeFileNameMinimal(e.srcElement.value);
+                if (Flow.starData.name.trim() == '') nameInputElement.value = Flow.starData.name = Flow.starData.link;
+            }
+
+            Flow.updateSaveButton();
+        });
+        Flow.starData.nameInputElement = nameInputElement;
+        Flow.starData.linkInputElement = linkInputElement;
+
+        settingsElement.appendChild(linkInputElement);
+        element.appendChild(settingsElement);
+        element.appendChild(hb(8));
+
+        // Footer
+        const footer = fromHTML(`<div class="listHorizontal">`);
+        const cancelButton = fromHTML(`<button tooltip="Savely cancel any changes" class="w-100 largeElement complexButton flexFill">Cancel`);
+        cancelButton.addEventListener('click', e => Flow.closeStarDialog());
+        footer.appendChild(cancelButton);
+        const saveButton = fromHTML(`<button tooltip="No changes" class="w-100 largeElement complexButton flexFill" disabled>Save`);
+        saveButton.addEventListener('click', e => Flow.saveStarSettings());
+        Flow.starData.saveButton = saveButton;
+        footer.appendChild(saveButton);
+        element.appendChild(footer);
+    
+        contentElement.appendChild(element);
+        dialogElement.appendChild(contentElement);
+        const overlayElement = fromHTML(`<div class="dialogOverlay">`);
+        dialogElement.appendChild(overlayElement);
+        dialogsContainer.appendChild(dialogElement);
+
+        Flow.starDialog = dialogElement;
     }
 
     static setupDialogs() {
@@ -1097,7 +1229,7 @@ function getFlowPage() {
     leftBarList.appendChild(exportButton);
     const starButton = fromHTML(`<button class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
     starButton.setAttribute('tooltip', name == 'flow' ? 'Bookmark for Easy Access' : 'Edit Bookmark');
-    starButton.addEventListener('click', e => Flow.star());
+    starButton.addEventListener('click', e => Flow.openStarDialog());
     const starIcon = name == 'flow' ? icons.star() : icons.starFilled();
     starButton.appendChild(starIcon);
     leftBarList.appendChild(starButton);

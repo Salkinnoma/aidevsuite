@@ -435,7 +435,7 @@ async function showGroup(group, insertAt = -1, deleteAfter = 0) {
         return await map.get(element.id)(_mapGroup(content.group), content.element, content.newData);
     });
 
-    return _mapGroup(response);
+    return _mapGroup(response ?? []);
 }
 
 /**
