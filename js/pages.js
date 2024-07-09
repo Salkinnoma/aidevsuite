@@ -20,9 +20,13 @@ function saveLocalPages() {
     const localPagesObj = {};
     for (let entry of localPages.entries()) localPagesObj[entry[0]] = entry[1];
     localStorage.setItem('pages', JSON.stringify(localPagesObj));
+    
+    updateLocalPagesSidebar();
 }
 
 function addLocalPage(name, link, code) {
+    if (link.trim() == '') Flow.updateDefaultCode(code);
+
     localPages.set(link, {name, link, code});
     saveLocalPages();
 }
@@ -38,6 +42,14 @@ function updateLocalPage(page) {
 
 function getValidHashUrls(){
     return [...defaultPages, ...localPages.keys()];
+}
+
+function updateLocalPagesSidebar() {
+    const localPagesList = document.getElementById('localPagesList')
+    localPagesList.innerHTML = '';
+    localPages.values().forEach(p => localPagesList.appendChild(fromHTML(`<a class="element sidebarElement hoverable" href="#${p.link}">${p.name}</a>`)));
+    if (localPages.size == 0) localPagesList.classList.add('hide');
+    else localPagesList.classList.remove('hide');
 }
 
 // Function to handle hash changes
@@ -68,11 +80,7 @@ function loadPage() {
     if (!Array.isArray(newPage)) newPage = [newPage];
     page.replaceChildren(...newPage);
 
-    const localPagesList = document.getElementById('localPagesList')
-    localPagesList.innerHTML = '';
-    localPages.values().forEach(p => localPagesList.appendChild(fromHTML(`<a class="element sidebarElement hoverable" href="#${p.link}">${p.name}</a>`)));
-    if (localPages.size == 0) localPagesList.classList.add('hide');
-    else localPagesList.classList.remove('hide');
+    updateLocalPagesSidebar();
     updateSidebar();
 
     window.dispatchEvent(pageLoadedEvent);

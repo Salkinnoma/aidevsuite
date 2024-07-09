@@ -79,7 +79,7 @@ class DropAreaHelpers {
         if (isChildEvent(event)) return;
 
         let element = event.currentTarget;
-        const allowedMimeTypes = this.allowedMimeTypes(element);
+        const allowedMimeTypes = DropAreaHelpers.getAllowedMimeTypes(element);
         const allowedTypes = new Set(allowedMimeTypes);
         const wildcardTypes = [...allowedTypes].filter(type => type.includes('*'));
         const isTypeAllowed = (fileType) => {
@@ -99,7 +99,7 @@ class DropAreaHelpers {
 
         let valid = false;
         if (event.dataTransfer.items) {
-            const multiple = element.getAttribute('multiple');
+            const multiple = DropAreaHelpers.getMultiple(element);
             if (multiple || event.dataTransfer.items.length === 1) {
                 for (let item of event.dataTransfer.items) {
                     if (item.kind === "file" && isTypeAllowed(item.type)) {
@@ -156,6 +156,18 @@ class DropAreaHelpers {
         return newFiles;
     }
 
+    static getMultiple(element){
+        let multiple = element.
+        closest('.dropArea')?.
+        querySelector('.dropInput')?.
+        getAttribute('multiple') ?? false;
+        
+        console.log(multiple, isString(multiple), multiple == null);
+        if (isString(multiple) && multiple.trim() == '') multiple = true;
+        return multiple;
+    }
+
+
     static getAllowedMimeTypes(element){
         return element.
             closest('.dropArea')?.
@@ -165,40 +177,55 @@ class DropAreaHelpers {
             filter(a => a !== "") ?? [];
     }
 
+    static getAccept(element){
+        return element.
+            closest('.dropArea')?.
+            querySelector('.dropInput')?.
+            getAttribute('accept')?.
+            split(',').
+            map(ext => ext.trim()).
+            filter(a => a !== "") ?? [];
+    }
+
     static getMaxFileSize(element){
         let maxSize = parseInt(element.closest('.dropArea')?.getAttribute('max-file-size'));
-        if (!isNaN(maxSize)) maxSize = null;
+        if (isNaN(maxSize)) maxSize = null;
         return maxSize;
+    }
+
+    static getFilesFromSelect(event){
+        const input = event.srcElement;
+        if (!input.files || input.files.length === 0) return;
+    
+        let files = [];
+        for (let file of input.files) {
+            files.push(file);
+        }
+        input.value = '';
+    
+        return DropAreaHelpers.validateFiles(files, DropAreaHelpers.getAllowedMimeTypes(input), DropAreaHelpers.getMaxFileSize(input));
+    }
+    
+    static getFilesFromDrop(event){
+        event.preventDefault();
+    
+        if (!event.dataTransfer.items) return;
+    
+        let files = [];
+        for (let item of event.dataTransfer.items) {
+            const file = item.getAsFile();
+            files.push(file);
+        }
+    
+        const target = event.target;
+        return DropAreaHelpers.validateFiles(files, DropAreaHelpers.getAllowedMimeTypes(target), DropAreaHelpers.getMaxFileSize(target));
     }
 }
 
 window.addEventListener('load', e => DropAreaHelpers.setupEventListeners())
 
 
-function getFilesFromSelect(event){
-    const input = event.srcElement;
-    if (!input.files || input.files.length === 0) return;
-
-    let files = [];
-    for (let file of input.files) {
-        files.push(file);
-    }
-    input.value = '';
-
-    return DropAreaHelpers.validateFiles(files, DropAreaHelpers.getAllowedMimeTypes(input), DropAreaHelpers.getMaxFileSize(input));
-}
-
-function getFilesFromDrop(event){
-    event.preventDefault();
-
-    if (!event.dataTransfer.items) return;
-
-    let files = [];
-    for (let item of event.dataTransfer.items) {
-        const file = item.getAsFile();
-        files.push(file);
-    }
-
-    const target = event.target;
-    return DropAreaHelpers.validateFiles(files, DropAreaHelpers.getAllowedMimeTypes(target), DropAreaHelpers.getMaxFileSize(target));
+function getFilesFromEvent(e) {
+    if (e.srcElement.files && e.srcElement.files.length !== 0) return DropAreaHelpers.getFilesFromSelect(e);
+    else if (e.dataTransfer.items) return DropAreaHelpers.getFilesFromDrop(e);
 }

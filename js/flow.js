@@ -16,14 +16,21 @@ class Flow {
         const name = getPathFromHash();
         if (name !== 'flow' && !localPages.has(name)) return;
 
-        const mode = getHashQueryVariable('mode') ?? Flow.editMode;
+        let mode = getHashQueryVariable('mode') ?? Flow.editMode;
+        const locked = getHashQueryVariable('locked') ?? false;
+        if (locked) mode = Flow.runMode;
+
         if (mode == Flow.runMode) Flow.run();
+    }
+
+    static updateDefaultCode(code) {
+        localStorage.setItem('lastCode', code);
     }
 
     static updateCode(code) {
         const name = getPathFromHash();
         if (name == 'flow') {
-            localStorage.setItem('lastCode', code);
+            Flow.updateDefaultCode(code);
         } else {
             const page = localPages.get(name);
             page.code = code;
@@ -532,18 +539,11 @@ class Flow {
             settings.filesDisplayElement.appendChild(fileDisplayElement);
         }
     }
-
-    static async processFileDrop(event, settings) {
-        const e = event;
-        let files = getFilesFromDrop(e);
-        console.log("Drop", files.map(f => f.name));
-        await Flow.addFiles(files, settings);
-    }
     
-    static async processFileSelect(event, settings) {
+    static async processFileInput(event, settings) {
         const e = event;
-        let files = getFilesFromSelect(e);
-        console.log("Select", files.map(f => f.name));
+        let files = getFilesFromEvent(e);
+        console.log("Files Input:", files.map(f => f.name));
         await Flow.addFiles(files, settings);
     }
 
@@ -710,21 +710,19 @@ class Flow {
         } else if (type == Flow.fileInputType) {
             const fileElement = fromHTML(`<div class="w-100 largeElement bordered">`);
             const dropArea = fromHTML(`<div class="dropArea">`);
-            if (settings.multiple) dropArea.setAttribute('multiple', '');
             dropArea.setAttribute('allowed-mime-types', settings.allowedMimeTypes);
-            dropArea.setAttribute('accept', settings.allowedExtensions);
             if (settings.maxSize) dropArea.setAttribute('max-file-size', settings.maxSize);
-            dropArea.addEventListener('drop', e => Flow.processFileDrop(e, settings));
+            dropArea.addEventListener('drop', e => Flow.processFileInput(e, settings));
             const dropDescriptionElement = fromHTML(`<div>`);
             dropDescriptionElement.textContent = settings.dropDescription;
             dropArea.appendChild(dropDescriptionElement);
             dropArea.appendChild(hb(4));
             const selectFilesElement = fromHTML(`<input type="file" class="dropInput">`);
-            if (settings.multiple) dropArea.setAttribute('multiple', '');
+            if (settings.multiple) selectFilesElement.setAttribute('multiple', '');
             selectFilesElement.setAttribute('accept', settings.allowedExtensions);
-            selectFilesElement.addEventListener('change', e => Flow.processFileSelect(e, settings));
+            selectFilesElement.addEventListener('change', e => Flow.processFileInput(e, settings));
             dropArea.appendChild(selectFilesElement);
-            const dropButtonElement = fromHTML(`<button class="w-100 dropButton largeElement">`);
+            const dropButtonElement = fromHTML(`<button class="w-100 dropButton largeElement complexButton">`);
             dropButtonElement.textContent = settings.selectDescription;
             dropArea.appendChild(dropButtonElement);
             fileElement.appendChild(dropArea);
@@ -859,7 +857,212 @@ class Flow {
         settings.event = e;
         Flow.spliceOutput(content.insertAt, content.deleteAfter, settings);
     }
+
+    static import(){
+        for (let fileInfo of Flow.importData.files) {
+            if (fileInfo.starred) {
+                addLocalPage(fileInfo.item.name, fileInfo.item.link, fileInfo.item.code);
+            } else {
+                // Unstarring input is disabled
+            }
+        }
+        Flow.closeImportDialog();
+    }
+
+    static openImportDialog() {
+        Flow.importData.files = [];
+        Flow.importData.filesDisplayElement.innerHTML = '';
+        Flow.importData.filesDisplayElement.appendChild(fromHTML(`<i>No file selected.`));
+        Flow.importDialog.classList.remove('hide');
+    }
+
+    static closeImportDialog() {
+        Flow.importDialog.classList.add('hide');
+    }
+
+    static removeImportFile(index) {
+        spliceChildren(Flow.importData.filesDisplayElement, index, 1);
+        Flow.importData.files.splice(index, 1);
+        if (Flow.importData.files.length == 0) {
+            Flow.importData.importButton.setAttribute('disabled', '');
+            Flow.importData.filesDisplayElement.appendChild(fromHTML(`<i>No file selected.`));
+        }
+    }
+
+    static async processImport(event) {
+        const fileData = [];
+        const files = getFilesFromEvent(event);
+        for (let file of files) {
+            const text = await file.text();
+            const json = JSON.parse(text);
+            if (!json) {
+                console.log("Error: File couldn't be parsed.");
+                continue;
+            }
+            if (!isString(json.code) || !isString(json.name, true) || !isString(json.link, true)) {
+                console.log("Error: Invalid file.");
+                continue;
+            }
+            const item = {
+                code: json.code,
+                name: json.name,
+                link: json.link,
+            }
+            const fileInfo = {
+                name: file.name,
+                starred: true,
+                item,
+            }
+            fileData.push(fileInfo);
+            break;
+        }
+        if (fileData.length == 0) return;
+        if (Flow.importData.files.length == 0) Flow.importData.filesDisplayElement.innerHTML = '';
+        Flow.importData.importButton.removeAttribute('disabled');
+
+        Flow.importData.files = Flow.importData.files.concat(fileData);
+        for (let [index, fileInfo] of Object.entries(fileData)) {
+            const fileDisplayElement = fromHTML(`<div class="listHorizontal">`);
+            const fileNameElement = fromHTML(`<div>`);
+            fileNameElement.textContent = fileInfo.name + ':';
+            fileDisplayElement.appendChild(fileNameElement);
+            const nameInputElement = fromHTML(`<input type="text" tooltip="Enter name. Discarded if link is empty." placeholder="Enter name here...">`);
+            nameInputElement.value = fileInfo.item.name;
+            fileDisplayElement.appendChild(nameInputElement);
+            const linkInputElement = fromHTML(`<input type="text" tooltip="Enter link. An empty link will override the default Code Flow page." placeholder="Enter link here...">`);
+            linkInputElement.value = escapeFileNameMinimal(fileInfo.item.name);
+
+            nameInputElement.addEventListener('input', e => {
+                fileInfo.item.name = e.srcElement.value;
+                if (e.srcElement.value.trim() == '') e.srcElement.value = fileInfo.item.name = fileInfo.item.link;
+                else if (!fileInfo.hasChanged) {
+                    linkInputElement.value = fileInfo.item.link = escapeFileNameMinimal(fileInfo.item.name);
+                }
+
+            });
+            linkInputElement.addEventListener('input', e => {
+                if (e.srcElement.value.trim() == '') {
+                    fileInfo.hasChanged = false;
+                    //e.srcElement.value = escapeFileNameMinimal(fileInfo.item.name);
+                    nameInputElement.value = fileInfo.item.name = '';
+                }
+                else if (fileInfo.link != e.srcElement.value) {
+                    fileInfo.hasChanged = true;
+                    fileInfo.item.link = e.srcElement.value;
+                    if (fileInfo.item.name.trim() == '') nameInputElement.value = fileInfo.item.name = fileInfo.item.link;
+                }
+            });
+
+            fileDisplayElement.appendChild(linkInputElement);
+
+            // Star button
+            // const starButton = fromHTML(`<button>`);
+            // starButton.addEventListener('click', e => {
+            //     fileInfo.starred = !fileInfo.starred;
+            //     starButton.innerHTML = '';
+            //     if (fileInfo.starred) starButton.appendChild(icons.star());
+            //     else starButton.appendChild(icons.starFilled());
+            // });
+            // const starIcon = icons.starFilled();
+            // starButton.appendChild(starIcon);
+            // leftBarList.appendChild(starButton);
+
+            const fileDeleteElement = fromHTML(`<button>`);
+            fileDeleteElement.textContent = "X";
+            fileDeleteElement.addEventListener('click', e => Flow.removeImportFile(index));
+            fileDisplayElement.appendChild(fileDeleteElement);
+            Flow.importData.filesDisplayElement.appendChild(fileDisplayElement);
+        }
+        
+    }
+
+    static setupImportDialog() {
+        const dialogsContainer = document.getElementById('dialogs');
+        const dialogElement = fromHTML(`<div class="dialog hide">`);
+        const contentElement = fromHTML(`<div class="dialogContent">`);
+    
+        const element = fromHTML(`<div class="dialogInnerContent largeElement bordered grounded">`);
+        const titleBar = fromHTML(`<div class="listContainerHorizontal">`);
+        titleBar.appendChild(fromHTML(`<h1>Import Code`));
+        element.appendChild(titleBar);
+        element.appendChild(hb(2));
+
+        // File drop area
+        Flow.importData = {files: []};
+        const dropArea = fromHTML(`<div class="dropArea" allowed-mime-types="${commonMimeTypes.json}">`);
+        dropArea.addEventListener('drop', e => Flow.processImport(e));
+        const dropDescriptionElement = fromHTML(`<div>Drag and drop valid .json files.`);
+        dropArea.appendChild(dropDescriptionElement);
+        dropArea.appendChild(hb(4));
+        const selectFilesElement = fromHTML(`<input type="file" class="dropInput" multiple accept=".json">`);
+        selectFilesElement.addEventListener('change', e => Flow.processImport(e));
+        dropArea.appendChild(selectFilesElement);
+        const dropButtonElement = fromHTML(`<button class="w-100 dropButton largeElement complexButton">Or select files`);
+        dropArea.appendChild(dropButtonElement);
+        element.appendChild(dropArea);
+
+        // Files display
+        element.appendChild(hb(4));
+        const filesDisplayElement = fromHTML(`<div class="listVertical">`);
+        filesDisplayElement.appendChild(fromHTML(`<i>No file selected.`));
+        Flow.importData.filesDisplayElement = filesDisplayElement;
+        element.appendChild(filesDisplayElement);
+        element.appendChild(hb(4));
+
+        // Footer
+        const footer = fromHTML(`<div class="listHorizontal">`);
+        const cancelButton = fromHTML(`<button class="w-100 largeElement complexButton flexFill">Cancel`);
+        cancelButton.addEventListener('click', e => Flow.closeImportDialog());
+        footer.appendChild(cancelButton);
+        const importButton = fromHTML(`<button class="w-100 largeElement complexButton flexFill" disabled>Import`);
+        importButton.addEventListener('click', e => Flow.import());
+        Flow.importData.importButton = importButton;
+        footer.appendChild(importButton);
+        element.appendChild(footer);
+    
+        contentElement.appendChild(element);
+        dialogElement.appendChild(contentElement);
+        const overlayElement = fromHTML(`<div class="dialogOverlay">`);
+        dialogElement.appendChild(overlayElement);
+        dialogsContainer.appendChild(dialogElement);
+
+        Flow.importDialog = dialogElement;
+    }
+
+    static export() {
+        const item = {};
+
+        const name = getPathFromHash();
+        if (name == 'flow') {
+            item.code = localStorage.getItem('lastCode') ?? "";
+        } else {
+            const page = localPages.get(name);
+            item.code = page.code;
+            item.link = page.link;
+            item.name = page.name;
+        }
+
+        const json = JSON.stringify(item);
+        console.log(item);
+        const fileName = item.name ? escapeFileName(item.name) : escapeFileName(item.link);
+        downloadJson(fileName, json);
+    }
+
+    static star() {
+
+    }
+
+    static setupStarDialog() {
+        
+    }
+
+    static setupDialogs() {
+        Flow.setupImportDialog();
+        Flow.setupStarDialog();
+    }
 }
+
+window.addEventListener('load', e => Flow.setupDialogs());
 
 function getFlowPage() {
     const name = getPathFromHash();
@@ -875,13 +1078,29 @@ function getFlowPage() {
 
     const elements = [];
 
-    const mode = getHashQueryVariable('mode') ?? Flow.editMode;
+    let mode = getHashQueryVariable('mode') ?? Flow.editMode;
     const locked = getHashQueryVariable('locked') ?? false;
     if (locked) mode = Flow.runMode;
 
     const bar = fromHTML(`<div class="listContainerHorizontal">`);
     const leftBarList = fromHTML(`<div class="listHorizontal">`);
     bar.appendChild(leftBarList);
+
+    // Top left buttons
+    const importButton = fromHTML(`<button tooltip="Import Code from JSON" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
+    importButton.addEventListener('click', e => Flow.openImportDialog());
+    importButton.appendChild(icons.upload());
+    leftBarList.appendChild(importButton);
+    const exportButton = fromHTML(`<button tooltip="Export Code to JSON" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
+    exportButton.addEventListener('click', e => Flow.export());
+    exportButton.appendChild(icons.download());
+    leftBarList.appendChild(exportButton);
+    const starButton = fromHTML(`<button class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
+    starButton.setAttribute('tooltip', name == 'flow' ? 'Bookmark for Easy Access' : 'Edit Bookmark');
+    starButton.addEventListener('click', e => Flow.star());
+    const starIcon = name == 'flow' ? icons.star() : icons.starFilled();
+    starButton.appendChild(starIcon);
+    leftBarList.appendChild(starButton);
     if (!locked) {
         const editButton = fromHTML(`<button class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
         editButton.addEventListener('click', e => Flow.edit());
@@ -893,12 +1112,13 @@ function getFlowPage() {
     runButton.addEventListener('click', e => Flow.run());
     runButton.appendChild(icons.play());
     leftBarList.appendChild(runButton);
-    elements.push(bar);
 
+    elements.push(bar);
     elements.push(hb(7));
 
     if (mode == Flow.editMode) {
-        const codeEditorContainer = fromHTML(`<div class="contenteditableContainer largeElement">`);
+        // Code editor
+        const codeEditorContainer = fromHTML(`<div class="contenteditableContainer">`);
         const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter code here...">`);
         codeEditor.textContent = code;
         codeEditor.addEventListener('input', e => Flow.onCodeInput(e));
@@ -907,18 +1127,24 @@ function getFlowPage() {
         codeEditorContainer.appendChild(codeEditor);
         Flow.codeEditorContainerElement = codeEditorContainer;
         elements.push(codeEditorContainer);
+
+        // Stream target
         const streamTargetElement = fromHTML(`<div class="largeElement bordered fixText hide">`);
         Flow.streamTargetElement = streamTargetElement;
         elements.push(streamTargetElement);
         elements.push(hb(7));
-        const promptEditorContainer = fromHTML(`<div class="contenteditableContainer largeElement">`);
+
+        // Prompt editor
+        const promptEditorContainer = fromHTML(`<div class="contenteditableContainer">`);
+        //promptEditorContainer.addEventListener('click', e => Flow.promptEditor.focus()); // removed because doesn't move tabIndex to closest.
         const promptEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter prompt here...">`);
         promptEditor.textContent = prompt;
         promptEditor.addEventListener('input', e => Flow.onPromptInput(e));
         promptEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
+        Flow.promptEditor = promptEditor;
         promptEditorContainer.appendChild(promptEditor);
         promptEditorContainer.appendChild(hb(5));
-        const footer = fromHTML(`<div class="listContainerHorizontal">`);
+        const footer = fromHTML(`<div class="listContainerHorizontal contenteditableContainerFooter">`);
         footer.appendChild(fromHTML(`<div>`));
         const rightFooterList = fromHTML(`<div class="listHorizontal">`);
         const generateButton = fromHTML(`<button class="largeElement complexButton">`);

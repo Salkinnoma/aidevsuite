@@ -59,11 +59,6 @@ const _htmlStringHelpers = {
 };
 _htmlStringHelpers.escapeHtmlRegex = _htmlStringHelpers.getEscapeHtmlRegex();
 
-commonFileTypes = {
-    plainText: "text/plain",
-        json: "application/json",
-        csv: "text/csv",
-}
 function escapeFileName(filename) {
     return filename.replace(/[^a-zA-Z0-9]/g, "_");
 }
@@ -103,4 +98,8 @@ function removeFirstChar(str){
 }
 function removeLastChar(str){
     return str.substring(0, str.length - 1);
+}
+
+function isString(str, orNull = false) {
+    return (orNull && str == null) || typeof str === 'string' || str instanceof String;
 }

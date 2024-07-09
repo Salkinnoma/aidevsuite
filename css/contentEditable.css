@@ -8,11 +8,14 @@
 
 [contenteditable] {
     overflow-y: auto;
+    padding: 10px 32px;
 }
 
 .contenteditableContainer {
-    padding: 10px 32px;
     border: solid 1px var(--border-color);
+    background: inherit;
+    padding: 0;
+    border-radius: 10px;
 }
 
 [contenteditable]:focus-visible {
@@ -21,4 +24,12 @@
 
 .contenteditableContainer:focus-within {
     outline: var(--border-color) auto 1px;
+}
+
+.contenteditableContainerHeader {
+    padding: 10px 32px 0 32px;
+}
+
+.contenteditableContainerFooter {
+    padding: 0 32px 10px 32px;
 }

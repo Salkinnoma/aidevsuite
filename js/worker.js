@@ -575,7 +575,7 @@ const _helpers = {
 _helpers.escapeHtmlRegex = _helpers.getEscapeHtmlRegex();
 
 // Extended helper functions
-let commonFileTypes = {
+let commonMimeTypes = {
     plainText: "text/plain",
     json: "application/json",
     csv: "text/csv",

@@ -31,7 +31,7 @@ class Settings {
         const dialogElement = fromHTML(`<div class="dialog">`);
         const contentElement = fromHTML(`<div class="dialogContent">`);
     
-        const element = fromHTML(`<div class="largeElement bordered grounded" style="max-width: min(90vw, 800px); min-width: min(90vw, 400px);">`);
+        const element = fromHTML(`<div class="dialogInnerContent largeElement bordered grounded">`);
         const titleBar = fromHTML(`<div class="listContainerHorizontal">`);
         titleBar.appendChild(fromHTML(`<h1>Settings`));
         const closeButton = fromHTML(`<button class="h-100">`);

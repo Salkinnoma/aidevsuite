@@ -2,14 +2,14 @@ function escapeFileName(filename) {
     return filename.replace(/[^a-zA-Z0-9]/g, "_");
 }
 
-let commonFileTypes = {
+let commonMimeTypes = {
     plainText: "text/plain",
     json: "application/json",
     csv: "text/csv"
 }
 
 function downloadFile(name, contents, mime_type) {
-    mime_type = mime_type || commonFileTypes.plainText;
+    mime_type = mime_type || commonMimeTypes.plainText;
 
     const blob = new Blob([contents], { type: mime_type });
 
@@ -28,19 +28,19 @@ function downloadFile(name, contents, mime_type) {
 }
 
 function downloadPlainText(name, contents, addFileType = true) {
-    const mime_type = commonFileTypes.plainText;
+    const mime_type = commonMimeTypes.plainText;
     if (!name.endsWith(".txt") && addFileType) name += ".txt";
     downloadFile(name, contents, mime_type);
 }
 
 function downloadJson(name, contents, addFileType = true) {
-    const mime_type = commonFileTypes.json;
+    const mime_type = commonMimeTypes.json;
     if (!name.endsWith(".json") && addFileType) name += ".json";
     downloadFile(name, contents, mime_type);
 }
 
 function downloadCsv(name, contents, addFileType = true) {
-    const mime_type = commonFileTypes.csv;
+    const mime_type = commonMimeTypes.csv;
     if (!name.endsWith(".csv") && addFileType) name += ".csv";
     downloadFile(name, contents, mime_type);
 }
