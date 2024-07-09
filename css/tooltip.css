@@ -15,6 +15,11 @@
   background-color: var(--tooltip-background-color);
 }
 
+[color-scheme="light"] #tooltip {
+  border: 1px solid var(--border-color);
+}
+
+
 .cardTooltip {
   border-radius: 10px;
   padding: 32px;

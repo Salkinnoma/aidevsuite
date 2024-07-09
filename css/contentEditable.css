@@ -12,6 +12,7 @@
 
 .contenteditableContainer {
     padding: 10px 32px;
+    border: solid 1px var(--border-color);
 }
 
 [contenteditable]:focus-visible {

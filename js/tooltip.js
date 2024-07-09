@@ -1,28 +1,55 @@
-let tooltipQuery = ".tooltipAnchor, [tooltip], [tooltip-url]";
+class Tooltip {
+    static tooltipQuery = ".tooltipAnchor, [tooltip], [tooltip-url]";
+    static cachedHtmlsByUrl = {};
+    static fetchPromisesByUrl = {};
+    static currentElement = null;
+    static keepTooltipsOpenKey = "q";
+    static minEdgeDistance = 6;
 
-const tooltipMethods = {
-    cachedHtmlsByUrl: {},
-    fetchPromisesByUrl: {},
-    currentElement: null,
-    keepTooltipsOpenKey: "q",
-    setupTooltips(element = document) {
-        let elementsWithTooltip = [...element.querySelectorAll(tooltipQuery)];
-        for (let element of elementsWithTooltip) {
-            element.addEventListener('mouseenter', e => this.onMouseenter(e));
-            element.classList.add('tooltipTarget');
+    static tooltip = null;
+    static tooltipStyle = null;
+
+    static setupEventListeners() {
+        Tooltip.setupTooltips(document);
+
+        document.addEventListener('scroll', Tooltip.updatePosition, true);
+        window.addEventListener('resize', Tooltip.updatePosition, true);
+        document.addEventListener('mousemove', Tooltip.onMousemove, true);
+
+        // MutationObserver to watch for newly added elements
+        const observer = new MutationObserver((mutationsList) => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            Tooltip.setupTooltips(node);
+                        }
+                    });
+                }
+            }
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    static setupTooltips(element = document) {
+        const elementsWithTooltip = [...element.querySelectorAll(Tooltip.tooltipQuery)];
+        for (let elem of elementsWithTooltip) {
+            elem.addEventListener('mouseenter', (e) => Tooltip.onMouseenter(e));
+            elem.classList.add('tooltipTarget');
         }
-    },
-    updatePosition() {
-        if (!tooltipMethods.currentElement) return;
-        tooltipMethods.positionTooltipRelativeTo(tooltipMethods.currentElement);
-    },
-    minEdgeDistance: 6,
-    positionTooltipRelativeTo(element) {
+    }
+
+    static updatePosition() {
+        if (!Tooltip.currentElement) return;
+        Tooltip.positionTooltipRelativeTo(Tooltip.currentElement);
+    }
+
+    static positionTooltipRelativeTo(element) {
         let tooltipTop = 0;
         let tooltipLeft = 0;
         let elementRect = element.getBoundingClientRect();
-
-        let tooltipRect = tooltip.getBoundingClientRect();
+        let tooltipRect = Tooltip.tooltip.getBoundingClientRect();
         let distance = 8;
         let position = 'top';
         let match = true;
@@ -66,7 +93,7 @@ const tooltipMethods = {
             }
         }
 
-        tooltip.setAttribute('tooltip-position', position);
+        Tooltip.tooltip.setAttribute('tooltip-position', position);
 
         if (match) {
             if (position === 'top') {
@@ -83,81 +110,82 @@ const tooltipMethods = {
                 tooltipLeft = elementRect.right + distance;
             }
 
-            tooltip.style.top = tooltipTop + 'px';
-            tooltip.style.left = Math.max(tooltipLeft, this.minEdgeDistance) + 'px';
-            tooltipStyle.innerHTML = "";
+            Tooltip.tooltip.style.top = tooltipTop + 'px';
+            Tooltip.tooltip.style.left = Math.max(tooltipLeft, Tooltip.minEdgeDistance) + 'px';
+            Tooltip.tooltipStyle.innerHTML = "";
         } else {
             if (position === 'top') {
                 tooltipTop = elementRect.top - tooltipRect.height - distance;
             } else if (position === 'bottom') {
                 tooltipTop = elementRect.bottom + distance;
             }
-            tooltip.style.top = tooltipTop + 'px';
+            Tooltip.tooltip.style.top = tooltipTop + 'px';
 
-            let currentLeft = this.minEdgeDistance;
-            let newCenterIfLeft = this.minEdgeDistance + tooltipRect.width / 2;
+            let currentLeft = Tooltip.minEdgeDistance;
+            let newCenterIfLeft = Tooltip.minEdgeDistance + tooltipRect.width / 2;
             let newCenterIfRight = window.innerWidth - tooltipRect.width / 2;
             if (Math.abs(elementXCenter - newCenterIfLeft) > Math.abs(elementXCenter - newCenterIfRight)) {
                 // Closer to right than left.
-                currentLeft = window.innerWidth - this.minEdgeDistance - tooltipRect.width;
+                currentLeft = window.innerWidth - Tooltip.minEdgeDistance - tooltipRect.width;
             }
-            tooltip.style.left = currentLeft + 'px';
+            Tooltip.tooltip.style.left = currentLeft + 'px';
             let normalLeft = tooltipXLeftFromCenter;
             // (normal left - current left) / width + 50%
             let leftPercent = ((normalLeft - currentLeft) / tooltipRect.width) * 100 + 50;
             leftPercent = Math.max(10, Math.min(90, leftPercent));
-            tooltipStyle.innerHTML = `#tooltip::after {
+            Tooltip.tooltipStyle.innerHTML = `#tooltip::after {
                 left: ${leftPercent}% !important;
             }`;
         }
-    },
-    async onMouseenter(event) {
+    }
+
+    static async onMouseenter(event) {
         if (isChildEvent(event)) return;
 
         let element = event.currentTarget;
-        this.currentElement = element;
+        Tooltip.currentElement = element;
         let tooltipAttribute = element.getAttribute('tooltip');
         if (tooltipAttribute == null) {
             let url = element.getAttribute('tooltip-url');
             let alreadyLoading = false;
             if (url) {
-                if (this.fetchPromisesByUrl[url]) {
+                if (Tooltip.fetchPromisesByUrl[url]) {
                     alreadyLoading = true;
                 } else {
-                    if (!this.cachedHtmlsByUrl[url]) {
-                        tooltip.innerHTML = "Loading...";
+                    if (!Tooltip.cachedHtmlsByUrl[url]) {
+                        Tooltip.tooltip.innerHTML = "Loading...";
                     }
                     try {
                         const fetchPromise = fetch(url);
-                        this.fetchPromisesByUrl[url] = fetchPromise;
+                        Tooltip.fetchPromisesByUrl[url] = fetchPromise;
                         const response = await fetchPromise;
-                        this.cachedHtmlsByUrl[url] = await response.text();
-                        tooltip.innerHTML = this.cachedHtmlsByUrl[url];
+                        Tooltip.cachedHtmlsByUrl[url] = await response.text();
+                        Tooltip.tooltip.innerHTML = Tooltip.cachedHtmlsByUrl[url];
                     } catch (e) {
-                        tooltip.innerHTML = "Error loading tooltip.";
+                        Tooltip.tooltip.innerHTML = "Error loading tooltip.";
                     }
 
-                    delete this.fetchPromisesByUrl[url];
+                    delete Tooltip.fetchPromisesByUrl[url];
                 }
             }
 
-
             if (!alreadyLoading) {
-                tooltip.classList.remove('smallTooltip');
-                tooltip.classList.add('cardTooltip');
+                Tooltip.tooltip.classList.remove('smallTooltip');
+                Tooltip.tooltip.classList.add('cardTooltip');
             }
         } else {
-            tooltip.innerHTML = tooltipAttribute;
-            tooltip.classList.add('smallTooltip');
-            tooltip.classList.remove('cardTooltip');
+            Tooltip.tooltip.innerHTML = tooltipAttribute;
+            Tooltip.tooltip.classList.add('smallTooltip');
+            Tooltip.tooltip.classList.remove('cardTooltip');
         }
 
-        if (tooltipMethods.currentElement) {
-            tooltip.classList.remove('hide');
-            tooltipMethods.updatePosition();
+        if (Tooltip.currentElement) {
+            Tooltip.tooltip.classList.remove('hide');
+            Tooltip.updatePosition();
         }
-    },
-    eventWithinDistance(event, element) {
+    }
+
+    static eventWithinDistance(event, element) {
         const buffer = 8; // Distance in pixels that is allowed
         const rect = element.getBoundingClientRect();
 
@@ -172,29 +200,23 @@ const tooltipMethods = {
         }
 
         return false;
-    },
-    onMousemove(event) {
-        let currentElement = tooltipMethods.currentElement;
+    }
+
+    static onMousemove(event) {
+        let currentElement = Tooltip.currentElement;
         if (!currentElement) return;
         if (currentElement.contains(event.toElement) || currentElement == event.toElement) return;
-        if (pressedKeys[tooltipMethods.keepTooltipsOpenKey]) return;
-        //if (tooltip.contains(event.toElement) || tooltip == event.toElement) return;
-        if (tooltipMethods.eventWithinDistance(event, currentElement)) return;
+        if (pressedKeys[Tooltip.keepTooltipsOpenKey]) return;
+        if (Tooltip.eventWithinDistance(event, currentElement)) return;
 
-        tooltip.classList.add('hide');
-        tooltipMethods.currentElement = null;
-    },
+        Tooltip.tooltip.classList.add('hide');
+        Tooltip.currentElement = null;
+    }
 }
 
-let tooltip;
-let tooltipStyle;
+// Initialize Tooltip on script load
 window.addEventListener('load', () => {
-    tooltip = document.getElementById('tooltip');
-    tooltipStyle = document.getElementById('tooltipStyle');
-    tooltipMethods.setupTooltips();
+    Tooltip.tooltip = document.getElementById('tooltip');
+    Tooltip.tooltipStyle = document.getElementById('tooltipStyle');
+    Tooltip.setupEventListeners();
 });
-
-
-document.addEventListener('scroll', tooltipMethods.updatePosition, true);
-window.addEventListener('resize', tooltipMethods.updatePosition, true);
-document.addEventListener('mousemove', tooltipMethods.onMousemove, true);

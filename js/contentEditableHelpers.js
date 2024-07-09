@@ -12,8 +12,13 @@ class ContentEditableHelpers {
             for (const mutation of mutationsList) {
                 if (mutation.type === 'childList') {
                     mutation.addedNodes.forEach((node) => {
-                        if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('contenteditable-type')) {
-                            ContentEditableHelpers.checkAndConvertPlainTextOnly(node);
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            if (node.hasAttribute('contenteditable-type')) {
+                                ContentEditableHelpers.checkAndConvertPlainTextOnly(node);
+                            }
+                            node.querySelectorAll('[contenteditable-type]').forEach(child => {
+                                ContentEditableHelpers.checkAndConvertPlainTextOnly(child);
+                            });
                         }
                     });
                 } else if (mutation.type === 'attributes' && mutation.attributeName === 'contenteditable-type') {
@@ -64,10 +69,14 @@ class ContentEditableHelpers {
         selection.removeAllRanges(); // Clear any selections
         selection.addRange(range); // Update the range
     }
+
+    static textNeedsFixing(text) {
+        return text === '\n';
+    }
+
+    static fixText(text) {
+        return text === '\n' ? '' : text;
+    }
 }
 
 ContentEditableHelpers.setupEventListeners();
-
-function fixContentEditableText(text){
-    return text === '\n' ? '' : text;
-}

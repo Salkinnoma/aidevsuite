@@ -11,3 +11,7 @@
 .bottomBorder {
     border-bottom: 1px solid var(--border-color);
 }
+
+hr {
+    border-color: var(--border-color);
+}

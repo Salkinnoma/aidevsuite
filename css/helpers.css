@@ -72,6 +72,7 @@ b {
 .xxxl-font {
     font-size: 2rem;
 }
+
 .xl-title {
     font-size: 3.5rem;
 }
@@ -82,4 +83,12 @@ b {
   
 .children-w-100 > * {
     width: 100%;
+}
+
+.rounded {
+    border-radius: 5px;
+}
+
+.rounded-xl {
+    border-radius: 10px;
 }

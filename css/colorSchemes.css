@@ -16,6 +16,7 @@
     --text-color: #EEE;
     --raised-text-color: #BBB;
     --stress-color: #78bfc1;
+    --placeholder-color: #666;
     /* Background Colors */
     --background-color: #222;
     --raised-background-color: #333;
@@ -39,6 +40,7 @@
     /* Specific Elements */
     --sidebar-background-color: var(--background-color);
     --navbar-background-color: var(--background-color);
+    --tooltip-background-color: var(--raised-background-color);
 }
 
 /* The variabels should work with multiple levels of abstractions. */
@@ -53,6 +55,7 @@
     --text-color: #111;
     --raised-text-color: #333;
     --stress-color: #30765a;
+    --placeholder-color: #999;
     /* Background Colors */
     --background-color: #FFF;
     --raised-background-color: #F9F9F9;
@@ -76,6 +79,7 @@
     /* Specific Elements */
     --sidebar-background-color: var(--background-color);
     --navbar-background-color: var(--background-color);
+    --tooltip-background-color: var(--background-color);
 }
 
 [color-scheme="dark"] .lightModeOnly {

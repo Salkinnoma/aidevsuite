@@ -80,4 +80,56 @@ function dm() {
     switchToColorScheme(darkColorScheme);
 }
 
+class ColorSchemeHelpers {
+    // Observer functions
+    static setupEventListeners() {
+        const observer = new MutationObserver(mutationsList => {
+            for (const mutation of mutationsList) {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(node => ColorSchemeHelpers.processAddedNode(node));
+                } else if (mutation.type === 'attributes' && (mutation.attributeName === 'class')) {
+                    const target = mutation.target;
+                    const oldClasses = (mutation.oldValue ?? '').split(/\s+/);
+                    const newClasses = target.className.split(/\s+/);
+                    const addedClasses = newClasses.filter(cls => !oldClasses.includes(cls));
+                    const removedClasses = oldClasses.filter(cls => !newClasses.includes(cls));
+                    const relevantClasses = [...addedClasses, ...removedClasses].filter(cls => cls.startsWith('light-only-') || cls.startsWith('dark-only-'));
+
+                    if (relevantClasses.length > 0) {
+                        ColorSchemeHelpers.updateClassesBasedOnColorScheme(target);
+                    }
+                }
+            }
+        });
+        
+        observer.observe(document.body, { childList: true, attributes: true, subtree: true,  attributeOldValue : true });
+        
+        // Event listener for color scheme changes
+        window.addEventListener('color-scheme-changed', () => {
+            document.querySelectorAll('[class*="light-only-"], [class*="dark-only-"]').forEach(ColorSchemeHelpers.updateClassesBasedOnColorScheme);
+        });
+    }
+
+    static updateClassesBasedOnColorScheme(element) {
+        const lightOnlyClasses = [...element.classList].filter(cls => cls.startsWith('light-only-'));
+        const darkOnlyClasses = [...element.classList].filter(cls => cls.startsWith('dark-only-'));
+
+        if (colorScheme === lightColorScheme) {
+            lightOnlyClasses.forEach(cls => element.classList.add(cls.replace('light-only-', '')));
+            darkOnlyClasses.forEach(cls => element.classList.remove(cls.replace('dark-only-', '')));
+        } else {
+            lightOnlyClasses.forEach(cls => element.classList.remove(cls.replace('light-only-', '')));
+            darkOnlyClasses.forEach(cls => element.classList.add(cls.replace('dark-only-', '')));
+        }
+    }
+
+    static processAddedNode(node) {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            ColorSchemeHelpers.updateClassesBasedOnColorScheme(node);
+            node.querySelectorAll('*').forEach(child => ColorSchemeHelpers.updateClassesBasedOnColorScheme(child));
+        }
+    }
+}
+
+window.addEventListener('body-created', e => ColorSchemeHelpers.setupEventListeners());
 

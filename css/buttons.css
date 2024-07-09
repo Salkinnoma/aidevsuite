@@ -4,6 +4,7 @@ button, .fakeButton {
     border: 0;
     background: inherit;
     padding: 0;
+    font-size: 1rem;
 }
 
 .complexButton {

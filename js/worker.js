@@ -16,14 +16,21 @@ const setProgressEventType = "setProgressEventType";
 const setStatusEventType = "setStatusEventType";
 
 // Element types
-const codeType = "codeType";
 const breakType = "breakType";
-const imageType = "imageType";
+const markdownType = "markdownType"; // Includes Katex math parser.
 const paragraphType = "paragraphType";
 const titleType = "titleType";
 const subTitleType = "subTitleType";
+const codeType = "codeType";
+const imageType = "imageType";
+const iconType = "iconType";
+
+// Icon types
+const materialIconType = "materialIconType";
+const heroIconType = "heroIconType";
 
 // Container element types
+const divType = "divType";
 const barType = "barType";
 
 // Bar types
@@ -38,6 +45,7 @@ const buttonType = "buttonType";
 const textInputType = "textInputType";
 const numberInputType = "numberInputType";
 const passwordInputType = "passwordInputType";
+const codeInputType = "codeInputType";
 const checkboxInputType = "checkboxInputType";
 const selectInputType = "selectInputType";
 const pasteInputType = "pasteInputType";
@@ -45,12 +53,15 @@ const fileInputType = "fileInputType";
 
 // Element type sets
 const allTypes = new Set([
-    codeType,
     breakType,
-    imageType,
+    markdownType,
     paragraphType,
     titleType,
     subTitleType,
+    codeType,
+    imageType,
+    iconType,
+    divType,
     barType,
     buttonType,
     textInputType,
@@ -63,10 +74,12 @@ const allTypes = new Set([
 ]);
 
 const containerTypes = new Set([
+    divType,
     barType,
 ]);
 
-const simpleTypes = new Set([
+const textTypes = new Set([
+    markdownType,
     paragraphType,
     titleType,
     subTitleType,
@@ -76,6 +89,7 @@ const inputTypes = new Set([
     textInputType,
     numberInputType,
     passwordInputType,
+    codeInputType,
     checkboxInputType,
     selectInputType,
     pasteInputType,
@@ -109,7 +123,7 @@ function postErrorResponse(requestEvent, message, content = null) {
 function requireResponse(type, content, onPing = null){
     return new Promise((resolve, reject) => {
         const id = generateUniqueId();
-        const pingId = null;
+        let pingId = null;
         if (onPing != null) {
             pingId = generateUniqueId();
             onEvent.set(pingId, async (event) => {
@@ -172,59 +186,110 @@ function createBreak() {
     return content;
 }
 
-function createParagraph(text) {
+/**
+ * - **type** (string): Specifies the type of element.  Supported values are:
+ *     - `markdownType`
+ *     - `paragraphType`
+ *     - `titleType`
+ *     - `subTitleType`
+ * - **options** (object): An object that can have the following properties:
+ *     - **title** (string) [optional]: The title to be shown on hover.
+ *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
+ */
+function createText(type, text, options = null) {
     const content = {
-        type: paragraphType,
-        text: text,
+        type,
+        text,
+        options,
     };
     return content;
 }
 
-function createTitle(text) {
+/**
+ * - **options** (object): An object that can have the following properties:
+ *     - **language** (string) [optional]: The language of the code.
+ *     - **title** (string) [optional]: The title to be shown on hover.
+ *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
+ */
+function createCode(code, options = null) {
     const content = {
-        type: titleType,
-        text: text,
+        type: codeType,
+        code,
+        options,
     };
     return content;
 }
 
-function createSubTitle(text) {
-    const content = {
-        type: subTitleType,
-        text: text,
-    };
-    return content;
-}
-
-function createImage(url, caption = null) {
+/**
+ * - **options** (object): An object that can have the following properties:
+ *     - **caption** (string) [optional]: The caption for the image.
+ *     - **title** (string) [optional]: The title to be shown on hover.
+ *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
+ */
+function createImage(url, options = null) {
     const content = {
         type: imageType,
-        url: url,
-        caption: caption,
-    };
-    return content;
-}
-
-function createBar(options = null) {
-    options ??= {};
-    const content = {
-        type: barType,
-        barType: options.type ?? navBarType,
-        elements: options.elements ?? [],
+        url,
+        options,
     };
     return content;
 }
 
 /**
  * ## Parameters
- *
+ * - **ds** (array of strings): Creates a path element for each d.
+ * - **iconType** (string): The type of the icon. Supported values are:
+ *     - `materialIconType`
+ *     - `heroIconType`
+ * - **options** (object): An object that can have the following properties:
+ *     - **title** (string) [optional]: The title to be shown on hover.
+ *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
+ */
+function createIcon(d, iconType, options = null) {
+    const content = {
+        type: iconType,
+        d,
+        iconType,
+        options,
+    };
+    return content;
+}
+
+/**
+ * ## Parameters
+ * - **type** (string): Specifies the type of the container. Supported values are:
+ *     - `barType`
+ * - **elements** (array): A list of elements displayed within the container.
+ * - **options** (object): An object that contains various options specific to the `type` of input. The options available depend on the input type.
+ * 
+ * ## Options Configuration by Container Type
+ * 
+ * ### `barType`
+ * - **barType** (string) [optional]: The type of the bar. Default is `navBarType`. Supported values are:
+ *     - `navBarType`
+ *     - `listBarType`
+ *     - `fillBarType`
+ */
+function createContainer(type, elements, options = null) {
+    options ??= {};
+    const content = {
+        type,
+        elements,
+        options,
+    };
+    return content;
+}
+
+/**
+ * ## Parameters
  * - **type** (string): Specifies the type of input. Supported values are:
- *   - `textInputType`
- *   - `numberInputType`
- *   - `checkboxInputType`
- *   - `fileInputType`
- *   - `pasteInputType`
- *
+ *     - `textInputType`
+ *     - `numberInputType`
+ *     - `passwordInputType`
+ *     - `checkboxInputType`
+ *     - `selectInputType`
+ *     - `fileInputType`
+ *     - `pasteInputType`
  * - **options** (object): An object that contains various options specific to the `type` of input. The options available depend on the input type.
  *
  *
@@ -246,71 +311,49 @@ function createBar(options = null) {
  *     - **override** (object) [optional]: Allows overwriting the value of elements within the group. The object must be any number of elements mapped by their names.
  *
  * ### `textInputType`
- *
- * When `type` is `textInputType`, the `options` object can have the following properties:
- *
  * - **defaultValue** (string) [optional]: The default text value for the input. Default is an empty string `''`.
- *
  * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter text here..."`.
  *
  * ### `numberInputType`
- *
- * When `type` is `numberInputType`, the `options` object can have the following property:
- *
  * - **defaultValue** (number) [optional]: The default number value for the input. Default is 0.
  * 
  * ### `passwordInputType`
+ * - **defaultValue** (string) [optional]: The default text value for the input. Default is an empty string `''`.
+ * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter password here..."`.
  *
- * When `type` is `passwordInputType`, the `options` object can have the following property:
- *
- * - **defaultValue** (string) [optional]: The default number value for the input. Default is an empty string `''`.
- *
+ * ### `codeInputType`
+ * - **defaultValue** (string) [optional]: The default code value for the input. Default is an empty string `''`.
+ * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter code here..."`.
+ * - **language** (string) [optional]: The language of the code.
+ * - **context** (string) [optional]: Information about the context in which the code will be executed. Allows better integration with chatbots.
+ * 
  * ### `checkboxInputType`
- *
- * When `type` is `checkboxInputType`, the `options` object can have the following property:
- *
  * - **defaultValue** (number) [optional]: The default bool value for the input. Default is false.
- *
  * - **description** (string) [optional]: A short description to the left of the checkbox. Default is an empty string `''`.
  * 
  * ### `selectInputType`
- *
- * When `type` is `selectInputType`, the `options` object can have the following property:
- *
  * - **defaultValue** (number) [optional]: The default number value for the input. Default is 0.
- * - **options** (array): An array of option objects that have the following properties.
+ * - **choices** (array): An array of option objects that have the following properties.
  *     - **value** (string) [optional]: The value of the option. Default is its index.
  *     - **name** (string) [optional]: The name of the option. Default is its value.
  *
  * ### `fileInputType`
- *
- * When `type` is `fileInputType`, the `options` object can have the following properties:
- *
- * - **allowedFileTypes** (array of strings) [optional]: Specifies the types of files (e.g .json) that are allowed. Default is an empty array `[]`.
- *
- * - **dropDescription** (string) [optional]: Description text for the drag-and-drop area. Default is `"Drag and drop valid files (any type)."` if `allowedFileTypes` is empty, or will list the allowed file types.
- *
+ * - **allowedMimeTypes** (array of strings) [optional]: Specifies the mime types (e.g application/json) that are allowed. Wildcards are supported. Default is an empty array `[]`.
+ * - **allowedExtensions** (array of strings) [optional]: Specifies the file extensions (e.g .json) that are allowed. Default is an empty array `[]`.
+ * - **dropDescription** (string) [optional]: Description text for the drag-and-drop area. Default is `"Drag and drop valid files (any type)."` if `allowedExtensions` is empty, or will list the allowed file types.
  * - **selectDescription** (string) [optional]: Description text for the file selection area. Default is `"Or select files"`.
- *
- * - **accept** (string) [optional]: The `accept` attribute specifies the types of files that the server accepts. Default is an empty string `''`.
- *
+ * - **noFileSelectedMessage** (string) [optional]: Shown when no file is selected. Default is `"No file selected."`.
  * - **multiple** (boolean) [optional]: Specifies whether multiple file selection is allowed. Default is `false`.
- *
  * - **maxSize** (number) [optional]: Specifies the maximum size (in bytes) for the file upload.
  *
  * ### `pasteInputType`
- *
- * When `type` is `pasteInputType`, the `options` object can have the following properties:
- *
  * - **emptyDescription** (string) [optional]: Description text when nothing has been pasted. Default is `'Paste (STRG + V) into here to continue.'`.
- *
  * - **replaceDescription** (string) [optional]: Description text when something has been pasted. Default is `Successfully pasted. Paste (STRG + V) into here to change its content.`.
-
+ * 
  * ## Returns
- *
- * A content object for the `requestInput` and `requestMultiInput` functions.
+ * A content object for the `showGroup` and `show` functions.
  * */
-function createInput(type, options) {
+function createInput(type, options = null) {
     const content = {
         type: type,
         options: options,
@@ -322,11 +365,11 @@ function createInput(type, options) {
 
 function _extractElements(group) {
     const elements = [];
-    let unprocessedElements = [group];
+    let unprocessedElements = group;
     while (unprocessedElements.length !== 0) {
-        const newUnprocessedElements = [];
+        let newUnprocessedElements = [];
         for (let element of unprocessedElements) {
-            if (containerTypes.has(element.type)) newUnprocessedElements.push(element);
+            if (containerTypes.has(element.type)) newUnprocessedElements = newUnprocessedElements.concat(element.elements);
             else elements.push(element);
         }
         unprocessedElements = newUnprocessedElements;
@@ -336,22 +379,21 @@ function _extractElements(group) {
 
 function _mapGroup(group) {
     const mapped = {};
-    for (let element of _extractElements(group)) {
-        if (inputTypes.has(element.type)) mapped[element.name] = element;
+    for (let element of group) {
+        mapped[element.name] = element;
     }
     return mapped;
 }
 
 /**
  * The group parameter accepts an array of elements created via any of the create functions.
- * For inputs, it is recommended to define a name, to allow easy access of the return value.
+ * For inputs, it is recommended to define a name, to allow easy access of the return values.
  *
  * ## Return value when awaited
  * When this function is awaited, it returns an object that contains each input element from the group parameter with their name as a key. If no name is defined, their flattened index within the group is used instead, and added to the element as a name property.
- * Each returned input element additionally contains data as described by the `show` function.
- *
+ * Each returned input element contains data as described by the `show` function.
  * */
-async function showGroup(...group) {
+async function showGroup(group, insertAt = -1, deleteAfter = 0) {
     const onValidateMap = new Map();
     const onDelayedValidateMap = new Map();
     const elements = _extractElements(group);
@@ -359,6 +401,7 @@ async function showGroup(...group) {
 
     for (let [index, element] of elements.entries()) {
         element.id = generateUniqueId();
+        element.options ??= {};
 
         element.name = element.options.name ?? index;
         delete element.options.name;
@@ -378,7 +421,7 @@ async function showGroup(...group) {
         }
     }
 
-    const response = await requireResponse(showEventType, group, async (content) => {
+    const response = await requireResponse(showEventType, {group, insertAt, deleteAfter}, async (content) => {
         let map = null;
         if (content.validationType == validateInputEventType) {
             if (!onValidateMap.has(content.element.id)) return;
@@ -392,7 +435,6 @@ async function showGroup(...group) {
         return await map.get(element.id)(_mapGroup(content.group), content.element, content.newData);
     });
 
-
     return _mapGroup(response);
 }
 
@@ -402,81 +444,54 @@ async function showGroup(...group) {
  *
  * ## Return value when awaited
  * When this function is awaited:
- * - If the element is not an input, it returns null.
- * - If the element is an input, it returns an object with the options (or their default values) and additional properties depending on the input type:
+ * - If the element is not an input, it returns the input element with following properties:
  *
+ * ### All Types
+ * - **name** (string): The name assigned to the element.
+ * 
  * ### For `textInputType`
- *
- * ```javascript
- * {
- *     ...
- *     text: string // The text value of the input
- * }
- * ```
+ * - **text** (string): The text value of the input.
+ * 
+ * ### For `codeInputType`
+ * - **code** (string): The code value of the input.
  *
  * ### For `numberInputType`
+ * - **number** (number): The number value of the input.
  *
- * ```javascript
- * {
- *     ...
- *     number: number // The number value of the input
- * }
- * ```
+ * ### For `passwordInputType`
+ * - **password** (string): The password value of the input.
  *
  * ### For `checkboxInputType`
- *
- * ```javascript
- * {
- *     ...
- *     ticked: bool // Whether the checkbox was ticked
- * }
- * ```
+ * - **ticked** (bool): Whether the checkbox was ticked.
+ * 
+ * ### For `selectInputType`
+ * - **value** (string): The selected value.
  *
  * ### For `fileInputType`
- *
- * ```javascript
- * {
- *     ...
- *     files: [
- *         { // Custom object with data extracted from the file
- *             name: string, // The name of the file
- *             size: number, // The size of the file in bytes
- *             type: string, // The MIME type of the file
- *             lastModified: number, // The last modified timestamp of the file
- *             lastModifiedDate: Date, // The last modified date of the file
- *             text: string, // The text content of the file
- *             dataURL: string // The Data URL of the file
- *         },
- *         ...
- *     ]
- * }
- * ```
+ * - **files** (array): List of files with the following properties:
+ *     - **name** (string): The name of the file.
+ *     - **size** (number): The size of the file in bytes.
+ *     - **type** (string): The MIME type of the file.
+ *     - **lastModified** (number): The last modified timestamp of the file.
+ *     - **lastModifiedDate** (Date): The last modified date of the file.
+ *     - **text** (string): The text content of the file.
+ *     - **dataURL** (string): The Data URL of the file.
  *
  * ### For `pasteInputType`
- *
- * ```javascript
- * {
- *     ...
- *     html: string // The html value of the input
- *     text: string // The text value of the input
- *     rtf: string // The rtf value of the input
- *     files: [
- *         { // Custom object with data extracted from the file
- *             name: string, // The name of the file
- *             size: number, // The size of the file in bytes
- *             type: string, // The MIME type of the file
- *             lastModified: number, // The last modified timestamp of the file
- *             lastModifiedDate: Date, // The last modified date of the file
- *             text: string, // The text content of the file
- *             dataURL: string // The Data URL of the file
- *         },
- *         ...
- *     ]
- * }
- * ```
+ * - **html** (string): The html value of the input.
+ * - **text** (string): The text value of the input.
+ * - **rtf** (string): The rtf value of the input.
+ * - **files** (array): List of files with the following properties:
+ *     - **name** (string): The name of the file.
+ *     - **size** (number): The size of the file in bytes.
+ *     - **type** (string): The MIME type of the file.
+ *     - **lastModified** (number): The last modified timestamp of the file.
+ *     - **lastModifiedDate** (Date): The last modified date of the file.
+ *     - **text** (string): The text content of the file.
+ *     - **dataURL** (string): The Data URL of the file.
  * */
-async function show(element) {
-    let result = await showGroup(element);
+async function show(element, insertAt = -1, deleteAfter = 0) {
+    let result = await showGroup([element], insertAt, deleteAfter);
     return result[element.name];
 }
 

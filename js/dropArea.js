@@ -79,8 +79,8 @@ class DropAreaHelpers {
         if (isChildEvent(event)) return;
 
         let element = event.currentTarget;
-        const allowedFileTypes = this.getAllowedFileTypes(element);
-        const allowedTypes = new Set(allowedFileTypes);
+        const allowedMimeTypes = this.allowedMimeTypes(element);
+        const allowedTypes = new Set(allowedMimeTypes);
         const wildcardTypes = [...allowedTypes].filter(type => type.includes('*'));
         const isTypeAllowed = (fileType) => {
             if (allowedTypes.size === 0) return true;
@@ -126,8 +126,8 @@ class DropAreaHelpers {
         element.classList.remove('invalidFiles');
     }
 
-    static validateFiles(files, allowedFileTypes = [], maxSize = null) {
-        const allowedTypes = new Set(allowedFileTypes);
+    static validateFiles(files, allowedMimeTypes = [], maxSize = null) {
+        const allowedTypes = new Set(allowedMimeTypes);
         const wildcardTypes = [...allowedTypes].filter(type => type.includes('*'));
         const isTypeAllowed = (fileType) => {
             if (allowedTypes.size === 0) return true;
@@ -156,21 +156,27 @@ class DropAreaHelpers {
         return newFiles;
     }
 
-    static getAllowedFileTypes(element){
+    static getAllowedMimeTypes(element){
         return element.
             closest('.dropArea')?.
-            getAttribute('allowed-file-types')?.
+            getAttribute('allowed-mime-types')?.
             split(',').
             map(ext => ext.trim()).
             filter(a => a !== "") ?? [];
+    }
+
+    static getMaxFileSize(element){
+        let maxSize = parseInt(element.closest('.dropArea')?.getAttribute('max-file-size'));
+        if (!isNaN(maxSize)) maxSize = null;
+        return maxSize;
     }
 }
 
 window.addEventListener('load', e => DropAreaHelpers.setupEventListeners())
 
 
-function getFilesFromDropInput(event, maxSize = null){
-    let input = event.srcElement;
+function getFilesFromSelect(event){
+    const input = event.srcElement;
     if (!input.files || input.files.length === 0) return;
 
     let files = [];
@@ -178,10 +184,11 @@ function getFilesFromDropInput(event, maxSize = null){
         files.push(file);
     }
     input.value = '';
-    return DropAreaHelpers.validateFiles(files, DropAreaHelpers.getAllowedFileTypes(input), maxSize);
+
+    return DropAreaHelpers.validateFiles(files, DropAreaHelpers.getAllowedMimeTypes(input), DropAreaHelpers.getMaxFileSize(input));
 }
 
-function getFilesFromDrop(event, maxSize = null){
+function getFilesFromDrop(event){
     event.preventDefault();
 
     if (!event.dataTransfer.items) return;
@@ -192,5 +199,6 @@ function getFilesFromDrop(event, maxSize = null){
         files.push(file);
     }
 
-    return DropAreaHelpers.validateFiles(files, DropAreaHelpers.getAllowedFileTypes(event.target), maxSize);
+    const target = event.target;
+    return DropAreaHelpers.validateFiles(files, DropAreaHelpers.getAllowedMimeTypes(target), DropAreaHelpers.getMaxFileSize(target));
 }

@@ -24,8 +24,16 @@
     border: 1px solid var(--border-color);
 }
 
+.outlined {
+    outline: var(--border-color) auto 1px;
+}
+
 .raised {
     background: var(--raised-background-color);
+}
+
+.grounded {
+    background: var(--background-color);
 }
 
 .interactive {

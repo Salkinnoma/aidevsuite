@@ -13,3 +13,7 @@
 .dropArea.invalidFiles {
     border-color: var(--danger-color);
 }
+
+.dropInput {
+    display: none;
+}

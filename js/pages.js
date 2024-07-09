@@ -49,7 +49,7 @@ function loadPage() {
 
     // Show the section corresponding to the hash
     let newPage;
-    console.log(hash);
+    console.log("Page loaded:", hash);
     const link = getPathFromHash();
     if (hash == '' || hash == '#' || hash == '#home') {
         removeHash();
@@ -68,8 +68,11 @@ function loadPage() {
     if (!Array.isArray(newPage)) newPage = [newPage];
     page.replaceChildren(...newPage);
 
-    localPages.values().forEach(
-        p => document.getElementById('topSidebarList').appendChild(fromHTML(`<a class="element sidebarElement hoverable" href="#${p.link}">${p.name}</a>`)));
+    const localPagesList = document.getElementById('localPagesList')
+    localPagesList.innerHTML = '';
+    localPages.values().forEach(p => localPagesList.appendChild(fromHTML(`<a class="element sidebarElement hoverable" href="#${p.link}">${p.name}</a>`)));
+    if (localPages.size == 0) localPagesList.classList.add('hide');
+    else localPagesList.classList.remove('hide');
     updateSidebar();
 
     window.dispatchEvent(pageLoadedEvent);

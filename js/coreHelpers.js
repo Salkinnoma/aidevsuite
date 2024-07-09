@@ -40,6 +40,11 @@ function equalSets(set1, set2) {
         [...set1].every((x) => set2.has(x));
 }
 
+
+function between(x, min, max) {
+    return x >= min && x <= max;
+}
+
 // Defaults to max length
 function setCookie(name, value, days = null) {
     let expires = "";
@@ -93,3 +98,36 @@ function removeHash() {
 function goToUrl(url) {
     window.location.href = url;
 }
+
+function spliceChildren(element, start = -1, deleteCount = 0, ...newChildren) {
+    console.log(element, start, deleteCount, newChildren);
+    if (start < 0) start = element.children.length + 1 + start;
+
+    const childElements = [...element.children];
+    const removedChildren = childElements.splice(start, deleteCount, ...newChildren);
+    removedChildren.forEach(child => child.remove());
+    const isLast = element.children.length <= start;
+    // Insert new children into the DOM
+    newChildren.forEach((child, index) => {
+        if (isLast) {
+            element.appendChild(child);
+        } else {
+            element.insertBefore(child, element.children[start + index]);
+        }
+    });
+}
+
+(function() {
+    const observer = new MutationObserver(() => {
+        if (document.body) {
+            observer.disconnect(); // Stop observing once the body is found
+
+            // Dispatch custom body-created event
+            const event = new CustomEvent('body-created');
+            window.dispatchEvent(event);
+        }
+    });
+
+    // Start observing the document element for added nodes (the body)
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+})();
