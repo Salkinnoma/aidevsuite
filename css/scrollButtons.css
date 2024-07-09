@@ -1,0 +1,6 @@
+#scrollButtons {
+ position: absolute;
+ bottom: 4px;
+ right: 22px;
+ gap: 4px;
+}
