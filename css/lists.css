@@ -42,3 +42,7 @@
     flex: 1;
     flex-basis: max-content;
 }
+
+.divList {
+    align-items: start;
+}
