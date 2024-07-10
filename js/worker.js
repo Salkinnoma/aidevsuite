@@ -1,4 +1,5 @@
 const onEvent = new Map();
+const onPingEvent = new Map();
 
 // Event status types
 const successStatus = 'successStatus';
@@ -109,8 +110,8 @@ function generateUniqueId() {
 }
 
 // Event logic to communicate with origin
-function postRequest(type, content, id = null, pingId = null) {
-    postMessage({id, pingId, type, content});
+function postRequest(type, content, id = null, pingId = null, pingSourceEvent = null) {
+    postMessage({id, pingId, pingSourceId: pingSourceEvent?.data.pingId, type, content});
 }
 
 function postSuccessResponse(requestEvent, content = null, message = null) {
@@ -121,36 +122,32 @@ function postErrorResponse(requestEvent, message, content = null) {
     postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: errorStatus, content, message });
 }
 
-function requireResponse(type, content, onPing = null){
+function requireResponse(type, content, onPing = null, pingSourceEvent = null){
     return new Promise((resolve, reject) => {
         const id = generateUniqueId();
         let pingId = null;
         if (onPing != null) {
             pingId = generateUniqueId();
-            onEvent.set(pingId, async (event) => {
-                if (event.data.id !== pingId) return;
-    
+            onPingEvent.set(pingId, async (event) => {
                 try {
-                    const result = await onPing(event.data.content);
+                    const result = await onPing(event.data.type, event.data.content);
                     postSuccessResponse(event, result);
                 } catch (e) {
-                    postErrorResponse(event, e.message);
+                    postErrorResponse(event, e.stack);
                 }
             });
         }
 
         onEvent.set(id, (event) => {
-            if (event.data.id !== id) return;
-
             onEvent.delete(id);
-            if (pingId != null) onEvent.delete(pingId);
+            if (pingId != null) onPingEvent.delete(pingId);
 
             if (event.data.status === errorStatus) reject(event.data.message);
             else resolve(event.data.content);
         });
 
 
-        postRequest(type, content, id, pingId);
+        postRequest(type, content, id, pingId, pingSourceEvent);
     });
 }
 
@@ -171,10 +168,12 @@ async function onEvalRequest(e){
 onmessage = async function(e){
     if (e.data.type !== logEventType) await log("Origin Message Received:", e.data);
 
-    if (e.data.type === evalEventType) {
-        onEvalRequest(e);
-    } else if (onEvent.has(e.data.id)) {
+    if (onEvent.has(e.data.id)) {
         onEvent.get(e.data.id)(e);
+    } else if (onPingEvent.has(e.data.pingSourceId)) {
+        onPingEvent.get(e.data.pingSourceId)(e);
+    } else if (e.data.type === evalEventType) {
+        onEvalRequest(e);
     }
 };
 
@@ -317,15 +316,15 @@ function createContainer(type, elements, options = null) {
  * - **name** (string) [optional]: Recommended for use as part of the `showGroup` function.
  *
  * ### All Input Types
- * - **isInvalid** (bool) [optional]: Whether the input is invalid at start. Defaults to 'false'.
- * - **validationMessage** (string) [optional]: The initial validation message. Defaults to 'null'.
- * - **onValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called whenever the value of an input changes. Its parameters are group, element, and newData. The return value of onValidate must be an object with the following properties:
+ * - **isInvalid** (bool) [optional]: Whether the input is invalid at start. Defaults to `false`.
+ * - **validationMessage** (string) [optional]: The initial validation message. Defaults to `'Invalid value. Please choose a different value.'`.
+ * - **onValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called whenever the value of an input changes. Its parameters are group, element. The return value of onValidate must be an object with the following properties:
  *     - **valid** (bool): Whether the value is valid.
- *     - **message** (string) [optional]: An error message. Defaults to `null`.
+ *     - **message** (string) [optional]: An error message. Defaults to `'Invalid value. Please choose a different value.'`.
  *     - **override** (object) [optional]: Allows overwriting the value of elements within the group. The object must be any number of elements mapped by their names.
- * - **onDelayedValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called only when a user wants to accept input. Its parameters are group, element, and newData. The return value of onValidate must be an object with the following properties:
+ * - **onDelayedValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called only when a user wants to accept input. Its parameters are group, element. The return value of onValidate must be an object with the following properties:
  *     - **valid** (bool): Whether the value is valid.
- *     - **message** (string) [optional]: An error message. Defaults to `null`.
+ *     - **message** (string) [optional]: An error message. Defaults to `'Invalid value. Please choose a different value.'`.
  *     - **override** (object) [optional]: Allows overwriting the value of elements within the group. The object must be any number of elements mapped by their names.
  *
  * ### `textInputType`
@@ -333,7 +332,7 @@ function createContainer(type, elements, options = null) {
  * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter text here..."`.
  *
  * ### `numberInputType`
- * - **defaultValue** (number) [optional]: The default number value for the input. Default is 0.
+ * - **defaultValue** (number) [optional]: The default number value for the input. Default is `0`.
  * 
  * ### `passwordInputType`
  * - **defaultValue** (string) [optional]: The default text value for the input. Default is an empty string `''`.
@@ -350,7 +349,7 @@ function createContainer(type, elements, options = null) {
  * - **description** (string) [optional]: A short description to the left of the checkbox. Default is an empty string `''`.
  * 
  * ### `selectInputType`
- * - **defaultValue** (number) [optional]: The default number value for the input. Default is 0.
+ * - **defaultValue** (number) [optional]: The default number value for the input. Default is the value of the first choice.
  * - **choices** (array): An array of option objects that have the following properties.
  *     - **value** (string) [optional]: The value of the option. Default is its index.
  *     - **name** (string) [optional]: The name of the option. Default is its value.
@@ -428,29 +427,26 @@ async function showGroup(group, insertAt = -1, deleteAfter = 0) {
             const onValidate = element.options.onValidate;
             delete element.options.onValidate;
             element.hasValidation = true;
-            onValidateMap.set(element.id, onValidate);
+            onValidateMap.set(element.name, onValidate);
         }
 
         if (element.options?.onDelayedValidate != null) {
             const onDelayedValidate = element.options.onDelayedValidate;
             delete element.options.onDelayedValidate;
-            element.hasValidation = true;
-            onDelayedValidateMap.set(element.id, onDelayedValidate);
+            element.hasDelayedValidation = true;
+            onDelayedValidateMap.set(element.name, onDelayedValidate);
         }
     }
 
-    const response = await requireResponse(showEventType, {group, insertAt, deleteAfter}, async (content) => {
+    const response = await requireResponse(showEventType, {group, insertAt, deleteAfter}, async (type, content) => {
         let map = null;
-        if (content.validationType == validateInputEventType) {
-            if (!onValidateMap.has(content.element.id)) return;
+        if (type == validateInputEventType) {
             map = onValidateMap;
-        } else if (content.validationType == delayedValidateInputEventType) {
-            if (!onDelayedValidateMap.has(content.element.id)) return;
+        } else if (type == delayedValidateInputEventType) {
             map = onDelayedValidateMap;
         }
-        if (map == null) return;
-
-        return await map.get(element.id)(_mapGroup(content.group), content.element, content.newData);
+        log(map.size, [...map.entries()]);
+        return await map.get(content.element.name)(_mapGroup(content.group), content.element);
     });
 
     return _mapGroup(response ?? []);

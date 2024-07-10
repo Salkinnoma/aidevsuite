@@ -9,3 +9,9 @@ input {
     font-style: italic;
     color: var(--placeholder-color);
 }
+
+.validationMessage {
+    color: var(--danger-color);
+    font-style: italic;
+    font-size: 0.8rem;
+}

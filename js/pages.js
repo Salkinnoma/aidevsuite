@@ -46,9 +46,8 @@ function updateLocalPage(page) {
 }
 
 function moveLocalPage(page, newLink) {
+    addLocalPage(page.name, newLink, page.code, page.prompt);
     deleteLocalPage(page.link);
-    page.link = newLink;
-    addLocalPage(page);
     saveLocalPages();
 }
 

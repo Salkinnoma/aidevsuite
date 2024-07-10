@@ -47,7 +47,6 @@ class Flow {
             };
             return item;
         } else {
-            console.log(localPages.get(name), name);
             return localPages.get(name);
         }
     }
@@ -169,7 +168,7 @@ class Flow {
         }
         Flow.worker.terminate();
 
-        if (error) Flow.status = "Script Error: " + error.toString();
+        if (error) Flow.status = "Script Error: " + error.stack;
         else Flow.status = "Finished";
         console.log(Flow.status);
         Flow.progress = Flow.maxProgress;
@@ -200,6 +199,7 @@ class Flow {
     }
 
     static onEvent = new Map();
+    static onPingEvent = new Map();
 
     // Event status types
     static successStatus = 'successStatus';
@@ -305,8 +305,8 @@ class Flow {
     static filesPasteItemType = "files";
     
     // Event logic to communicate with worker
-    static postRequest(type, content, id = null, pingId = null) {
-        Flow.worker.postMessage({id, pingId, type, content});
+    static postRequest(type, content, id = null, pingId = null, pingSourceEvent = null) {
+        Flow.worker.postMessage({id, pingId, pingSourceId: pingSourceEvent?.data.pingId, type, content});
     }
 
     static postSuccessResponse(requestEvent, content, message = null) {
@@ -317,36 +317,32 @@ class Flow {
         Flow.worker.postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: Flow.errorStatus, content, message });
     }
 
-    static requireResponse(type, content, onPing = null){
+    static requireResponse(type, content, onPing = null, pingSourceEvent = null){
         return new Promise((resolve, reject) => {
             const id = generateUniqueId();
-            const pingId = null;
+            let pingId = null;
             if (onPing != null) {
                 pingId = generateUniqueId();
-                Flow.onEvent.set(pingId, async (event) => {
-                    if (event.data.id !== pingId) return;
-        
+                Flow.onPingEvent.set(pingId, async (event) => {
                     try {
-                        const result = await onPing(event.data.content);
+                        const result = await onPing(event.data.type, event.data.content);
                         Flow.postSuccessResponse(event, result);
                     } catch (e) {
-                        Flow.postErrorResponse(event, e.message);
+                        Flow.postErrorResponse(event, "Executing request produced an error.");
                     }
                 });
             }
     
             Flow.onEvent.set(id, (event) => {
-                if (event.data.id !== id) return;
-    
                 Flow.onEvent.delete(id);
-                if (pingId != null) Flow.onEvent.delete(pingId);
+                if (pingId != null) Flow.onPingEvent.delete(pingId);
     
                 if (event.data.status === Flow.errorStatus) reject(event.data.message);
                 else resolve(event.data.content);
             });
     
     
-            Flow.postRequest(type, content, id, pingId);
+            Flow.postRequest(type, content, id, pingId, pingSourceEvent);
         });
     }
     
@@ -355,7 +351,11 @@ class Flow {
         if (e.data.type !== Flow.logEventType) console.log("Worker Message Received:", e.data);
 
         try {
-            if (e.data.type === Flow.logEventType) {
+            if (Flow.onEvent.has(e.data.id)) {
+                Flow.onEvent.get(e.data.id)(e);
+            } else if (Flow.onPingEvent.has(e.data.pingSourceId)) {
+                Flow.onPingEvent.get(e.data.pingSourceId)(e);
+            } else if (e.data.type === Flow.logEventType) {
                 Flow.onLogRequest(e);
             } else if (e.data.type === Flow.showEventType) {
                 Flow.onShowRequest(e);
@@ -367,8 +367,6 @@ class Flow {
                 Flow.onSetProgressRequest(e);
             } else if (e.data.type === Flow.setStatusEventType) {
                 Flow.onSetStatusRequest(e);
-            } else if (Flow.onEvent.has(e.data.id)) {
-                Flow.onEvent.get(e.data.id)(e);
             }
         } catch (error) {
             console.error("Error while executing worker request:", error.stack);
@@ -396,12 +394,49 @@ class Flow {
         return await Flow.requireResponse(Flow.evalEventType, {code});
     }
 
+    // Validation
+    static async requestValidation(settings, delayed = false) {
+        if ((delayed && !settings.hasDelayedValidation) || (!delayed && !settings.hasValidation)) return;
+
+        const inputValues = Flow.extractInputValues(settings.group);
+        const inputs = Flow.extractInputElements(settings.group);
+        const targetInputValue = inputValues.find(v => v.name == settings.name);
+        const response = await Flow.requireResponse(
+            delayed ? Flow.delayedValidateInputEventType : Flow.validateInputEventType,
+            {group: inputValues, element: targetInputValue},
+            null,
+            settings.group.event
+        );
+
+        settings.isInvalid = !response.valid;
+        if (response.valid) {
+            settings.validationMessageElement.classList.add('hide');
+        } else {
+            settings.validationMessageElement.textContent = response.message ?? 'Invalid value. Please choose a different value.';
+            settings.validationMessageElement.classList.remove('hide');
+        }
+
+        settings.group.isInvalid = inputs.some(s => s.isInvalid);
+        
+        if (settings.group.isInvalid) {
+            settings.group.validationMessageElement.classList.remove('hide');
+            settings.group.acceptButtonElement.setAttribute('disabled', '');
+        } else {
+            settings.group.validationMessageElement.classList.add('hide');
+            settings.group.acceptButtonElement.removeAttribute('disabled');
+        }
+    }
+
+    static async requestDelayedValidation(settings) {
+        await Flow.requestValidation(settings, true);
+    }
+
     // Element of group
-    static extractSettingsFromElement(element) {
+    static extractSettingsFromElement(element, groupSettings) {
         const type = element.type;
         const options = element.options ?? {};
     
-        const settings = {type, id: element.id};
+        const settings = {type, id: element.id, group: groupSettings};
         if (Flow.textTypes.has(type)) {
             settings.text = element.text;
             settings.title = options.title;
@@ -425,7 +460,7 @@ class Flow {
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
         } else if (Flow.containerTypes.has(type)) {
-            settings.children = element.elements.map(e => Flow.extractSettingsFromElement(e));
+            settings.children = element.elements.map(e => Flow.extractSettingsFromElement(e, groupSettings));
             settings.children.forEach(s => s.parent = settings);
             if (type === Flow.barType) {
                 settings.barType = options.barType;
@@ -434,8 +469,8 @@ class Flow {
             settings.name = element.name;
             settings.hasValidation = element.hasValidation ?? false;
             settings.hasDelayedValidation = element.hasDelayedValidation ?? false;
-            settings.isInvalid = options.isInvalid ?? false;
-            settings.validationMessage = options.validationMessage ?? null;
+            settings.isInvalid = false;
+            settings.validationMessage = null;
     
             if (type === Flow.textInputType) {
                 settings.text = options.defaultValue ?? '';
@@ -484,9 +519,11 @@ class Flow {
 
     static extractSettingsFromGroup(group) {
         const settings = {};
-        settings.children = group.map(e => Flow.extractSettingsFromElement(e));
+        settings.children = group.map(e => Flow.extractSettingsFromElement(e, settings));
         settings.children.forEach(s => s.parent = settings);
         settings.accepted = false;
+        const inputs = Flow.extractInputElements(group);
+        settings.isInvalid = inputs.some(s => s.isInvalid);
         return settings;
     }
 
@@ -500,7 +537,9 @@ class Flow {
 
     static processInput(element, settings, settingsProperty, elementProperty = 'value') {
         settings[settingsProperty] = element[elementProperty];
-        // Add validation
+
+        // Validation
+        Flow.requestValidation(settings);
     }
 
     static processContentEditableInput(element, settings, settingsProperty) {
@@ -563,6 +602,9 @@ class Flow {
         let files = getFilesFromEvent(e);
         console.log("Files Input:", files.map(f => f.name));
         await Flow.addFiles(files, settings);
+        
+        // Validation
+        Flow.requestValidation(settings);
     }
 
     static async processPaste(event, settings) {
@@ -618,6 +660,9 @@ class Flow {
             settings.filesDisplayElement.appendChild(filesContainer);
             settings.filesDisplayElement.classList.remove('hide');
         } else settings.filesDisplayElement.classList.add('hide');
+
+        // Validation
+        Flow.requestValidation(settings);
     }
 
     static fromElementSettings(settings) {
@@ -786,6 +831,15 @@ class Flow {
             element.appendChild(pasteElement);
         }
 
+        if (Flow.inputTypes.has(type)) {
+            element.appendChild(hb(1));
+            const validationMessageElement = fromHTML(`<div class="validationMessage">`);
+            if (!settings.isInvalid) validationMessageElement.classList.add('hide');
+            validationMessageElement.textContent = settings.validationMessage;
+            element.appendChild(validationMessageElement);
+            settings.validationMessageElement = validationMessageElement;
+        }
+
         return element;
     }
 
@@ -837,13 +891,21 @@ class Flow {
         return inputValues;
     }
 
-    static onAccept(groupSettings) {
+    static async onAccept(groupSettings) {
         const inputValues = Flow.extractInputValues(groupSettings);
         groupSettings.accepted = true;
         groupSettings.acceptButtonElement.remove();
-        Flow.postSuccessResponse(groupSettings.event, inputValues);
 
         const inputs = Flow.extractInputElements(groupSettings);
+        for (let settings of inputs) {
+            await Flow.requestDelayedValidation(settings)
+        }
+
+        if (groupSettings.isInvalid) return;
+
+        groupSettings.accepted = true;
+        Flow.postSuccessResponse(groupSettings.event, inputValues);
+
         for (let settings of inputs) {
             const element = fromHTML(`<div>`);
 
@@ -904,10 +966,19 @@ class Flow {
 
         const inputs = Flow.extractInputElements(settings);
         if (inputs.length != 0) {
-            groupElement.appendChild(hb(4));
+            groupElement.appendChild(hb(1));
+            const validationContainer = fromHTML(`<div class="listContainerHorizontal">`);
+            validationContainer.appendChild(fromHTML(`<div>`));
+            const validationMessageElement = fromHTML(`<div class="validationMessage">Some inputs are invalid.`);
+            if (!settings.isInvalid) validationMessageElement.classList.add('hide');
+            settings.validationMessageElement = validationMessageElement;
+            validationContainer.appendChild(validationMessageElement);
+            groupElement.appendChild(validationContainer);
+            groupElement.appendChild(hb(1));
             const footer = fromHTML(`<div class="listContainerHorizontal">`);
             footer.appendChild(fromHTML(`<div>`));
             const acceptButton = fromHTML(`<button class="largeElement complexButton">`);
+            if (settings.isInvalid) acceptButton.setAttribute('disabled', '');
             acceptButton.textContent = "Accept";
             acceptButton.addEventListener('click', e => Flow.onAccept(settings));
             footer.appendChild(acceptButton);
@@ -918,27 +989,40 @@ class Flow {
         return groupElement;
     }
 
-    static spliceOutput(start = -1, deleteCount = 0, ...insertGroupSettings) {
+    static async spliceOutput(start = -1, deleteCount = 0, ...insertGroupSettings) {
         if (start < 0) start = Flow.output.length + 1 + start;
 
         if (Flow.output.length == 0 && insertGroupSettings.length > 0) Flow.outputElement.innerHTML = '';
+
+        // Create elements
+        const elements = insertGroupSettings.map(s => Flow.fromGroupSettings(s));
+
+        // Validate inputs before showing (but after creating)
+        for (let groupSettings of insertGroupSettings) {
+            const inputs = Flow.extractInputElements(groupSettings);
+            for (let settings of inputs) {
+                await Flow.requestValidation(settings);
+            }
+        }
 
         // Splice settings
         Flow.output.splice(start, deleteCount, ...insertGroupSettings);
 
         // Splice elements
-        spliceChildren(Flow.outputElement, start, deleteCount, ...insertGroupSettings.map(s => Flow.fromGroupSettings(s)));
+        spliceChildren(Flow.outputElement, start, deleteCount, ...elements);
 
         if (Flow.output.length == 0) Flow.outputElement.textContent = Flow.noOutputMessage;
     }
 
-    static onShowRequest(event) {
+    static async onShowRequest(event) {
         const e = event;
         const content = e.data.content;
         const settings = Flow.extractSettingsFromGroup(content.group);
         settings.event = e;
-        Flow.spliceOutput(content.insertAt, content.deleteAfter, settings);
+
         const inputs = Flow.extractInputElements(settings);
+        await Flow.spliceOutput(content.insertAt, content.deleteAfter, settings);
+
         if (inputs.length == 0) Flow.postSuccessResponse(e);
     }
 
@@ -1128,7 +1212,6 @@ class Flow {
         }
 
         const json = JSON.stringify(item);
-        console.log(item);
         const fileName = item.name ? escapeFileName(item.name) : escapeFileName(item.link);
         downloadJson(fileName, json);
     }
@@ -1160,7 +1243,7 @@ class Flow {
                 // Move bookmark
                 page.name = Flow.starData.name;
                 moveLocalPage(page, Flow.starData.link);
-                openPage(page.link);
+                openPage(Flow.starData.link);
             }
         } else {
             if (Flow.starData.link.trim() != '') {
@@ -1302,13 +1385,13 @@ function getFlowPage() {
     starButton.appendChild(starIcon);
     leftBarList.appendChild(starButton);
     if (!locked) {
-        const editButton = fromHTML(`<button class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
+        const editButton = fromHTML(`<button tooltip="Edit Code" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
         editButton.addEventListener('click', e => Flow.edit());
         editButton.appendChild(icons.edit());
         if (mode == Flow.editMode) editButton.setAttribute('disabled', '');
         leftBarList.appendChild(editButton);
     }
-    const runButton = fromHTML(`<button class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
+    const runButton = fromHTML(`<button tooltip="Execute Code" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
     runButton.addEventListener('click', e => Flow.run());
     runButton.appendChild(icons.play());
     leftBarList.appendChild(runButton);
