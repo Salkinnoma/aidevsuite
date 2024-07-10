@@ -41,6 +41,8 @@
     --sidebar-background-color: var(--background-color);
     --navbar-background-color: var(--background-color);
     --tooltip-background-color: var(--raised-background-color);
+    --code-bar-background-color: var(--raised-background-color);
+    --codeblock-background-color: var(--lowered-background-color);
 }
 
 /* The variabels should work with multiple levels of abstractions. */
@@ -80,6 +82,8 @@
     --sidebar-background-color: var(--background-color);
     --navbar-background-color: var(--background-color);
     --tooltip-background-color: var(--background-color);
+    --code-bar-background-color: #333;
+    --codeblock-background-color: #111;
 }
 
 [color-scheme="dark"] .lightModeOnly {

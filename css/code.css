@@ -17,9 +17,15 @@ code {
     border-radius: 8px 8px 0 0;
 }
 
-.preCodeContainer {
+pre {
+    padding: 8px 16px;
+    margin: 0;
+}
+
+.preContainer {
     background-color: var(--codeblock-background-color);
     border-radius: 8px;
+    margin: 16px 0;
 }
 
 .codeLanguage {

@@ -12,7 +12,7 @@
     flex-direction: column;
 }
 
-.listHorizontal, .listVertical {
+.listHorizontal, .listVertical, .divList {
     display: flex;
     flex-wrap: wrap;
     padding: 0;
@@ -30,6 +30,10 @@
     flex-direction: column;
 }
 
+.divList {
+    align-items: start;
+}
+
 .nowrap {
     flex-wrap: nowrap;
 }
@@ -43,6 +47,3 @@
     flex-basis: max-content;
 }
 
-.divList {
-    align-items: start;
-}

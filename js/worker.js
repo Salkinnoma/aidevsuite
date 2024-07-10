@@ -28,14 +28,14 @@ const imageType = "imageType";
 const iconType = "iconType";
 
 // Icon types
-const materialIconType = "materialIconType";
-const heroIconType = "heroIconType";
+const materialIconProvider = "materialIconProvider";
+const heroIconProvider = "heroIconProvider";
 
 // Container element types
-const divType = "divType";
 const barType = "barType";
+const verticalType = "verticalType";
 
-// Bar types
+// Bar sub types
 const navBarType = "navBarType";
 const listBarType = "listBarType";
 const fillBarType = "fillBarType";
@@ -63,8 +63,8 @@ const allTypes = new Set([
     codeType,
     imageType,
     iconType,
-    divType,
     barType,
+    verticalType,
     buttonType,
     textInputType,
     numberInputType,
@@ -76,8 +76,8 @@ const allTypes = new Set([
 ]);
 
 const containerTypes = new Set([
-    divType,
     barType,
+    verticalType,
 ]);
 
 const textTypes = new Set([
@@ -204,7 +204,7 @@ function createBreak() {
  *         [
  *             {left: "$$", right: "$$", display: true},
  *             {left: "\\(", right: "\\)", display: false},
- *             //{left: "$", right: "$", display: false} // LaTeX uses $…$, but it ruins the display of normal `$` in text ($ must come after $$)
+ *             //{left: "$", right: "$", display: false} // LaTeX uses $…$, but it ruins the display of normal `$` in text ($ must come after $$). Use \(...\) for inline math instead.
  *             {left: "\\begin{equation}", right: "\\end{equation}", display: true},
  *             {left: "\\begin{align}", right: "\\end{align}", display: true},
  *             {left: "\\begin{alignat}", right: "\\end{alignat}", display: true},
@@ -254,19 +254,19 @@ function createImage(url, options = null) {
 
 /**
  * ## Parameters
- * - **ds** (array of strings): Creates a path element for each d.
- * - **iconType** (string): The type of the icon. Supported values are:
- *     - `materialIconType`
- *     - `heroIconType`
+ * - **ds** (array of strings or a string): If it is an array, it creates a path element for each d. If it is a string, it uses predefined paths. The following string values are supported: `"close"`, `"expandMore"`, `"expandLess"`, `"menu"`, `"menuClose"`, `"menuHorizontal"`, `"download"`, `"upload"`, `"lock"`, `"noLock"`, `"edit"`, `"noEdit"`, `"delete"`, `"highlight"`, `"highlightOff"`, `"play"`, `"settings"`, `"sparkles"`, `"star"`, `"starFilled"`, `"copy"`.
+ * - **iconProvider** (string): The type of the icon. Supported values are:
+ *     - `materialIconProvider`
+ *     - `heroIconProvider`
  * - **options** (object): An object that can have the following properties:
  *     - **title** (string) [optional]: The title to be shown on hover.
  *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
  */
-function createIcon(d, iconType, options = null) {
+function createIcon(ds, iconProvider, options = null) {
     const content = {
         type: iconType,
-        d,
-        iconType,
+        ds,
+        iconProvider,
         options,
     };
     return content;
@@ -276,16 +276,20 @@ function createIcon(d, iconType, options = null) {
  * ## Parameters
  * - **type** (string): Specifies the type of the container. Supported values are:
  *     - `barType`
+ *     - `verticalType`
  * - **elements** (array): A list of elements displayed within the container.
  * - **options** (object): An object that contains various options specific to the `type` of input. The options available depend on the input type.
  * 
  * ## Options Configuration by Container Type
  * 
  * ### `barType`
- * - **barType** (string) [optional]: The type of the bar. Default is `navBarType`. Supported values are:
+ * - **barSubType** (string) [optional]: The type of the bar. Default is `navBarType`. Supported values are:
  *     - `navBarType`
  *     - `listBarType`
  *     - `fillBarType`
+ * 
+ * ### `verticalType`
+ * - **centered** (bool) [optional]: Whether the items should be centered. Default is `false`.
  */
 function createContainer(type, elements, options = null) {
     options ??= {};
@@ -328,6 +332,7 @@ function createContainer(type, elements, options = null) {
  * ### `textInputType`
  * - **defaultValue** (string) [optional]: The default text value for the input. Default is an empty string `''`.
  * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter text here..."`.
+ * - **spellcheck** (bool) [optional]: Whether to enable spellcheck. Default is `false`.
  *
  * ### `numberInputType`
  * - **defaultValue** (number) [optional]: The default number value for the input. Default is `0`.

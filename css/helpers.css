@@ -73,6 +73,14 @@
     word-break: break-word;
 }
 
+.nestedText {
+    display: table;
+}
+
+.block {
+    display: block;
+}
+
 b {
     font-weight: bold;
 }

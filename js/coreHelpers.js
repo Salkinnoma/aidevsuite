@@ -65,10 +65,11 @@ function jsonEquals(obj1, obj2) {
 
 /**
  * @param {String} HTML representing a single element.
+ * @param {Boolean} collapse representing whether or not to return only the element when only one element exists.
  * @param {Boolean} flag representing whether or not to trim input whitespace, defaults to true.
  * @return {Element | Node | HTMLCollection | null}
  */
-function fromHTML(html, trim = true) {
+function fromHTML(html, collapse = true, trim = true) {
     // Process the HTML string.
     html = trim ? html.trim() : html;
     if (!html) return null;
@@ -80,7 +81,7 @@ function fromHTML(html, trim = true) {
 
     // Then return either an HTMLElement or HTMLCollection,
     // based on whether the input HTML had one or more roots.
-    if (result.length === 1) return result[0];
+    if (collapse && result.length === 1) return result[0];
     return result;
 }
 
@@ -114,6 +115,11 @@ function spliceChildren(element, start = -1, deleteCount = 0, ...newChildren) {
             element.insertBefore(child, element.children[start + index]);
         }
     });
+}
+
+function wrapElement(element, wrapper) {
+    element.parentNode.insertBefore(wrapper, element);
+    wrapper.appendChild(element);
 }
 
 (function() {

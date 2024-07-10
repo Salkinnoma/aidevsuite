@@ -53,3 +53,7 @@ class ParsingHelpers {
         return codes;
     }
 }
+
+function sanitizeHtml(html) {
+    return DOMPurify.sanitize(html);
+}

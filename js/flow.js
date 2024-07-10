@@ -168,7 +168,7 @@ class Flow {
         }
         Flow.worker.terminate();
 
-        if (error) Flow.status = "Script Error: " + error.stack;
+        if (error) Flow.status = "Script Error: " + error;
         else Flow.status = "Finished";
         console.log(Flow.status);
         Flow.progress = Flow.maxProgress;
@@ -227,14 +227,14 @@ class Flow {
     static iconType = "iconType";
 
     // Icon types
-    static materialIconType = "materialIconType";
-    static heroIconType = "heroIconType";
+    static materialIconProvider = "materialIconProvider";
+    static heroIconProvider = "heroIconProvider";
 
     // Container element types
-    static divType = "divType";
     static barType = "barType";
+    static verticalType = "verticalType";
 
-    // Bar types
+    // Bar sub types
     static navBarType = "navBarType";
     static listBarType = "listBarType";
     static fillBarType = "fillBarType";
@@ -262,8 +262,8 @@ class Flow {
         Flow.codeType,
         Flow.imageType,
         Flow.iconType,
-        Flow.divType,
         Flow.barType,
+        Flow.verticalType,
         Flow.buttonType,
         Flow.textInputType,
         Flow.numberInputType,
@@ -276,8 +276,8 @@ class Flow {
     ]);
 
     static containerTypes = new Set([
-        Flow.divType,
         Flow.barType,
+        Flow.verticalType,
     ]);
 
     static textTypes = new Set([
@@ -336,7 +336,7 @@ class Flow {
             Flow.onEvent.set(id, (event) => {
                 Flow.onEvent.delete(id);
                 if (pingId != null) Flow.onPingEvent.delete(pingId);
-    
+
                 if (event.data.status === Flow.errorStatus) reject(event.data.message);
                 else resolve(event.data.content);
             });
@@ -454,8 +454,9 @@ class Flow {
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
         } else if (type === Flow.iconType) {
+            console.log(type);
             settings.ds = element.ds;
-            settings.iconType = element.iconType;
+            settings.iconProvider = element.iconProvider;
             settings.caption = options.caption;
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
@@ -463,7 +464,9 @@ class Flow {
             settings.children = element.elements.map(e => Flow.extractSettingsFromElement(e, groupSettings));
             settings.children.forEach(s => s.parent = settings);
             if (type === Flow.barType) {
-                settings.barType = options.barType;
+                settings.barSubType = options.barSubType ?? Flow.navBarType;
+            } else if (type === Flow.verticalType) {
+                settings.centered = options.centered ?? false;
             }
         } else if (Flow.inputTypes.has(type)) {
             settings.name = element.name;
@@ -475,6 +478,7 @@ class Flow {
             if (type === Flow.textInputType) {
                 settings.text = options.defaultValue ?? '';
                 settings.placeholder = options.placeholder ?? 'Enter text here...';
+                settings.spellcheck = options.spellcheck ?? false;
             } else if (type === Flow.numberInputType) {
                 settings.number = options.defaultValue ?? 0;
             } else if (type === Flow.passwordInputType) {
@@ -697,8 +701,8 @@ class Flow {
             element.appendChild(subTitleElement);
         }  else if (type == Flow.codeType) {
             Flow.tryAddTitle(element, settings);
-            element.classList.add('fixText');
-            element.textContent = settings.code;
+            const codeElement = CodeHelpers.createCodeElement(settings.code, settings.language);
+            element.appendChild(codeElement);
         } else if (type == Flow.imageType) {
             Flow.tryAddTitle(element, settings);
             const figureElement = fromHTML(`<figure>`);
@@ -707,24 +711,29 @@ class Flow {
             imgElement.setAttribute('alt', settings.caption ?? "");
             figureElement.appendChild(imgElement);
             if (settings.caption) {
-                const captionElement = fromHTML(`<i>`);
+                const captionElement = fromHTML(`<figcaption>`);
                 captionElement.textContent = settings.caption;
                 figureElement.appendChild(captionElement);
             }
             element.appendChild(figureElement);
         } else if (type == Flow.iconType) {
-            const pathHtml = icons.dsToPathHtml(settings.ds, settings.iconType);
-            const svgElement = icons.icon(pathHtml, settings.iconType, settings.title, settings.useTooltipInstead);
-            element.appendChild(svgElement);
+            if (isString(settings.ds)) {
+                element.appendChild(icons[settings.ds]());
+            } else {
+                const pathHtml = IconHelpers.dsToPathHtml(settings.ds, settings.iconProvider);
+                const svgElement = IconHelpers.icon(pathHtml, settings.iconProvider, settings.title, settings.useTooltipInstead);
+                console.log(settings, pathHtml, svgElement);
+                element.appendChild(svgElement);
+            }
         } else if (Flow.containerTypes.has(settings.type)) {
             const childElements = settings.children.map(s => Flow.fromElementSettings(s));
 
             if (type == Flow.barType) {
-                if (settings.barType == Flow.navBarType) {
+                if (settings.barSubType == Flow.navBarType) {
                     element.classList.add('listContainerHorizontal');
-                } else if (settings.barType == Flow.listBarType) {
+                } else if (settings.barSubType == Flow.listBarType) {
                     element.classList.add('listHorizontal');
-                } else if (settings.barType == Flow.fillBarType) {
+                } else if (settings.barSubType == Flow.fillBarType) {
                     element.classList.add('listHorizontal');
                     childElements.map(e => {
                         const wrapper = fromHTML(`<div class="flexFill">`);
@@ -732,12 +741,19 @@ class Flow {
                         return wrapper;
                     });
                 }
+            } else if (type == Flow.verticalType) {
+                if (settings.centered == true) {
+                    element.classList.add('listVertical');
+                } else {
+                    element.classList.add('divList');
+                }
             }
 
             childElements.forEach(e => element.appendChild(e));
         } else if (type == Flow.textInputType) {
             const editorContainer = fromHTML(`<div class="contenteditableContainer largeElement bordered">`);
             const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText">`);
+            codeEditor.setAttribute('spellcheck', settings.spellcheck);
             codeEditor.setAttribute('placeholder', settings.placeholder);
             codeEditor.textContent = settings.text;
             codeEditor.addEventListener('input', e => Flow.processContentEditableInput(e.srcElement, settings, 'text'));
@@ -761,6 +777,7 @@ class Flow {
         } else if (type == Flow.codeInputType) {
             const editorContainer = fromHTML(`<div class="contenteditableContainer largeElement bordered">`);
             const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText">`);
+            codeEditor.setAttribute('spellcheck', false);
             codeEditor.setAttribute('placeholder', settings.placeholder);
             codeEditor.textContent = settings.code;
             codeEditor.addEventListener('input', e => Flow.processContentEditableInput(e.srcElement, settings, 'code'));
@@ -1403,6 +1420,7 @@ function getFlowPage() {
         // Code editor
         const codeEditorContainer = fromHTML(`<div class="contenteditableContainer">`);
         const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter code here...">`);
+        codeEditor.setAttribute('spellcheck', false);
         codeEditor.textContent = code;
         codeEditor.addEventListener('input', e => Flow.onCodeInput(e));
         codeEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));

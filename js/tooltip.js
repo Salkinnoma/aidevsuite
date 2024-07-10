@@ -16,7 +16,7 @@ class Tooltip {
         window.addEventListener('resize', Tooltip.updatePosition, true);
         document.addEventListener('mousemove', Tooltip.onMousemove, true);
 
-        // MutationObserver to watch for newly added elements
+        // MutationObserver to watch for newly added elements and attribute changes
         const observer = new MutationObserver((mutationsList) => {
             for (const mutation of mutationsList) {
                 if (mutation.type === 'childList') {
@@ -25,11 +25,17 @@ class Tooltip {
                             Tooltip.setupTooltips(node);
                         }
                     });
+                } else if (mutation.type === 'attributes') {
+                    if (mutation.attributeName === 'tooltip' || mutation.attributeName === 'tooltip-url') {
+                        if (mutation.target === Tooltip.currentElement) {
+                            Tooltip.updateTooltip();
+                        }
+                    }
                 }
             }
         });
 
-        observer.observe(document.body, { childList: true, subtree: true });
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['tooltip', 'tooltip-url'] });
     }
 
     static setupTooltips(element = document) {
@@ -139,11 +145,8 @@ class Tooltip {
         }
     }
 
-    static async onMouseenter(event) {
-        if (isChildEvent(event)) return;
-
-        let element = event.currentTarget;
-        Tooltip.currentElement = element;
+    static async updateTooltip() {
+        const element = Tooltip.currentElement;
         let tooltipAttribute = element.getAttribute('tooltip');
         if (tooltipAttribute == null) {
             let url = element.getAttribute('tooltip-url');
@@ -183,6 +186,14 @@ class Tooltip {
             Tooltip.tooltip.classList.remove('hide');
             Tooltip.updatePosition();
         }
+    }
+
+    static async onMouseenter(event) {
+        if (isChildEvent(event)) return;
+
+        let element = event.currentTarget;
+        Tooltip.currentElement = element;
+        Tooltip.updateTooltip();
     }
 
     static eventWithinDistance(event, element) {

@@ -1,0 +1,25 @@
+.hljs-number {
+  color: #80b8ff;
+}
+
+.hljs-built_in,
+.hljs-literal {
+  color: #4493f8;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-meta .hljs-keyword,
+.hljs-doctag,
+.hljs-section {
+  color: #4493f8;
+}
+
+.hljs-string {
+    color: #d27d64;
+}
+
+.hljs {
+    color: inherit;
+    background: inherit;
+}
