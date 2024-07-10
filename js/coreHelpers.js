@@ -100,7 +100,6 @@ function goToUrl(url) {
 }
 
 function spliceChildren(element, start = -1, deleteCount = 0, ...newChildren) {
-    console.log(element, start, deleteCount, newChildren);
     if (start < 0) start = element.children.length + 1 + start;
 
     const childElements = [...element.children];

@@ -93,6 +93,14 @@ function unescapeHTML(str) {
     });
 }
 
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
+function escapeReplacement(string) {
+    return string.replace(/\$/g, '$$$$');
+}
+
 function removeFirstChar(str){
     return str.substring(1);
 }

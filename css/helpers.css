@@ -56,6 +56,13 @@
     margin-right: auto;
 }
 
+.sticky {
+    position: sticky;
+    top: 0;
+    background-color: var(--background-color);
+    z-index: 10;
+}
+
 .vr {
     height: 100%;
     border-left: 1px solid var(--border-color);
@@ -100,4 +107,12 @@ b {
 
 .rounded-xl {
     border-radius: 10px;
+}
+
+.scroll-x {
+    overflow-x: auto;
+}
+
+.scroll-y {
+    overflow-y: auto;
 }

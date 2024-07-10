@@ -91,9 +91,25 @@ class ChatGptApi {
 
     /**
      * options:
-     * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null
+     * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null, continueAfterMaxTokens = true
      */
     static async getChatResponse(messages, options = null) {
+        options ??= {};
+        options.continueAfterMaxTokens ??= true;
+
+        const messagesCopy = [...messages];
+        let response;
+        let result = '';
+        do {
+            response = await ChatGptApi._internalGetChatResponse(messages, options);
+            result += response.response;
+            messagesCopy.push(ChatGptApi.ToAssistantMessage(response.response));
+        } while (options.continueAfterMaxTokens && response.finish_reason == 'length');
+
+        return result;
+    }
+
+    static async _internalGetChatResponse(messages, options = null) {
         options ??= {};
         const model = options.gptModel ?? ChatGptApi.defaultModel;
         const apiKey = options.apiKey ?? ChatGptApi.getLocalApiKey();
@@ -143,7 +159,7 @@ class ChatGptApi {
                 if (openAiSeed) {
                     console.log('Seed:', openAiSeed, 'Fingerprint:', json.system_fingerprint);
                 }
-                return json['choices'][0]['message'];
+                return {response: json['choices'][0]['message'], finish_reason: json.finish_reason};
             }
 
             console.log("Json response:", json);
@@ -160,7 +176,6 @@ class ChatGptApi {
             } else throw lastError;
         }
     }
-
     /**
      * options:
      * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null
@@ -233,18 +248,35 @@ class ChatGptApi {
      * Fetches and reads a stream.
      * 
      * options:
-     * gptModel = ChatGptApi.defaultModel, applyToText = t => t, seed = null, apiKey = null, stopStream = false
+     * gptModel = ChatGptApi.defaultModel, applyToText = t => t, seed = null, apiKey = null, stopStream = false, continueAfterMaxTokens = true
      * 
      * Note: Keep the options object, so you can later set stopStream to true to stop the stream as soon as possible.
      */
     static async streamChat(messages, onUpdate, options) {
         options ??= {};
+        options.continueAfterMaxTokens ??= true;
+
+        const messagesCopy = [...messages];
+        let response;
+        let result = '';
+        do {
+            response = await ChatGptApi._internalStreamChat(messagesCopy, onUpdate, options);
+            result = response.response;
+            messagesCopy.push(ChatGptApi.ToAssistantMessage(response.response));
+        } while (options.continueAfterMaxTokens && response.finish_reason == 'length');
+
+        return result;
+    }
+
+    static async _internalStreamChat(messages, onUpdate, options, previousResponse = null) {
+        options ??= {};
         const streamOptions = {gptModel: options.gptModel, seed: options.seed, apiKey: options.apiKey};
         let reader = await ChatGptApi.getChatStream(messages, streamOptions);
 
-        let fullResponse = '';
+        let fullResponse = previousResponse ?? '';
         const textDecoder = new TextDecoder("utf-8");
         let buffer = "";
+        let finish_reason = '';
         while (true) {
             if (options.stopStream) {
                 options.stopStream = false;
@@ -259,7 +291,7 @@ class ChatGptApi {
                 if (e.message === "network error") {
                     await sleep((1 + Math.random())*1000);
                     reader = await ChatGptApi.getChatStream(messages, streamOptions);
-                    fullResponse = '';
+                    fullResponse = previousResponse ?? '';
                     onUpdate('');
                     continue;
                 } else {
@@ -297,6 +329,7 @@ class ChatGptApi {
                    }
 
                    const content = obj.choices?.[0]?.delta?.content?.toString() ?? "";
+                   finish_reason = obj.finish_reason;
 
                    fullResponse = fullResponse.concat(content);
                    onUpdate(fullResponse);
@@ -318,6 +351,6 @@ class ChatGptApi {
 
         console.log('Request:', messages);
         console.log('Response:', fullResponse);
-        return fullResponse;
+        return {response: fullResponse, finish_reason};
     }
 }

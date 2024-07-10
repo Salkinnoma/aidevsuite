@@ -1,57 +1,9 @@
-let scrolledBottomLastFrame = false;
-let userHasScrolled = false;
-let autoScrollBotom = true;
+class ScrollingHelpers {
+    static scrolledBottomLastFrame = false;
+    static userHasScrolled = false;
+    static autoScrollBotom = true;
+    static pageLoaded = true;
 
-function getScrollingElement() {
-    return document.getElementById('scrollingElement');
-}
-
-function isScrolledBottom() {
-    let scrollingElement = getScrollingElement();
-    return Math.abs(scrollingElement.scrollHeight - scrollingElement.scrollTop - scrollingElement.clientHeight) <= 3.0;
-}
-
-function scrollToBottom() {
-    let scrollingElement = getScrollingElement();
-    scrollingElement.scroll({top: scrollingElement.scrollHeight});
-}
-
-function isScrolledTop() {
-    let scrollingElement = getScrollingElement();
-    return scrollingElement.scrollTop === 0;
-}
-
-function scrollToTop() {
-    let scrollingElement = getScrollingElement();
-    scrollingElement.scroll({top: 0});
-}
-
-getScrollingElement().addEventListener('scroll', () => {
-    userHasScrolled = true;
-});
-
-async function doScrollTick(){
-    if (isScrolledBottom()) {
-        scrolledBottomLastFrame = true;
-    } else if (userHasScrolled) {
-        scrolledBottomLastFrame = false;
-    } else if (autoScrollBotom && scrolledBottomLastFrame) {
-        scrollToBottom();
-    }
-
-    userHasScrolled = false;
-
-    await sleep(10);
-}
-
-// Check scroll periodically
-(async function() {
-    while (true) {
-        await doScrollTick();
-    }
-})();
-
-class ScrollHelpers {
     static injectScrollTopButton() {
         const scrollButtons = document.getElementById('scrollButtons');
         const topButton = fromHTML(`<button class="largeElement complexButton scrollButtonTop" title="Scroll to the top of the page">`);
@@ -81,9 +33,61 @@ class ScrollHelpers {
     }
 
     static injectScrollButtons() {
-        ScrollHelpers.injectScrollTopButton();
-        ScrollHelpers.injectScrollBottomButton();
+        ScrollingHelpers.injectScrollTopButton();
+        ScrollingHelpers.injectScrollBottomButton();
     }
 }
 
-ScrollHelpers.injectScrollButtons();
+function getScrollingElement() {
+    return document.getElementById('scrollingElement');
+}
+
+function isScrolledBottom() {
+    let scrollingElement = getScrollingElement();
+    return Math.abs(scrollingElement.scrollHeight - scrollingElement.scrollTop - scrollingElement.clientHeight) <= 3.0;
+}
+
+function scrollToBottom() {
+    let scrollingElement = getScrollingElement();
+    scrollingElement.scroll({top: scrollingElement.scrollHeight});
+}
+
+function isScrolledTop() {
+    let scrollingElement = getScrollingElement();
+    return scrollingElement.scrollTop === 0;
+}
+
+function scrollToTop() {
+    let scrollingElement = getScrollingElement();
+    scrollingElement.scroll({top: 0});
+}
+
+getScrollingElement().addEventListener('scroll', () => {
+    ScrollingHelpers.userHasScrolled = true;
+});
+
+window.addEventListener('pageloaded', e => ScrollingHelpers.pageLoaded = true);
+
+async function doScrollTick(){
+    if (isScrolledBottom()) {
+        ScrollingHelpers.scrolledBottomLastFrame = true;
+    } else if (ScrollingHelpers.userHasScrolled || ScrollingHelpers.pageLoaded) {
+        ScrollingHelpers.scrolledBottomLastFrame = false;
+    } else if (ScrollingHelpers.autoScrollBotom && ScrollingHelpers.scrolledBottomLastFrame) {
+        scrollToBottom();
+    }
+
+    ScrollingHelpers.userHasScrolled = false;
+    ScrollingHelpers.pageLoaded = false;
+
+    await sleep(10);
+}
+
+// Check scroll periodically
+(async function() {
+    while (true) {
+        await doScrollTick();
+    }
+})();
+
+ScrollingHelpers.injectScrollButtons();

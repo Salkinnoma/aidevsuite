@@ -406,6 +406,10 @@ class Flow {
             settings.text = element.text;
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
+            if (type == Flow.markdownType) {
+                settings.katex = options.katex ?? true;
+                settings.katexDelimiters = options.katexDelimiters;
+            }
         } else if (type === Flow.codeType) {
             settings.code = element.code;
             settings.language = options.language;
@@ -450,12 +454,12 @@ class Flow {
                 settings.ticked = options.defaultValue ?? false;
                 settings.description = options.description ?? '';
             } else if (type === Flow.selectInputType) {
-                settings.choices.forEach((c, index) => {
+                options.choices.forEach((c, index) => {
                     c.value ??= index;
                     c.name ??= c.value;
                 });
-                settings.value = options.defaultValue ?? element.choices[0].value;
-                settings.choices = element.choices;
+                settings.value = options.defaultValue ?? options.choices[0].value;
+                settings.choices = options.choices;
             } else if (type === Flow.fileInputType) {
                 settings.files = [];
                 settings.allowedMimeTypes = options.allowedMimeTypes ?? [];
@@ -570,27 +574,35 @@ class Flow {
         const text = event.clipboardData.getData('text/plain');
         const rtf = event.clipboardData.getData('text/rtf');
         const files = [];
+        const unprocessFiles = [];
         for (let item of event.clipboardData.items) {
             if (item.kind === 'file') {
                 const file = item.getAsFile();
-                const fileData = await Flow.extractFileData(file);
-                files.push(fileData);
+                unprocessFiles.push(file);
             }
         }
-        element.html = html;
-        element.text = text;
-        element.rtf = rtf;
-        element.files = files;
+        for (let file of unprocessFiles) {
+            const fileData = await Flow.extractFileData(file);
+            files.push(fileData);
+        }
 
-        if (element.html) {
+        settings.html = html;
+        settings.text = text;
+        settings.rtf = rtf;
+        settings.files = files;
+
+        if (settings.html) {
             settings.htmlDisplayElement.innerHTML = '';
             const titleElement = fromHTML(`<h2>`);
             titleElement.textContent = "Pasted Html";
             settings.htmlDisplayElement.appendChild(titleElement);
             const htmlContainer = fromHTML(`<div>`);
-            htmlContainer.textContent = element.html;
+            htmlContainer.textContent = settings.html;
             settings.htmlDisplayElement.appendChild(htmlContainer);
-        } else if (element.files.length != 0) {
+            settings.htmlDisplayElement.classList.remove('hide');
+        } else settings.htmlDisplayElement.classList.add('hide');
+        
+        if (settings.files.length != 0) {
             settings.filesDisplayElement.innerHTML = '';
             const titleElement = fromHTML(`<h2>`);
             titleElement.textContent = "Pasted Files";
@@ -604,13 +616,15 @@ class Flow {
                 filesContainer.appendChild(fileDisplayElement);
             }
             settings.filesDisplayElement.appendChild(filesContainer);
-        }
+            settings.filesDisplayElement.classList.remove('hide');
+        } else settings.filesDisplayElement.classList.add('hide');
     }
 
     static fromElementSettings(settings) {
         const type = settings.type;
 
         const element = fromHTML(`<div>`);
+        settings.htmlElement = element;
         const containered = Flow.containerTypes.has(settings.parent.type);
         if (!containered) element.classList.add('w-100');
         
@@ -620,12 +634,14 @@ class Flow {
             else element.classList.add('hb-1');
         } else if (type == Flow.markdownType) {
             Flow.tryAddTitle(element, settings);
-            element.textContent = settings.text;
+            renderMarkdown(element, settings.text, {options: {delimiters: settings.katexDelimiters}, sanitize: true, katex: settings.katex});
         } else if (type == Flow.paragraphType) {
             Flow.tryAddTitle(element, settings);
+            element.classList.add('fixText');
             element.textContent = settings.text;
         } else if (type == Flow.titleType) {
             Flow.tryAddTitle(element, settings);
+            element.classList.add('fixText');
             const titleElement = fromHTML(`<h1>`);
             titleElement.textContent = settings.text;
             element.appendChild(titleElement);
@@ -636,6 +652,7 @@ class Flow {
             element.appendChild(subTitleElement);
         }  else if (type == Flow.codeType) {
             Flow.tryAddTitle(element, settings);
+            element.classList.add('fixText');
             element.textContent = settings.code;
         } else if (type == Flow.imageType) {
             Flow.tryAddTitle(element, settings);
@@ -758,11 +775,11 @@ class Flow {
             settings.descriptionElement = descriptionElement;
             pasteElement.appendChild(descriptionElement);
             pasteElement.appendChild(hb(2));
-            const filesDisplayElement = fromHTML(`<div class="w-100 hide">`);
+            const filesDisplayElement = fromHTML(`<div class="w-100 scroll-y hide">`);
             settings.filesDisplayElement = filesDisplayElement;
             pasteElement.appendChild(filesDisplayElement);
             pasteElement.appendChild(hb(2));
-            const htmlDisplayElement = fromHTML(`<div class="w-100 hide" style="max-height: 400px;">`);
+            const htmlDisplayElement = fromHTML(`<div class="w-100 scroll-y hide" style="max-height: 400px;">`);
             settings.htmlDisplayElement = htmlDisplayElement;
             pasteElement.appendChild(htmlDisplayElement);
             
@@ -825,10 +842,61 @@ class Flow {
         groupSettings.accepted = true;
         groupSettings.acceptButtonElement.remove();
         Flow.postSuccessResponse(groupSettings.event, inputValues);
+
+        const inputs = Flow.extractInputElements(groupSettings);
+        for (let settings of inputs) {
+            const element = fromHTML(`<div>`);
+
+            // Create an uneditable element based on the input type
+            const type = settings.type;
+    
+            if (type == Flow.textInputType) {
+                element.classList.add('fixText');
+                element.textContent = settings.text;
+            } else if (type == Flow.numberInputType) {
+                element.classList.add('fixText');
+                element.textContent = settings.number;
+            } else if (type == Flow.passwordInputType) {
+                element.classList.add('fixText');
+                element.textContent = '••••••••'; // Hide the actual password
+            } else if (type == Flow.codeInputType) {
+                element.classList.add('fixText');
+                element.textContent = settings.code;
+            } else if (type == Flow.checkboxInputType) {
+                const checkboxElement = fromHTML(`<input type="checkbox" disabled>`);
+                checkboxElement.checked = settings.ticked;
+                element.appendChild(checkboxElement);
+            } else if (type == Flow.selectInputType) {
+                element.classList.add('fixText');
+                const selectedChoice = settings.choices.find(c => c.value == settings.value);
+                element.textContent = selectedChoice ? selectedChoice.name : '';
+            } else if (type == Flow.fileInputType) {
+                const fileList = settings.filesDisplayElement.children;
+                const displayList = document.createElement('div');
+                for (const file of fileList) {
+                    const fileElement = fromHTML(`<div>`);
+                    fileElement.textContent = file.textContent;
+                    displayList.appendChild(fileElement);
+                }
+                element.appendChild(displayList);
+            } else if (type == Flow.pasteInputType) {
+                const filesDisplay = settings.filesDisplayElement.innerHTML;
+                const htmlDisplay = settings.htmlDisplayElement.innerHTML;
+                element.innerHTML = filesDisplay || htmlDisplay || settings.emptyDescription;
+            }
+    
+            settings.htmlElement.replaceWith(element);
+        }
     }
 
     static fromGroupSettings(settings) {
-        const groupElement = fromHTML(`<div class="w-100 bordered largeElement">`);
+        const groupElement = fromHTML(`<div class="w-100">`);
+        settings.htmlElement = groupElement;
+        if (settings.children.length > 1) {
+            groupElement.classList.add('bordered');
+            groupElement.classList.add('largeElement');
+        }
+
         for (const child of settings.children) {
             const childElement = Flow.fromElementSettings(child);
             groupElement.appendChild(childElement);
@@ -1214,7 +1282,7 @@ function getFlowPage() {
     const locked = getHashQueryVariable('locked') ?? false;
     if (locked) mode = Flow.runMode;
 
-    const bar = fromHTML(`<div class="listContainerHorizontal">`);
+    const bar = fromHTML(`<div class="listContainerHorizontal sticky">`);
     const leftBarList = fromHTML(`<div class="listHorizontal">`);
     bar.appendChild(leftBarList);
 

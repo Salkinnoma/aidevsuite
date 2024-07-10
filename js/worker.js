@@ -18,6 +18,7 @@ const setStatusEventType = "setStatusEventType";
 // Element types
 const breakType = "breakType";
 const markdownType = "markdownType"; // Includes Katex math parser.
+
 const paragraphType = "paragraphType";
 const titleType = "titleType";
 const subTitleType = "subTitleType";
@@ -192,9 +193,26 @@ function createBreak() {
  *     - `paragraphType`
  *     - `titleType`
  *     - `subTitleType`
- * - **options** (object): An object that can have the following properties:
- *     - **title** (string) [optional]: The title to be shown on hover.
+ * - **options** (object): An object that can have the following properties depending on its `type`:
+ * 
+ * ## All Types
+ *     - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
  *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
+ * 
+ * ## `markdownType`
+ *     - **katex** (bool) [optional]: Whether to render katex. Default is `true`.
+ *     - **katexDelimiters** (array) [optional]: The delimiters to use to find find math equations. Default:
+ *         [
+ *             {left: "$$", right: "$$", display: true},
+ *             {left: "\\(", right: "\\)", display: false},
+ *             //{left: "$", right: "$", display: false} // LaTeX uses $…$, but it ruins the display of normal `$` in text ($ must come after $$)
+ *             {left: "\\begin{equation}", right: "\\end{equation}", display: true},
+ *             {left: "\\begin{align}", right: "\\end{align}", display: true},
+ *             {left: "\\begin{alignat}", right: "\\end{alignat}", display: true},
+ *             {left: "\\begin{gather}", right: "\\end{gather}", display: true},
+ *             {left: "\\begin{CD}", right: "\\end{CD}", display: true},
+ *             {left: "\\[", right: "\\]", display: true},
+            ]
  */
 function createText(type, text, options = null) {
     const content = {
@@ -208,7 +226,7 @@ function createText(type, text, options = null) {
 /**
  * - **options** (object): An object that can have the following properties:
  *     - **language** (string) [optional]: The language of the code.
- *     - **title** (string) [optional]: The title to be shown on hover.
+ *     - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
  *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
  */
 function createCode(code, options = null) {

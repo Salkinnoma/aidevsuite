@@ -85,7 +85,7 @@ function loadPage() {
     } else if (localPages.has(link)) {
         newPage = getFlowPage(localPages.get(link).code);
     } else {
-        window.open('#');
+        openPage();
         return;
     }
 

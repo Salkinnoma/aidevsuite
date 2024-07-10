@@ -1,5 +1,5 @@
 class ParsingHelpers {
-    static extractCode(markdown) {
+    static extractCode(markdown, codeBlocksOnly = true) {
         let amount = 0;
         let isCodeBlock = false;
         let isIndentedCode = false;
@@ -30,7 +30,7 @@ class ParsingHelpers {
                     }
                 } else if (amount === 1) {
                     if (isIndentedCode) {
-                        codes.push(markdown.substring(codeStart, i));
+                        if (!codeBlocksOnly) codes.push(markdown.substring(codeStart, i));
                         isIndentedCode = false;
                     } else if (isCodeBlock) {
                         continue;
@@ -47,7 +47,7 @@ class ParsingHelpers {
         if (isCodeBlock) {
             codes.push(markdown.substring(codeStart, markdown.length - amount));
         } else if (isIndentedCode) {
-            codes.push(markdown.substring(codeStart, markdown.length - amount));
+            if(!codeBlocksOnly) codes.push(markdown.substring(codeStart, markdown.length - amount));
         }
 
         return codes;
