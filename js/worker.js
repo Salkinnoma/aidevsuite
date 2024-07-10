@@ -316,8 +316,6 @@ function createContainer(type, elements, options = null) {
  * - **name** (string) [optional]: Recommended for use as part of the `showGroup` function.
  *
  * ### All Input Types
- * - **isInvalid** (bool) [optional]: Whether the input is invalid at start. Defaults to `false`.
- * - **validationMessage** (string) [optional]: The initial validation message. Defaults to `'Invalid value. Please choose a different value.'`.
  * - **onValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called whenever the value of an input changes. Its parameters are group, element. The return value of onValidate must be an object with the following properties:
  *     - **valid** (bool): Whether the value is valid.
  *     - **message** (string) [optional]: An error message. Defaults to `'Invalid value. Please choose a different value.'`.
