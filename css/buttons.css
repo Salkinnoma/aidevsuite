@@ -3,6 +3,7 @@ button, .fakeButton {
     align-items: center;
     border: 0;
     background: inherit;
+    color: inherit;
     padding: 0;
     font-size: 1rem;
 }

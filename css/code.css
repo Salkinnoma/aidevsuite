@@ -4,11 +4,16 @@ code {
     overflow-x: clip;
 }
 
+p code {
+    background: var(--inline-code-background-color);
+}
+
 .codeCopyButton {
     border: none;
     padding: 5px 10px;
     cursor: pointer;
     border-radius: 5px;
+    color: inherit;
 }
 
 .codeBar {
@@ -26,6 +31,7 @@ pre {
     background-color: var(--codeblock-background-color);
     border-radius: 8px;
     margin: 16px 0;
+    color: var(--codeblock-color);
 }
 
 .codeLanguage {

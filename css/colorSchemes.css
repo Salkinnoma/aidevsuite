@@ -6,7 +6,7 @@
 
 /* The variabels should work with multiple levels of abstractions. */
 /* First generic color definitions, then more and more element specific. */
-[color-scheme="dark"] {
+[color-scheme="dark"], .dark {
     color-scheme: dark;
     /* Generic Colors */
     --brand-color: #BDAACB;
@@ -42,12 +42,14 @@
     --navbar-background-color: var(--background-color);
     --tooltip-background-color: var(--raised-background-color);
     --code-bar-background-color: var(--raised-background-color);
+    --codeblock-color: var(--text-color);
     --codeblock-background-color: var(--lowered-background-color);
+    --inline-code-background-color: #444;
 }
 
 /* The variabels should work with multiple levels of abstractions. */
 /* First generic color definitions, then more and more element specific. */
-[color-scheme="light"] {
+[color-scheme="light"], .light {
     color-scheme: light;
     /* Generic Colors */
     --brand-color: #BDAACB;
@@ -59,8 +61,8 @@
     --stress-color: #30765a;
     --placeholder-color: #999;
     /* Background Colors */
-    --background-color: #FFF;
-    --raised-background-color: #F9F9F9;
+    --background-color: #EEE;
+    --raised-background-color: #E7E7E7;
     --disabled-background-color: #777;
     --lowered-background-color: #FFF;
     --active-background-color: #DDD;
@@ -82,14 +84,16 @@
     --sidebar-background-color: var(--background-color);
     --navbar-background-color: var(--background-color);
     --tooltip-background-color: var(--background-color);
-    --code-bar-background-color: #333;
-    --codeblock-background-color: #111;
+    --code-bar-background-color: var(--raised-background-color);
+    --codeblock-background-color: var(--lowered-background-color);
+    --codeblock-color: var(--text-color);
+    --inline-code-background-color: #ccc;
 }
 
-[color-scheme="dark"] .lightModeOnly {
+[color-scheme="dark"] .lightModeOnly, .dark .lightModeOnly {
     display: none;
 }
 
-[color-scheme="light"] .darkModeOnly {
+[color-scheme="light"] .darkModeOnly, .light .lightModeOnly {
     display: none;
 }

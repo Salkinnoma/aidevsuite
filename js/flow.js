@@ -117,7 +117,11 @@ class Flow {
     }
 
     static async generateScript() {
-        const systemPrompt = `The user will ask you to write a script for a custom interactive tool that clearly communicates with the user. Your script will be evaluated in the eval part of onmessage on a worker. Below is the worker script that will eval your script. All code you write will be executed within an async funciton within eval. Write the whole script and only the script within a single code block, such that it can be easily parsed.\n\n` +
+        if (Flow.generating) return;
+        Flow.generating = true;
+        Flow.generateScriptButton.setAttribute('disabled', '');
+
+        const systemPrompt = `The user will ask you to write a script for a custom interactive tool that clearly communicates with the user. Your script will be evaluated in the eval part of onmessage on a worker. Below is the worker script that will eval your script. All code you write will be executed within an async funciton within eval. Write the whole script and only the script within a single code block (use \`\`\`code here\`\`\`), such that it can be easily parsed.\n\n` +
             await Flow.getWorkerScript();
         const prompt = Flow.getPrompt();
         const systemMessage = ChatGptApi.ToSystemMessage(systemPrompt);
@@ -149,6 +153,8 @@ class Flow {
         document.execCommand('insertText', false, code);
 
         Flow.updateCode(code);
+
+        Flow.generating = false;
     }
 
     static async executeCode() {
@@ -1501,6 +1507,7 @@ function getFlowPage() {
         footer.appendChild(fromHTML(`<div>`));
         const rightFooterList = fromHTML(`<div class="listHorizontal">`);
         const generateButton = fromHTML(`<button class="largeElement complexButton">`);
+        Flow.generateScriptButton = generateButton;
         const generateButtonList = fromHTML(`<div class="listHorizontal">`);
         const sparklesIcon = icons.sparkles();
         sparklesIcon.classList.add('smallIcon');

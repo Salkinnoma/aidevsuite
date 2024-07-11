@@ -22,10 +22,12 @@ class MarkdownHelpers {
 
     static adjustMarkedOuput(...elements) {
         for (let element of elements) {
-            if (!element.nodeType == Node.ELEMENT_NODE) return;
+            if (element.nodeType != Node.ELEMENT_NODE) continue;
             const tag = element.tagName?.toLowerCase();
+
             CodeHelpers.adjustCodeBlocks(element);
             if (tag == 'table') element.classList.add('tableBordered');
+            [...element.querySelectorAll('a')].forEach(e => e.classList.add('textLink'));
         }
     }
 }
