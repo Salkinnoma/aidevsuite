@@ -2,6 +2,7 @@ blockquote {
     padding: 0 60px;
     padding:10px;
     padding-left:55px;
+    font-style: italic;
 }
  
 blockquote:before {

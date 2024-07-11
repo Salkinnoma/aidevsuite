@@ -9,8 +9,10 @@ const errorStatus = 'errorStatus';
 const logEventType = "logEventType";
 const evalEventType = "evalEventType";
 const showEventType = "showEventType";
+const removeEventType = "removeEventType";
 const validateInputEventType = "validateInputEventType";
 const delayedValidateInputEventType = "delayedValidateInputEventType";
+const clickEventType = "clickEventType";
 const fileDownloadEventType = "fileDownloadEventType";
 const dataURLDownloadEventType = "dataURLDownloadEventType";
 const setProgressEventType = "setProgressEventType";
@@ -18,6 +20,7 @@ const setStatusEventType = "setStatusEventType";
 
 // Element types
 const breakType = "breakType";
+const emptyType = "emptyType";
 const markdownType = "markdownType"; // Includes Katex math parser.
 
 const paragraphType = "paragraphType";
@@ -34,14 +37,16 @@ const heroIconProvider = "heroIconProvider";
 // Container element types
 const barType = "barType";
 const verticalType = "verticalType";
+const buttonType = "buttonType";
 
 // Bar sub types
 const navBarType = "navBarType";
 const listBarType = "listBarType";
 const fillBarType = "fillBarType";
 
-// Interactable types
-const buttonType = "buttonType";
+// Button sub types
+const simpleButtonType = "simpleButtonType";
+const complexButtonType = "complexButtonType";
 
 // Input element types
 const textInputType = "textInputType";
@@ -56,6 +61,7 @@ const fileInputType = "fileInputType";
 // Element type sets
 const allTypes = new Set([
     breakType,
+    emptyType,
     markdownType,
     paragraphType,
     titleType,
@@ -78,6 +84,7 @@ const allTypes = new Set([
 const containerTypes = new Set([
     barType,
     verticalType,
+    buttonType,
 ]);
 
 const textTypes = new Set([
@@ -146,7 +153,6 @@ function requireResponse(type, content, onPing = null, pingSourceEvent = null){
             else resolve(event.data.content);
         });
 
-
         postRequest(type, content, id, pingId, pingSourceEvent);
     });
 }
@@ -182,6 +188,14 @@ onmessage = async function(e){
 function createBreak() {
     const content = {
         type: breakType,
+    };
+    return content;
+}
+
+// Create empty placeholder elements for use in navBarLists, as they use `justify: space-between;`
+function createEmpty() {
+    const content = {
+        type: emptyType,
     };
     return content;
 }
@@ -277,19 +291,29 @@ function createIcon(ds, iconProvider, options = null) {
  * - **type** (string): Specifies the type of the container. Supported values are:
  *     - `barType`
  *     - `verticalType`
- * - **elements** (array): A list of elements displayed within the container.
+ * - **elements** (array): A list of elements displayed within the container. Please do not put buttons or interactables within buttons.
  * - **options** (object): An object that contains various options specific to the `type` of input. The options available depend on the input type.
  * 
  * ## Options Configuration by Container Type
+ * ### All Types
+ * - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
+ * - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
  * 
  * ### `barType`
- * - **barSubType** (string) [optional]: The type of the bar. Default is `navBarType`. Supported values are:
- *     - `navBarType`
- *     - `listBarType`
- *     - `fillBarType`
+ * - **barSubType** (string) [optional]: The type of the bar or list. Default is `navBarType`. Supported values are:
+ *     - `navBarType` // Uses `justify-content: space-between;`, works well with the `emptyType` placeholder elements.
+ *     - `listBarType` // Normal wrapping list
+ *     - `fillBarType` // Uses `flex` to try to share the horzontal space but also fill it
  * 
  * ### `verticalType`
  * - **centered** (bool) [optional]: Whether the items should be centered. Default is `false`.
+ * 
+ * ### `buttonType`
+ * - **buttonSubType** (string): Specifies the type of the button. Default is `complexButtonType`. Supported values are:
+ *     - `simpleButtonType` // *Only* use this for small buttons that should blend in, such as an X to close a dialog.
+ *     - `complexButtonType` // Use this for buttons that should be strongly visible, such as a Save or Cancel button.
+ * - **onClick** (function): A callback function that is called whenever the button is clicked. It has neither parameters nor a return value.
+ * - **fullWidth** (bool) [optional]: Whether its width should be stretched to 100%. Default is `false`.
  */
 function createContainer(type, elements, options = null) {
     options ??= {};
@@ -390,7 +414,7 @@ function _extractElements(group) {
         let newUnprocessedElements = [];
         for (let element of unprocessedElements) {
             if (containerTypes.has(element.type)) newUnprocessedElements = newUnprocessedElements.concat(element.elements);
-            else elements.push(element);
+            elements.push(element);
         }
         unprocessedElements = newUnprocessedElements;
     }
@@ -416,6 +440,7 @@ function _mapGroup(group) {
 async function showGroup(group, insertAt = -1, deleteAfter = 0) {
     const onValidateMap = new Map();
     const onDelayedValidateMap = new Map();
+    const onClickMap = new Map();
     const elements = _extractElements(group);
 
 
@@ -439,6 +464,17 @@ async function showGroup(group, insertAt = -1, deleteAfter = 0) {
             element.hasDelayedValidation = true;
             onDelayedValidateMap.set(element.name, onDelayedValidate);
         }
+
+        if (element.options?.onClick != null) {
+            const onClick = element.options?.onClick;
+            delete element.options.onClick;
+            onClickMap.set(element.name, onClick);
+        }
+    }
+
+    const buttons = elements.filter(e => e.type == buttonType);
+    for (let element of buttons) {
+        requireResponse(clickEventType, element.id, _ => onClickMap.get(element.name)()); // Don't await
     }
 
     const response = await requireResponse(showEventType, {group, insertAt, deleteAfter}, async (type, content) => {
@@ -448,7 +484,6 @@ async function showGroup(group, insertAt = -1, deleteAfter = 0) {
         } else if (type == delayedValidateInputEventType) {
             map = onDelayedValidateMap;
         }
-        log(map.size, [...map.entries()]);
         return await map.get(content.element.name)(_mapGroup(content.group), content.element);
     });
 
@@ -510,6 +545,10 @@ async function showGroup(group, insertAt = -1, deleteAfter = 0) {
 async function show(element, insertAt = -1, deleteAfter = 0) {
     let result = await showGroup([element], insertAt, deleteAfter);
     return result[element.name];
+}
+
+async function remove(start, deleteCount) {
+    await requireResponse(removeEventType, {start, deleteCount});
 }
 
 async function requestFileDownload(name, type, content) {

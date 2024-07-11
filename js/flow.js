@@ -11,6 +11,7 @@ class Flow {
     static noOutputMessage = "No output yet...";
     static output = [];
     static groupByElement = new Map();
+    static clickEventById = new Map();
 
     static onPageLoaded() {
         const name = getPathFromHash();
@@ -209,8 +210,10 @@ class Flow {
     static logEventType = "logEventType";
     static evalEventType = "evalEventType";
     static showEventType = "showEventType";
+    static removeEventType = "removeEventType";
     static validateInputEventType = "validateInputEventType";
     static delayedValidateInputEventType = "delayedValidateInputEventType";
+    static clickEventType = "clickEventType";
     static fileDownloadEventType = "fileDownloadEventType";
     static dataURLDownloadEventType = "dataURLDownloadEventType";
     static setProgressEventType = "setProgressEventType";
@@ -218,6 +221,7 @@ class Flow {
 
     // Element types
     static breakType = "breakType";
+    static emptyType = "emptyType";
     static codeType = "codeType";
     static markdownType = "markdownType"; // Includes Katex math parser.
     static paragraphType = "paragraphType";
@@ -233,14 +237,16 @@ class Flow {
     // Container element types
     static barType = "barType";
     static verticalType = "verticalType";
+    static buttonType = "buttonType";
 
     // Bar sub types
     static navBarType = "navBarType";
     static listBarType = "listBarType";
     static fillBarType = "fillBarType";
 
-    // Interactable types
-    static buttonType = "buttonType";
+    // Button sub types
+    static simpleButtonType = "simpleButtonType";
+    static complexButtonType = "complexButtonType";
 
     // Input element types
     static textInputType = "textInputType";
@@ -255,6 +261,7 @@ class Flow {
     // Element type sets
     static allTypes = new Set([
         Flow.breakType,
+        Flow.emptyType,
         Flow.markdownType,
         Flow.paragraphType,
         Flow.titleType,
@@ -278,6 +285,7 @@ class Flow {
     static containerTypes = new Set([
         Flow.barType,
         Flow.verticalType,
+        Flow.buttonType,
     ]);
 
     static textTypes = new Set([
@@ -309,7 +317,7 @@ class Flow {
         Flow.worker.postMessage({id, pingId, pingSourceId: pingSourceEvent?.data.pingId, type, content});
     }
 
-    static postSuccessResponse(requestEvent, content, message = null) {
+    static postSuccessResponse(requestEvent, content = null, message = null) {
         Flow.worker.postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: Flow.successStatus, content, message });
     }
 
@@ -359,6 +367,10 @@ class Flow {
                 Flow.onLogRequest(e);
             } else if (e.data.type === Flow.showEventType) {
                 Flow.onShowRequest(e);
+            } else if (e.data.type === Flow.removeEventType) {
+                Flow.onRemove(e);
+            } else if (e.data.type === Flow.clickEventType) {
+                Flow.onClick(e);
             } else if (e.data.type === Flow.fileDownloadEventType) {
                 Flow.onFileDownloadRequest(e);
             } else if (e.data.type === Flow.dataURLDownloadEventType) {
@@ -445,6 +457,8 @@ class Flow {
                 settings.katex = options.katex ?? true;
                 settings.katexDelimiters = options.katexDelimiters;
             }
+        } else if (type === Flow.emptyType) {
+            // Do nothing
         } else if (type === Flow.codeType) {
             settings.code = element.code;
             settings.language = options.language;
@@ -454,7 +468,6 @@ class Flow {
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
         } else if (type === Flow.iconType) {
-            console.log(type);
             settings.ds = element.ds;
             settings.iconProvider = element.iconProvider;
             settings.caption = options.caption;
@@ -463,10 +476,16 @@ class Flow {
         } else if (Flow.containerTypes.has(type)) {
             settings.children = element.elements.map(e => Flow.extractSettingsFromElement(e, groupSettings));
             settings.children.forEach(s => s.parent = settings);
+            settings.title = options.title;
+            settings.useTooltipInstead = options.useTooltipInstead ?? true;
+
             if (type === Flow.barType) {
                 settings.barSubType = options.barSubType ?? Flow.navBarType;
             } else if (type === Flow.verticalType) {
                 settings.centered = options.centered ?? false;
+            } else if (type === Flow.buttonType) {
+                settings.buttonSubType = options.buttonSubType ?? Flow.complexButtonType;
+                settings.fullWidth = options.fullWidth ?? false;
             }
         } else if (Flow.inputTypes.has(type)) {
             settings.name = element.name;
@@ -681,6 +700,8 @@ class Flow {
         if (type == Flow.breakType) {
             if (containered) element.classList.add('vb-1');
             else element.classList.add('hb-1');
+        } else if (type == Flow.emptyType) {
+            // Do nothing
         } else if (type == Flow.markdownType) {
             Flow.tryAddTitle(element, settings);
             renderMarkdown(element, settings.text, {options: {delimiters: settings.katexDelimiters}, sanitize: true, katex: settings.katex});
@@ -726,7 +747,8 @@ class Flow {
                 element.appendChild(svgElement);
             }
         } else if (Flow.containerTypes.has(settings.type)) {
-            const childElements = settings.children.map(s => Flow.fromElementSettings(s));
+            Flow.tryAddTitle(element, settings);
+            let childElements = settings.children.map(s => Flow.fromElementSettings(s));
 
             if (type == Flow.barType) {
                 if (settings.barSubType == Flow.navBarType) {
@@ -735,21 +757,38 @@ class Flow {
                     element.classList.add('listHorizontal');
                 } else if (settings.barSubType == Flow.fillBarType) {
                     element.classList.add('listHorizontal');
-                    childElements.map(e => {
+                    childElements = childElements.map(e => {
                         const wrapper = fromHTML(`<div class="flexFill">`);
                         wrapper.appendChild(e);
                         return wrapper;
                     });
                 }
+
+                childElements.forEach(e => element.appendChild(e));
             } else if (type == Flow.verticalType) {
                 if (settings.centered == true) {
                     element.classList.add('listVertical');
                 } else {
                     element.classList.add('divList');
                 }
+
+                childElements.forEach(e => element.appendChild(e));
+            } else if (type == Flow.buttonType) {
+                const buttonElement = fromHTML(`<button>`);
+                console.log(settings);
+                if (settings.buttonSubType == Flow.complexButtonType) {
+                    buttonElement.classList.add('complexButton');
+                    buttonElement.classList.add('largeElement');
+                }
+                if (settings.fullWidth) {
+                    buttonElement.classList.add('w-100');
+                }
+                buttonElement.addEventListener('click', e => Flow.requireResponse(Flow.clickEventType, null, null, Flow.clickEventById.get(settings.id)));
+                childElements.forEach(e => buttonElement.appendChild(e));
+                element.appendChild(buttonElement);
             }
 
-            childElements.forEach(e => element.appendChild(e));
+
         } else if (type == Flow.textInputType) {
             const editorContainer = fromHTML(`<div class="contenteditableContainer largeElement bordered">`);
             const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText">`);
@@ -1041,6 +1080,19 @@ class Flow {
         await Flow.spliceOutput(content.insertAt, content.deleteAfter, settings);
 
         if (inputs.length == 0) Flow.postSuccessResponse(e);
+    }
+
+    static async onRemove(event) {
+        const e = event;
+        const content = e.data.content;
+        Flow.spliceOutput(content.start, content.deleteCount);
+        Flow.postSuccessResponse(e);
+    }
+
+    static async onClick(event) {
+        const e = event;
+        const id = e.data.content;
+        Flow.clickEventById.set(id, event);
     }
 
     static import(){
