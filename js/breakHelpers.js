@@ -5,3 +5,8 @@ function hb(n) {
 function hr() {
     return fromHTML(`<hr>`);
 }
+
+
+function vr() {
+    return fromHTML(`<div class="vr">`);
+}

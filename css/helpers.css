@@ -56,6 +56,20 @@
     margin-right: auto;
 }
 
+.info {
+    color: var(--raised-text-color);
+    font-style: italic;
+    font-size: 0.8rem;
+}
+
+.indented {
+    margin-left: 4px;
+}
+
+.indented-2 {
+    margin-left: 8px;
+}
+
 .sticky {
     position: sticky;
     top: 0;
@@ -123,4 +137,30 @@ b {
 
 .scroll-y {
     overflow-y: auto;
+}
+
+.noBorder {
+    border: 0;
+}
+
+.noHorizontalPadding {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.noVerticalPadding {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.flex {
+    display: flex;
+}
+
+[placeholder]:empty:before{
+    content: attr(placeholder);
+    pointer-events: none;
+    display: block; /* For Firefox */
+    color: var(--placeholder-color);
+    font-style: italic;
 }

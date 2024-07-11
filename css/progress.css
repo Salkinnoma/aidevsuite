@@ -1,0 +1,25 @@
+progress {
+    border: 0;
+    height: 10px;
+    border-radius: 5px;
+}
+
+/* They need to be duplicate. Can't put them on one line. */
+progress::-webkit-progress-bar {
+    border: 0;
+    height: 10px;
+    border-radius: 5px;
+    background-color: var(--progress-background-color);
+}
+progress::-webkit-progress-value {
+    border: 0;
+    height: 10px;
+    border-radius: 5px 0 0 5px;
+    background-color: var(--progress-foreground-color);
+}
+progress::-moz-progress-bar {
+    border: 0;
+    height: 10px;
+    border-radius: 5px;
+    background-color: var(--progress-background-color);
+}

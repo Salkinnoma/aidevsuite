@@ -9,10 +9,12 @@ const errorStatus = 'errorStatus';
 const logEventType = "logEventType";
 const evalEventType = "evalEventType";
 const showEventType = "showEventType";
+const updateEventType = "updateEventType";
 const removeEventType = "removeEventType";
 const validateInputEventType = "validateInputEventType";
 const delayedValidateInputEventType = "delayedValidateInputEventType";
 const clickEventType = "clickEventType";
+const chatEventType = "chatEventType";
 const fileDownloadEventType = "fileDownloadEventType";
 const dataURLDownloadEventType = "dataURLDownloadEventType";
 const setProgressEventType = "setProgressEventType";
@@ -20,6 +22,7 @@ const setStatusEventType = "setStatusEventType";
 
 // Element types
 const breakType = "breakType";
+const rulerType = "rulerType";
 const emptyType = "emptyType";
 const markdownType = "markdownType"; // Includes Katex math parser.
 
@@ -53,6 +56,7 @@ const textInputType = "textInputType";
 const numberInputType = "numberInputType";
 const passwordInputType = "passwordInputType";
 const codeInputType = "codeInputType";
+const markdownInputType = "markdownInputType";
 const checkboxInputType = "checkboxInputType";
 const selectInputType = "selectInputType";
 const pasteInputType = "pasteInputType";
@@ -61,6 +65,7 @@ const fileInputType = "fileInputType";
 // Element type sets
 const allTypes = new Set([
     breakType,
+    rulerType,
     emptyType,
     markdownType,
     paragraphType,
@@ -75,6 +80,8 @@ const allTypes = new Set([
     textInputType,
     numberInputType,
     passwordInputType,
+    codeInputType,
+    markdownInputType,
     checkboxInputType,
     selectInputType,
     pasteInputType,
@@ -88,7 +95,6 @@ const containerTypes = new Set([
 ]);
 
 const textTypes = new Set([
-    markdownType,
     paragraphType,
     titleType,
     subTitleType,
@@ -99,6 +105,7 @@ const inputTypes = new Set([
     numberInputType,
     passwordInputType,
     codeInputType,
+    markdownInputType,
     checkboxInputType,
     selectInputType,
     pasteInputType,
@@ -184,25 +191,49 @@ onmessage = async function(e){
 };
 
 
-// Create elements
-function createBreak() {
+/**
+ * Create elements using various create functions. The `options` parameter of any elements can additionally take the following properties:
+ * - **name** (string) [optional]: This is necessary for the `update`, `remove` and some other functions that require an element name functions.
+ * - **hide** (bool) [optional]: This can be useful when smoothly wanting to add to elements of containers without recreating the entire container, as they can't be added via `update`. Default is `false`.
+ * - **leftElements** (array) [optional]: An array of small elements to float to the left of an element.
+ * - **rightElements** (array) [optional]: An array of small elements to float to the right of an element.
+ */
+
+/**
+ * Creates a break.
+ */
+function createBreak(options = null) {
     const content = {
         type: breakType,
+        options,
     };
     return content;
 }
 
-// Create empty placeholder elements for use in navBarLists, as they use `justify: space-between;`
-function createEmpty() {
+/**
+ * Creates a ruler (hr).
+ * - **options** (object) [optional]: An object that can have the following properties:
+ *     - **vertical** (bool) [optional]: Whether the ruler should be vertical. This is useful for bars.
+ */
+function createRuler(options = null) {
+    const content = {
+        type: rulerType,
+        options,
+    };
+    return content;
+}
+
+// Create empty placeholder elements for use in navBarLists, as they use `justify-content: space-between;`
+function createEmpty(options = null) {
     const content = {
         type: emptyType,
+        options,
     };
     return content;
 }
 
 /**
  * - **type** (string): Specifies the type of element.  Supported values are:
- *     - `markdownType`
  *     - `paragraphType`
  *     - `titleType`
  *     - `subTitleType`
@@ -211,21 +242,6 @@ function createEmpty() {
  * ## All Types
  *     - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
  *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
- * 
- * ## `markdownType`
- *     - **katex** (bool) [optional]: Whether to render katex. Default is `true`.
- *     - **katexDelimiters** (array) [optional]: The delimiters to use to find find math equations. Default:
- *         [
- *             {left: "$$", right: "$$", display: true},
- *             {left: "\\(", right: "\\)", display: false},
- *             //{left: "$", right: "$", display: false} // LaTeX uses $…$, but it ruins the display of normal `$` in text ($ must come after $$). Use \(...\) for inline math instead.
- *             {left: "\\begin{equation}", right: "\\end{equation}", display: true},
- *             {left: "\\begin{align}", right: "\\end{align}", display: true},
- *             {left: "\\begin{alignat}", right: "\\end{alignat}", display: true},
- *             {left: "\\begin{gather}", right: "\\end{gather}", display: true},
- *             {left: "\\begin{CD}", right: "\\end{CD}", display: true},
- *             {left: "\\[", right: "\\]", display: true},
-            ]
  */
 function createText(type, text, options = null) {
     const content = {
@@ -253,6 +269,31 @@ function createCode(code, options = null) {
 
 /**
  * - **options** (object): An object that can have the following properties:
+ *     - **katex** (bool) [optional]: Whether to render katex. Default is `true`.
+ *     - **katexDelimiters** (array) [optional]: The delimiters to use to find find math equations. Default:
+ *         [
+ *             {left: "$$", right: "$$", display: true},
+ *             {left: "\\(", right: "\\)", display: false},
+ *             //{left: "$", right: "$", display: false} // LaTeX uses $…$, but it ruins the display of normal `$` in text ($ must come after $$). Use \(...\) for inline math instead.
+ *             {left: "\\begin{equation}", right: "\\end{equation}", display: true},
+ *             {left: "\\begin{align}", right: "\\end{align}", display: true},
+ *             {left: "\\begin{alignat}", right: "\\end{alignat}", display: true},
+ *             {left: "\\begin{gather}", right: "\\end{gather}", display: true},
+ *             {left: "\\begin{CD}", right: "\\end{CD}", display: true},
+ *             {left: "\\[", right: "\\]", display: true},
+            ]
+ */
+function createMarkdown(markdown, options = null) {
+    const content = {
+        type: markdownType,
+        markdown,
+        options,
+    };
+    return content;
+}
+
+/**
+ * - **options** (object): An object that can have the following properties:
  *     - **caption** (string) [optional]: The caption for the image.
  *     - **title** (string) [optional]: The title to be shown on hover.
  *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
@@ -268,7 +309,7 @@ function createImage(url, options = null) {
 
 /**
  * ## Parameters
- * - **ds** (array of strings or a string): If it is an array, it creates a path element for each d. If it is a string, it uses predefined paths. The following string values are supported: `"close"`, `"expandMore"`, `"expandLess"`, `"menu"`, `"menuClose"`, `"menuHorizontal"`, `"download"`, `"upload"`, `"lock"`, `"noLock"`, `"edit"`, `"noEdit"`, `"delete"`, `"highlight"`, `"highlightOff"`, `"play"`, `"settings"`, `"sparkles"`, `"star"`, `"starFilled"`, `"copy"`.
+ * - **ds** (array of strings or a string): If it is an array, it creates a path element for each d. If it is a string, it uses predefined paths. The following string values are supported: `"close"`, `"expandMore"`, `"expandLess"`, `"menu"`, `"menuClose"`, `"menuHorizontal"`, `"download"`, `"upload"`, `"lock"`, `"noLock"`, `"edit"`, `"noEdit"`, `"delete"`, `"highlight"`, `"highlightOff"`, `"play"`, `"settings"`, `"sparkles"`, `"star"`, `"starFilled"`, `"copy"`, `"user"`, `"cpu"`, `"link"`, `"dollar"`, `"at"`, `"photo"`, `"retry"`, `"undo"`, `"redo"`.
  * - **iconProvider** (string): The type of the icon. Supported values are:
  *     - `materialIconProvider`
  *     - `heroIconProvider`
@@ -301,7 +342,7 @@ function createIcon(ds, iconProvider, options = null) {
  * 
  * ### `barType`
  * - **barSubType** (string) [optional]: The type of the bar or list. Default is `navBarType`. Supported values are:
- *     - `navBarType` // Uses `justify-content: space-between;`, works well with the `emptyType` placeholder elements.
+ *     - `navBarType` // Uses `justify-content: space-between;`, works well with `emptyType` elements. E.g. a navBar with an emptyElement and a button will cause the button to float right.
  *     - `listBarType` // Normal wrapping list
  *     - `fillBarType` // Uses `flex` to try to share the horzontal space but also fill it
  * 
@@ -371,6 +412,13 @@ function createContainer(type, elements, options = null) {
  * - **language** (string) [optional]: The language of the code.
  * - **context** (string) [optional]: Information about the context in which the code will be executed. Allows better integration with chatbots.
  * 
+ * ### `markdownInputType`
+ * - **defaultValue** (string) [optional]: The default code value for the input. Default is an empty string `''`.
+ * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter markdown here..."`.
+ * - **spellcheck** (bool) [optional]: Whether to enable spellcheck. Default is `false`.
+ * - **katex** (bool) [optional]: Whether to render katex. Default is `true`.
+ * - **katexDelimiters** (array) [optional]: The delimiters to use to find find math equations. Default: Same as for `createText`.
+ * 
  * ### `checkboxInputType`
  * - **defaultValue** (number) [optional]: The default bool value for the input. Default is false.
  * - **description** (string) [optional]: A short description to the left of the checkbox. Default is an empty string `''`.
@@ -414,6 +462,8 @@ function _extractElements(group) {
         let newUnprocessedElements = [];
         for (let element of unprocessedElements) {
             if (containerTypes.has(element.type)) newUnprocessedElements = newUnprocessedElements.concat(element.elements);
+            if (element.leftElements != null) newUnprocessedElements = newUnprocessedElements.concat(element.leftElements);
+            if (element.rightElements != null) newUnprocessedElements = newUnprocessedElements.concat(element.rightElements);
             elements.push(element);
         }
         unprocessedElements = newUnprocessedElements;
@@ -430,14 +480,20 @@ function _mapGroup(group) {
 }
 
 /**
- * The group parameter accepts an array of elements created via any of the create functions.
- * For inputs, it is recommended to define a name, to allow easy access of the return values.
+ * - **group** (array): The group parameter accepts an array of elements created via any of the create functions. For inputs, it is recommended to define a name, to allow easy access of the return values.
+ * - **options** (object) [optional]: An object that can have the following properties:
+ *     - **name** (string) [optional]: This is necessary for the `update`, `remove` and some other functions that require a group name functions.
+ *     - **bordered** (number) [optional]: Whether the group should be bordered. Default is `false`.
+ *     - **sticky** (number) [optional]: Whether it should stick to the top. Default is `false`.
+ *     - **insertAt** (number) [optional]: Where to insert. The default is `-1`.
+ *     - **deleteAfter** (number) [optional]: How many to delete after this. The default is `0`.
+ *     - **deleteBefore** (number) [optional]: How many to delete before this. The default is `0`.
  *
  * ## Return value when awaited
  * When this function is awaited, it returns an object that contains each input element from the group parameter with their name as a key. If no name is defined, their flattened index within the group is used instead, and added to the element as a name property.
  * Each returned input element contains data as described by the `show` function.
  * */
-async function showGroup(group, insertAt = -1, deleteAfter = 0) {
+async function showGroup(group, options) {
     const onValidateMap = new Map();
     const onDelayedValidateMap = new Map();
     const onClickMap = new Map();
@@ -477,7 +533,7 @@ async function showGroup(group, insertAt = -1, deleteAfter = 0) {
         requireResponse(clickEventType, element.id, _ => onClickMap.get(element.name)()); // Don't await
     }
 
-    const response = await requireResponse(showEventType, {group, insertAt, deleteAfter}, async (type, content) => {
+    const response = await requireResponse(showEventType, {children: group, options}, async (type, content) => {
         let map = null;
         if (type == validateInputEventType) {
             map = onValidateMap;
@@ -493,6 +549,9 @@ async function showGroup(group, insertAt = -1, deleteAfter = 0) {
 /**
  * The element parameter should be created via any of the create functions.
  * For showing multiple elements at once, use the `showGroup` function.
+ * 
+ * ## Parameters
+ * The parameters are the same as for the `showGroup` function.
  *
  * ## Return value when awaited
  * When this function is awaited:
@@ -506,6 +565,9 @@ async function showGroup(group, insertAt = -1, deleteAfter = 0) {
  * 
  * ### For `codeInputType`
  * - **code** (string): The code value of the input.
+ * 
+ * ### For `markdownInputType`
+ * - **markdown** (string): The markdown value of the input.
  *
  * ### For `numberInputType`
  * - **number** (number): The number value of the input.
@@ -542,13 +604,52 @@ async function showGroup(group, insertAt = -1, deleteAfter = 0) {
  *     - **text** (string): The text content of the file.
  *     - **dataURL** (string): The Data URL of the file.
  * */
-async function show(element, insertAt = -1, deleteAfter = 0) {
-    let result = await showGroup([element], insertAt, deleteAfter);
+async function show(element, options) {
+    let result = await showGroup([element], options);
     return result[element.name];
 }
 
-async function remove(start, deleteCount) {
-    await requireResponse(removeEventType, {start, deleteCount});
+/**
+ * - **groupName** (string): The name of the group to update.
+ * - **elementName** (string): The name of the element to update. You cannot update accepted inputs (after awaiting return value).
+ * - **properties** (object): An object that contains the properties to update. The following properties are available:
+ *     - All properties passed into any of the create functions, except `type`, `options`, any child element properties and any of the callback functions.
+ *     - All properties of the `options` property, except `defaultValue` and any of the callback functions.
+ *     - All return value properties from inputs.
+ */
+async function update(groupName, elementName, properties) {
+    await requireResponse(updateEventType, {groupName, elementName, properties});
+}
+
+/**
+ * - **groupName** (string) [optional]: The name of the group to delete. If null, all groups are deleted instead.
+ * - **elementName** (string) [optional]: The name of the element to delete. If null, the entire group is deleted instead.
+ */
+async function remove(groupName = null, elementName = null) {
+    await requireResponse(removeEventType, {groupName, elementName});
+}
+
+/**
+ * This allows communicating with a chatbot.
+ * - **context** (array): A list of message objects.
+ * - **options** (object): An object that can have the following properties:
+ *     - **element** (array of 2 strings) [optional]: Allows streaming to an element. The first string must be the `name` of the group, the second must be the `name` of the element. If streaming to an input, it will be disabled for user input while streaming. This only works on elements with a string value, such as text or code.
+ *     - **onUpdate** (function) [optional]: Allows streaming to a callback function. The function takes in the following parameters:
+ *         - **response** (string): The updated full response text.
+ *     - **model** (string) [optional]: The model to be used. Default is `ChatHelpers.gpt4OmniIdentifier`.
+ *     - **seed** (number) [optional]: The seed to be used. Very unreliable.
+ */
+async function chat(context, options = null) {
+    const onUpdate = options?.onUpdate;
+    if (onUpdate == null) {
+        await requireResponse(chatEventType, {context, options});
+    } else {
+        delete options.onUpdate;
+        options.hasOnUpdate = true;
+        await requireResponse(chatEventType, {context, options}, e => onUpdate(e.data.content));
+    }
+
+  
 }
 
 async function requestFileDownload(name, type, content) {
@@ -569,17 +670,17 @@ async function requestDataURLDownload(name, dataURL) {
 }
 
 /**
- * Sets the current progress of the application.
+ * Shows a progress bar at the top. This is useful if something may take long.
  *
  * ## Parameters
- * - **progress** (float): The desired progress. This is clamped between 0 and 0.9. After the program is finished, this is set to 1.
+ * - **progress** (float): The desired progress. This is clamped between 0 and 100. Set to null to hide progress again.
  * */
 async function setProgress(progress) {
     return await requireResponse(setProgressEventType, progress);
 }
 
 /**
- * Sets the current status message of the application.
+ * Sets the current status message of the application. Can be used in combination with progress if something may take long.
  *
  * ## Parameters
  * - **status** (string): The status message.
@@ -663,4 +764,58 @@ function unescapeHTML(str) {
             return entity;
         }
     });
+}
+
+const systemRole = "system";
+const userRole = "user";
+const assistantRole = "assistant";
+class ChatHelpers {
+    static messageToString(message){
+        return message.role + ": " + message.content;
+    }
+
+    static gpt4OmniName = "GPT-4 Omni";
+    static gpt4TurboName = "GPT-4 Turbo";
+    static gpt4Name = "GPT-4";
+    static gpt3_5TurboName = "GPT-3.5 Turbo";
+
+    static gpt4OmniIdentifier = "gpt-4o";
+    static gpt4TurboIdentifier = "gpt-4-turbo";
+    static gpt4Identifier = "gpt-4";
+    static gpt3_5TurboIdentifier = "gpt-3.5-turbo";
+
+    static defaultModel = this.gpt4OmniIdentifier;
+
+    static gptModelNames = {
+        [this.gpt4OmniIdentifier]: this.gpt4OmniName,
+        [this.gpt4TurboIdentifier]: this.gpt4TurboName,
+        [this.gpt4Identifier]: this.gpt4Name,
+        [this.gpt3_5TurboIdentifier]: this.gpt3_5TurboName
+    }
+
+    static gptModels = new Set(Object.keys(this.gptModelNames));
+
+    static gptModelsThatAllowImages = new Set([
+        this.gpt4OmniIdentifier,
+        this.gpt4TurboIdentifier
+    ]);
+}
+
+function toMessage(role, content, url = null){
+    return {role, content, url};
+}
+
+function toSystemMessage(prompt){
+    return toMessage(systemRole, prompt);
+}
+
+/**
+ * The image url is optional and only available for models that allow images.
+ */
+function toUserMessage(prompt, url = null){
+    return toMessage(userRole, prompt, url);
+}
+
+function toAssistantMessage(prompt){
+    return toMessage(assistantRole, prompt);
 }

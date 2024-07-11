@@ -10,6 +10,8 @@ class Flow {
     static status = "Running...";
     static noOutputMessage = "No output yet...";
     static output = [];
+    static groupByName = new Map();
+    static settingsByGroupNameAndName = new Map();
     static groupByElement = new Map();
     static clickEventById = new Map();
 
@@ -120,12 +122,13 @@ class Flow {
         if (Flow.generating) return;
         Flow.generating = true;
         Flow.generateScriptButton.setAttribute('disabled', '');
+        Flow.setStatus('Generating script...');
 
         const systemPrompt = `The user will ask you to write a script for a custom interactive tool that clearly communicates with the user. Your script will be evaluated in the eval part of onmessage on a worker. Below is the worker script that will eval your script. All code you write will be executed within an async funciton within eval. Write the whole script and only the script within a single code block (use \`\`\`code here\`\`\`), such that it can be easily parsed.\n\n` +
             await Flow.getWorkerScript();
         const prompt = Flow.getPrompt();
-        const systemMessage = ChatGptApi.ToSystemMessage(systemPrompt);
-        const userMessage = ChatGptApi.ToUserMessage(prompt);
+        const systemMessage = ChatGptApi.toSystemMessage(systemPrompt);
+        const userMessage = ChatGptApi.toUserMessage(prompt);
         const context = [systemMessage, userMessage];
 
         Flow.codeEditorContainerElement.classList.add('hide');
@@ -154,14 +157,38 @@ class Flow {
 
         Flow.updateCode(code);
 
+        Flow.setStatus('Finished');
         Flow.generating = false;
+    }
+
+    static showProgress() {
+        Flow.progressBar.classList.remove('hide');
+    }
+
+    static hideProgress() {
+        Flow.progressBar.classList.add('hide');
+    }
+
+    static setProgress(value) {
+        if (value == null) {
+            Flow.hideProgress();
+            return;
+        }
+
+        Flow.showProgress();
+        Flow.progress = Math.max(100, Math.min(0, value));
+        Flow.progressBar.value = Flow.progress;
+    }
+
+    static setStatus(message) {
+        Flow.status = message;
+        Flow.statusElement.textContent = Flow.status;
     }
 
     static async executeCode() {
         Flow.isRunning = true;
 
-        Flow.progress = 0;
-        Flow.status = "Running...";
+        Flow.setStatus("Running...");
         console.log(Flow.status);
         Flow.output = [];
         Flow.groupByElement.clear();
@@ -174,11 +201,11 @@ class Flow {
             error = e;
         }
         Flow.worker.terminate();
+        Flow.hideProgress();
 
-        if (error) Flow.status = "Script Error: " + error;
-        else Flow.status = "Finished";
+        if (error) Flow.setStatus("Script Error: " + error);
+        else Flow.setStatus("Finished");
         console.log(Flow.status);
-        Flow.progress = Flow.maxProgress;
 
         Flow.isRunning = false;
     }
@@ -216,10 +243,12 @@ class Flow {
     static logEventType = "logEventType";
     static evalEventType = "evalEventType";
     static showEventType = "showEventType";
+    static updateEventType = "updateEventType";
     static removeEventType = "removeEventType";
     static validateInputEventType = "validateInputEventType";
     static delayedValidateInputEventType = "delayedValidateInputEventType";
     static clickEventType = "clickEventType";
+    static chatEventType = "chatEventType";
     static fileDownloadEventType = "fileDownloadEventType";
     static dataURLDownloadEventType = "dataURLDownloadEventType";
     static setProgressEventType = "setProgressEventType";
@@ -227,6 +256,7 @@ class Flow {
 
     // Element types
     static breakType = "breakType";
+    static rulerType = "rulerType";
     static emptyType = "emptyType";
     static codeType = "codeType";
     static markdownType = "markdownType"; // Includes Katex math parser.
@@ -259,6 +289,7 @@ class Flow {
     static numberInputType = "numberInputType";
     static passwordInputType = "passwordInputType";
     static codeInputType = "codeInputType";
+    static markdownInputType = "markdownInputType";
     static checkboxInputType = "checkboxInputType";
     static selectInputType = "selectInputType";
     static pasteInputType = "pasteInputType";
@@ -267,6 +298,7 @@ class Flow {
     // Element type sets
     static allTypes = new Set([
         Flow.breakType,
+        Flow.rulerType,
         Flow.emptyType,
         Flow.markdownType,
         Flow.paragraphType,
@@ -282,6 +314,7 @@ class Flow {
         Flow.numberInputType,
         Flow.passwordInputType,
         Flow.codeInputType,
+        Flow.markdownInputType,
         Flow.checkboxInputType,
         Flow.selectInputType,
         Flow.pasteInputType,
@@ -295,7 +328,6 @@ class Flow {
     ]);
 
     static textTypes = new Set([
-        Flow.markdownType,
         Flow.paragraphType,
         Flow.titleType,
         Flow.subTitleType,
@@ -306,6 +338,7 @@ class Flow {
         Flow.numberInputType,
         Flow.passwordInputType,
         Flow.codeInputType,
+        Flow.markdownInputType,
         Flow.checkboxInputType,
         Flow.selectInputType,
         Flow.pasteInputType,
@@ -373,10 +406,14 @@ class Flow {
                 Flow.onLogRequest(e);
             } else if (e.data.type === Flow.showEventType) {
                 Flow.onShowRequest(e);
-            } else if (e.data.type === Flow.removeEventType) {
+            } else if (e.data.type === Flow.updateEventType) {
+                Flow.onUpdate(e);
+            }  else if (e.data.type === Flow.removeEventType) {
                 Flow.onRemove(e);
             } else if (e.data.type === Flow.clickEventType) {
                 Flow.onClick(e);
+            } else if (e.data.type === Flow.chatEventType) {
+                Flow.onChat(e);
             } else if (e.data.type === Flow.fileDownloadEventType) {
                 Flow.onFileDownloadRequest(e);
             } else if (e.data.type === Flow.dataURLDownloadEventType) {
@@ -454,20 +491,37 @@ class Flow {
         const type = element.type;
         const options = element.options ?? {};
     
-        const settings = {type, id: element.id, group: groupSettings};
+        const settings = {type, id: element.id, group: groupSettings, children: []};
+        if (options.leftElements) {
+            settings.leftChildren = options.leftElements.map(e => Flow.extractSettingsFromElement(e, groupSettings));
+            settings.children = settings.children.concat(settings.leftChildren);
+            settings.leftChildren.forEach(s => s.parent = settings);
+        }
+        if (options.rightElements) {
+            settings.rightChildren = options.rightElements.map(e => Flow.extractSettingsFromElement(e, groupSettings));
+            settings.children = settings.children.concat(settings.rightChildren);
+            settings.rightChildren.forEach(s => s.parent = settings);
+        }
+        settings.name = element.name ?? element.id;
+        settings.hide = element.hide ?? false;
+        Flow.settingsByGroupNameAndName.get(groupSettings.name).set(settings.name, settings);
+
+        console.log(element);
         if (Flow.textTypes.has(type)) {
             settings.text = element.text;
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
-            if (type == Flow.markdownType) {
-                settings.katex = options.katex ?? true;
-                settings.katexDelimiters = options.katexDelimiters;
-            }
         } else if (type === Flow.emptyType) {
             // Do nothing
+        } else if (type === Flow.rulerType) {
+            settings.vertical = options.vertical;
         } else if (type === Flow.codeType) {
             settings.code = element.code;
             settings.language = options.language;
+        } else if (type === Flow.markdownType) {
+            settings.markdown = element.markdown;
+            settings.katex = options.katex ?? true;
+            settings.katexDelimiters = options.katexDelimiters;
         } else if (type === Flow.imageType) {
             settings.url = element.url;
             settings.caption = options.caption;
@@ -480,7 +534,8 @@ class Flow {
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
         } else if (Flow.containerTypes.has(type)) {
-            settings.children = element.elements.map(e => Flow.extractSettingsFromElement(e, groupSettings));
+            settings.mainChildren = element.elements.map(e => Flow.extractSettingsFromElement(e, groupSettings));
+            settings.children = settings.children.concat(settings.mainChildren);
             settings.children.forEach(s => s.parent = settings);
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
@@ -494,7 +549,6 @@ class Flow {
                 settings.fullWidth = options.fullWidth ?? false;
             }
         } else if (Flow.inputTypes.has(type)) {
-            settings.name = element.name;
             settings.hasValidation = element.hasValidation ?? false;
             settings.hasDelayedValidation = element.hasDelayedValidation ?? false;
             settings.isInvalid = false;
@@ -514,6 +568,12 @@ class Flow {
                 settings.language = options.language;
                 settings.context = options.context;
                 settings.placeholder = options.placeholder ?? 'Enter code here...';
+            } else if (type === Flow.markdownInputType) {
+                settings.markdown = options.defaultValue ?? '';
+                settings.placeholder = options.placeholder ?? 'Enter markdown here...';
+                settings.spellcheck = options.spellcheck ?? false;
+                settings.katex = options.katex ?? true;
+                settings.katexDelimiters = options.katexDelimiters;
             } else if (type === Flow.checkboxInputType) {
                 settings.ticked = options.defaultValue ?? false;
                 settings.description = options.description ?? '';
@@ -547,11 +607,18 @@ class Flow {
     }
 
     static extractSettingsFromGroup(group) {
+        console.log(group);
+        const options = group.options;
         const settings = {};
-        settings.children = group.map(e => Flow.extractSettingsFromElement(e, settings));
+        settings.name ??= options.name ?? generateUniqueId();
+        Flow.groupByName.set(settings.name, settings);
+        Flow.settingsByGroupNameAndName.set(settings.name, new Map());
+        settings.children = group.children.map(e => Flow.extractSettingsFromElement(e, settings));
         settings.children.forEach(s => s.parent = settings);
         settings.accepted = false;
-        const inputs = Flow.extractInputElements(group);
+        settings.bordered ??= options.bordered;
+        settings.sticky ??= options.sticky;
+        const inputs = Flow.extractInputElements(settings.children);
         settings.isInvalid = inputs.some(s => s.isInvalid);
         return settings;
     }
@@ -635,32 +702,17 @@ class Flow {
         // Validation
         Flow.requestValidation(settings);
     }
+    
+    static updatePaste(settings, newSettings) {
+        const html = newSettings.html;
+        const text = newSettings.text;
+        const rtf = newSettings.rtf;
+        const files = newSettings.files;
 
-    static async processPaste(event, settings) {
-        event.preventDefault();
-
-        settings.descriptionElement.textContent = settings.replaceDescription;
-
-        const html = event.clipboardData.getData('text/html');
-        const text = event.clipboardData.getData('text/plain');
-        const rtf = event.clipboardData.getData('text/rtf');
-        const files = [];
-        const unprocessFiles = [];
-        for (let item of event.clipboardData.items) {
-            if (item.kind === 'file') {
-                const file = item.getAsFile();
-                unprocessFiles.push(file);
-            }
-        }
-        for (let file of unprocessFiles) {
-            const fileData = await Flow.extractFileData(file);
-            files.push(fileData);
-        }
-
-        settings.html = html;
-        settings.text = text;
-        settings.rtf = rtf;
-        settings.files = files;
+        if (newSettings.hasOwnPropertyType('html')) settings.html = html;
+        if (newSettings.hasOwnPropertyType('text')) settings.text = text;
+        if (newSettings.hasOwnPropertyType('rtf')) settings.rtf = rtf;
+        if (newSettings.hasOwnPropertyType('files')) settings.files = files;
 
         if (settings.html) {
             settings.htmlDisplayElement.innerHTML = '';
@@ -694,42 +746,102 @@ class Flow {
         Flow.requestValidation(settings);
     }
 
+    static async processPaste(event, settings) {
+        event.preventDefault();
+
+        settings.descriptionElement.textContent = settings.replaceDescription;
+
+        const html = event.clipboardData.getData('text/html');
+        const text = event.clipboardData.getData('text/plain');
+        const rtf = event.clipboardData.getData('text/rtf');
+        const files = [];
+        const unprocessFiles = [];
+        for (let item of event.clipboardData.items) {
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                unprocessFiles.push(file);
+            }
+        }
+        for (let file of unprocessFiles) {
+            const fileData = await Flow.extractFileData(file);
+            files.push(fileData);
+        }
+
+        Flow.updatePaste(settings, {html, text, rtf, files});
+    }
+
     static fromElementSettings(settings) {
         const type = settings.type;
-
-        const element = fromHTML(`<div>`);
-        settings.htmlElement = element;
+    
+        const container = fromHTML(`<div>`);
+        settings.htmlElement = container;
+        if (settings.hide) container.classList.add('hide');
         const containered = Flow.containerTypes.has(settings.parent.type);
-        if (!containered) element.classList.add('w-100');
-        
-
+        let decorated = settings.leftChildren != null || settings.rightChildren != null;
+        let element = container;
+        if (decorated && type != Flow.textInputType) {
+            console.log(settings);
+            container.classList.add('decoratedContainer');
+            const leftElement = fromHTML(`<div>`);
+            settings.leftElement = leftElement;
+            container.appendChild(leftElement);
+            element = fromHTML(`<div>`);
+            container.appendChild(element);
+            const rightElement = fromHTML(`<div>`);
+            settings.rightElement = rightElement;
+            container.appendChild(rightElement);
+        }
+    
         if (type == Flow.breakType) {
             if (containered) element.classList.add('vb-1');
             else element.classList.add('hb-1');
+        } else if (type == Flow.rulerType) {
+            const ruler = element.vertical ? vr() : hr();
+            element.appendChild(ruler);
+            settings.rulerElement = ruler;
         } else if (type == Flow.emptyType) {
             // Do nothing
-        } else if (type == Flow.markdownType) {
-            Flow.tryAddTitle(element, settings);
-            renderMarkdown(element, settings.text, {options: {delimiters: settings.katexDelimiters}, sanitize: true, katex: settings.katex});
         } else if (type == Flow.paragraphType) {
             Flow.tryAddTitle(element, settings);
+            element.classList.add('w-100');
             element.classList.add('fixText');
             element.textContent = settings.text;
+            settings.textElement = element;
         } else if (type == Flow.titleType) {
             Flow.tryAddTitle(element, settings);
+            element.classList.add('w-100');
             element.classList.add('fixText');
             const titleElement = fromHTML(`<h1>`);
             titleElement.textContent = settings.text;
             element.appendChild(titleElement);
+            settings.textElement = titleElement;
         } else if (type == Flow.subTitleType) {
             Flow.tryAddTitle(element, settings);
+            element.classList.add('w-100');
+            element.classList.add('fixText');
             const subTitleElement = fromHTML(`<h2>`);
             subTitleElement.textContent = settings.text;
             element.appendChild(subTitleElement);
-        }  else if (type == Flow.codeType) {
+            settings.textElement = subTitleElement;
+        } else if (type == Flow.codeType) {
             Flow.tryAddTitle(element, settings);
             const codeElement = CodeHelpers.createCodeElement(settings.code, settings.language);
             element.appendChild(codeElement);
+            settings.codeElement = codeElement;
+        } else if (type == Flow.markdownType) {
+            const markdownContainer = fromHTML(`<div class="w-100">`);
+            console.log(markdownContainer, settings);
+            renderMarkdown(markdownContainer, settings.markdown, { options: { delimiters: settings.katexDelimiters }, sanitize: true, katex: settings.katex });
+            settings.markdownElement = markdownContainer;
+            const rawTextContainer = fromHTML(`<div class="w-100 fixText hide">`);
+            rawTextContainer.textContent = settings.markdown;
+
+            const topBar = MarkdownHelpers.createBar(markdownContainer, rawTextContainer);
+            const bottomBar = MarkdownHelpers.createBar(markdownContainer, rawTextContainer, true);
+            element.appendChild(topBar);
+            element.appendChild(markdownContainer);
+            element.appendChild(rawTextContainer);
+            element.appendChild(bottomBar);
         } else if (type == Flow.imageType) {
             Flow.tryAddTitle(element, settings);
             const figureElement = fromHTML(`<figure>`);
@@ -737,25 +849,31 @@ class Flow {
             imgElement.setAttribute('src', settings.url);
             imgElement.setAttribute('alt', settings.caption ?? "");
             figureElement.appendChild(imgElement);
+            const captionElement = fromHTML(`<figcaption>`);
+            figureElement.appendChild(captionElement);
+            settings.captionElement = captionElement;
             if (settings.caption) {
-                const captionElement = fromHTML(`<figcaption>`);
                 captionElement.textContent = settings.caption;
-                figureElement.appendChild(captionElement);
+            } else {
+                captionElement.classList.add('hide');
             }
             element.appendChild(figureElement);
+            settings.imgElement = imgElement;
+            settings.figureElement = figureElement;
         } else if (type == Flow.iconType) {
             if (isString(settings.ds)) {
                 element.appendChild(icons[settings.ds]());
             } else {
                 const pathHtml = IconHelpers.dsToPathHtml(settings.ds, settings.iconProvider);
                 const svgElement = IconHelpers.icon(pathHtml, settings.iconProvider, settings.title, settings.useTooltipInstead);
-                console.log(settings, pathHtml, svgElement);
                 element.appendChild(svgElement);
+                settings.svgElement = svgElement;
             }
         } else if (Flow.containerTypes.has(settings.type)) {
             Flow.tryAddTitle(element, settings);
-            let childElements = settings.children.map(s => Flow.fromElementSettings(s));
-
+            let mainChildElements = settings.children.map(s => Flow.fromElementSettings(s));
+            settings.mainChildElements = mainChildElements;
+    
             if (type == Flow.barType) {
                 if (settings.barSubType == Flow.navBarType) {
                     element.classList.add('listContainerHorizontal');
@@ -763,25 +881,22 @@ class Flow {
                     element.classList.add('listHorizontal');
                 } else if (settings.barSubType == Flow.fillBarType) {
                     element.classList.add('listHorizontal');
-                    childElements = childElements.map(e => {
+                    mainChildElements = mainChildElements.map(e => {
                         const wrapper = fromHTML(`<div class="flexFill">`);
                         wrapper.appendChild(e);
                         return wrapper;
                     });
                 }
-
-                childElements.forEach(e => element.appendChild(e));
+                mainChildElements.forEach(e => element.appendChild(e));
             } else if (type == Flow.verticalType) {
                 if (settings.centered == true) {
                     element.classList.add('listVertical');
                 } else {
                     element.classList.add('divList');
                 }
-
-                childElements.forEach(e => element.appendChild(e));
+                mainChildElements.forEach(e => element.appendChild(e));
             } else if (type == Flow.buttonType) {
                 const buttonElement = fromHTML(`<button>`);
-                console.log(settings);
                 if (settings.buttonSubType == Flow.complexButtonType) {
                     buttonElement.classList.add('complexButton');
                     buttonElement.classList.add('largeElement');
@@ -790,21 +905,36 @@ class Flow {
                     buttonElement.classList.add('w-100');
                 }
                 buttonElement.addEventListener('click', e => Flow.requireResponse(Flow.clickEventType, null, null, Flow.clickEventById.get(settings.id)));
-                childElements.forEach(e => buttonElement.appendChild(e));
+                mainChildElements.forEach(e => buttonElement.appendChild(e));
                 element.appendChild(buttonElement);
+                settings.buttonElement = buttonElement;
             }
-
-
         } else if (type == Flow.textInputType) {
-            const editorContainer = fromHTML(`<div class="contenteditableContainer largeElement bordered">`);
-            const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText">`);
+            const editorContainer = fromHTML(`<div class="contenteditableContainer">`);
+            if (decorated) {
+                editorContainer.classList.add('decoratedContainer');
+            }
+            const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText">`);
             codeEditor.setAttribute('spellcheck', settings.spellcheck);
             codeEditor.setAttribute('placeholder', settings.placeholder);
             codeEditor.textContent = settings.text;
             codeEditor.addEventListener('input', e => Flow.processContentEditableInput(e.srcElement, settings, 'text'));
             codeEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
-            editorContainer.appendChild(codeEditor);
+            if (decorated) {
+                codeEditor.style.padding = "10px 12px";
+                const leftElement = editorContainer.appendChild(fromHTML(`<div>`));
+                leftElement.style.margin = "10px 0 0 10px";
+                settings.leftElement = leftElement;
+                editorContainer.appendChild(codeEditor);
+                const rightElement = editorContainer.appendChild(fromHTML(`<div>`));
+                rightElement.style.margin = "10px 10px 0 0";
+                settings.rightElement = rightElement;
+            } else {
+                editorContainer.appendChild(codeEditor);
+            }
             element.appendChild(editorContainer);
+            settings.editorContainer = editorContainer;
+            settings.codeEditor = codeEditor;
         } else if (type == Flow.numberInputType) {
             const inputElement = fromHTML(`<input type="number">`);
             inputElement.value = settings.number;
@@ -813,27 +943,87 @@ class Flow {
                 Flow.processInput(e.srcElement, settings, 'number', 'value');
             });
             element.appendChild(inputElement);
+            settings.inputElement = inputElement;
         } else if (type == Flow.passwordInputType) {
             const passwordElement = fromHTML(`<input type="password">`);
+            if (decorated) {
+                inputElement.classList.add('noBorder');
+            }
             passwordElement.value = settings.password;
             passwordElement.setAttribute('placeholder', settings.placeholder);
             passwordElement.addEventListener('input', e => Flow.processInput(e.srcElement, settings, 'password', 'value'));
             element.appendChild(passwordElement);
+            settings.passwordElement = passwordElement;
         } else if (type == Flow.codeInputType) {
-            const editorContainer = fromHTML(`<div class="contenteditableContainer largeElement bordered">`);
-            const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText">`);
+            const editorContainer = fromHTML(`<pre class="contenteditableContainer">`);
+            if (decorated) {
+                editorContainer.classList.add('decoratedContainer');
+            }
+            const codeEditor = fromHTML(`<code contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText">`);
             codeEditor.setAttribute('spellcheck', false);
             codeEditor.setAttribute('placeholder', settings.placeholder);
             codeEditor.textContent = settings.code;
             codeEditor.addEventListener('input', e => Flow.processContentEditableInput(e.srcElement, settings, 'code'));
             codeEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
-            editorContainer.appendChild(codeEditor);
+            if (decorated) {
+                codeEditor.style.padding = "10px 12px";
+                const leftElement = editorContainer.appendChild(fromHTML(`<div>`));
+                leftElement.style.margin = "10px 0 0 10px";
+                settings.leftElement = leftElement;
+                editorContainer.appendChild(codeEditor);
+                const rightElement = editorContainer.appendChild(fromHTML(`<div>`));
+                rightElement.style.margin = "10px 10px 0 0";
+                settings.rightElement = rightElement;
+            } else {
+                editorContainer.appendChild(codeEditor);
+            }
             element.appendChild(editorContainer);
+            settings.editorContainer = editorContainer;
+            settings.codeEditor = codeEditor;
+        } else if (type == Flow.markdownInputType) {
+            const contentContainer = fromHTML(`<div class="flex bordered rounded-xl">`);
+            const editorContainer = fromHTML(`<div class="w-100 contenteditableContainer markdownCodeEditor">`);
+            if (decorated) {
+                editorContainer.classList.add('decoratedContainer');
+            }
+            const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText">`);
+            codeEditor.setAttribute('spellcheck', settings.spellcheck);
+            codeEditor.setAttribute('placeholder', settings.placeholder);
+            codeEditor.textContent = settings.markdown;
+            codeEditor.addEventListener('input', e => {
+                Flow.processContentEditableInput(e.srcElement, settings, 'markdown');
+                settings.markdownElement.innerHTML = '';
+                renderMarkdown(settings.markdownElement, settings.markdown, { options: { delimiters: settings.katexDelimiters }, sanitize: true, katex: settings.katex });
+            });
+            codeEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
+            if (decorated) {
+                codeEditor.style.padding = "10px 12px";
+                const leftElement = editorContainer.appendChild(fromHTML(`<div>`));
+                leftElement.style.margin = "10px 0 0 10px";
+                settings.leftElement = leftElement;
+                editorContainer.appendChild(codeEditor);
+                const rightElement = editorContainer.appendChild(fromHTML(`<div>`));
+                rightElement.style.margin = "10px 10px 0 0";
+                settings.rightElement = rightElement;
+            } else {
+                editorContainer.appendChild(codeEditor);
+            }
+            contentContainer.appendChild(editorContainer);
+            settings.editorContainer = editorContainer;
+            settings.codeEditor = codeEditor;
+            const markdownElement = fromHTML(`<div class="w-100 markdownPreview" placeholder="Markdown Output">`);
+            renderMarkdown(markdownElement, settings.markdown, { options: { delimiters: settings.katexDelimiters }, sanitize: true, katex: settings.katex });
+            settings.markdownElement = markdownElement;
+            contentContainer.appendChild(markdownElement);
+            element.appendChild(contentContainer);
         } else if (type == Flow.checkboxInputType) {
+            const checkboxContainer = fromHTML(`<div class="checkboxContainer">`);
             const checkboxElement = fromHTML(`<input type="checkbox">`);
             checkboxElement.checked = settings.ticked;
             checkboxElement.addEventListener('change', e => Flow.processInput(e.srcElement, settings, 'ticked', 'checked'));
-            element.appendChild(checkboxElement);
+            checkboxContainer.appendChild(checkboxElement);
+            element.appendChild(checkboxContainer);
+            settings.checkboxElement = checkboxElement;
         } else if (type == Flow.selectInputType) {
             const selectElement = fromHTML(`<select>`);
             selectElement.addEventListener('change', e => Flow.processInput(e.srcElement, settings, 'value', 'value'));
@@ -845,6 +1035,7 @@ class Flow {
                 selectElement.appendChild(choiceElement);
             });
             element.appendChild(selectElement);
+            settings.selectElement = selectElement;
         } else if (type == Flow.fileInputType) {
             const fileElement = fromHTML(`<div class="w-100 largeElement bordered">`);
             const dropArea = fromHTML(`<div class="dropArea">`);
@@ -864,7 +1055,6 @@ class Flow {
             dropButtonElement.textContent = settings.selectDescription;
             dropArea.appendChild(dropButtonElement);
             fileElement.appendChild(dropArea);
-
             fileElement.appendChild(hb(4));
             const filesDisplayElement = fromHTML(`<div>`);
             const noFileSelectedElement = fromHTML(`<i>`);
@@ -872,7 +1062,10 @@ class Flow {
             filesDisplayElement.appendChild(noFileSelectedElement);
             fileElement.appendChild(filesDisplayElement);
             settings.filesDisplayElement = filesDisplayElement;
-
+            settings.dropArea = dropArea;
+            settings.dropDescriptionElement = dropDescriptionElement;
+            settings.selectFilesElement = selectFilesElement;
+            settings.dropButtonElement = dropButtonElement;
             element.appendChild(fileElement);
         } else if (type == Flow.pasteInputType) {
             const pasteElement = fromHTML(`<div class="w-100 largeElement bordered" tabIndex="0">`);
@@ -889,10 +1082,10 @@ class Flow {
             const htmlDisplayElement = fromHTML(`<div class="w-100 scroll-y hide" style="max-height: 400px;">`);
             settings.htmlDisplayElement = htmlDisplayElement;
             pasteElement.appendChild(htmlDisplayElement);
-            
             element.appendChild(pasteElement);
+            settings.pasteElement = pasteElement;
         }
-
+    
         if (Flow.inputTypes.has(type)) {
             element.appendChild(hb(1));
             const validationMessageElement = fromHTML(`<div class="validationMessage">`);
@@ -902,8 +1095,12 @@ class Flow {
             settings.validationMessageElement = validationMessageElement;
         }
 
-        return element;
+        settings.leftChildren?.forEach(s => settings.leftElement.appendChild(Flow.fromElementSettings(s)));
+        settings.rightChildren?.forEach(s => settings.rightElement.appendChild(Flow.fromElementSettings(s)));
+    
+        return container;
     }
+    
 
     static extractInputElements(groupSettings) {
         const inputs = [];
@@ -986,6 +1183,19 @@ class Flow {
             } else if (type == Flow.codeInputType) {
                 element.classList.add('fixText');
                 element.textContent = settings.code;
+            } else if (type == Flow.markdownInputType) {
+                const markdownContainer = fromHTML(`<div class="w-100">`);
+                console.log(markdownContainer, settings);
+                renderMarkdown(markdownContainer, settings.markdown, { options: { delimiters: settings.katexDelimiters }, sanitize: true, katex: settings.katex });
+                const rawTextContainer = fromHTML(`<div class="w-100 fixText hide">`);
+                rawTextContainer.textContent = settings.markdown;
+    
+                const topBar = MarkdownHelpers.createBar(markdownContainer, rawTextContainer);
+                const bottomBar = MarkdownHelpers.createBar(markdownContainer, rawTextContainer, true);
+                element.appendChild(topBar);
+                element.appendChild(markdownContainer);
+                element.appendChild(rawTextContainer);
+                element.appendChild(bottomBar);
             } else if (type == Flow.checkboxInputType) {
                 const checkboxElement = fromHTML(`<input type="checkbox" disabled>`);
                 checkboxElement.checked = settings.ticked;
@@ -1016,7 +1226,7 @@ class Flow {
     static fromGroupSettings(settings) {
         const groupElement = fromHTML(`<div class="w-100">`);
         settings.htmlElement = groupElement;
-        if (settings.children.length > 1) {
+        if (settings.bordered) {
             groupElement.classList.add('bordered');
             groupElement.classList.add('largeElement');
         }
@@ -1053,12 +1263,12 @@ class Flow {
 
     static async spliceOutput(start = -1, deleteCount = 0, ...insertGroupSettings) {
         if (start < 0) start = Flow.output.length + 1 + start;
-
+    
         if (Flow.output.length == 0 && insertGroupSettings.length > 0) Flow.outputElement.innerHTML = '';
-
+    
         // Create elements
         const elements = insertGroupSettings.map(s => Flow.fromGroupSettings(s));
-
+    
         // Validate inputs before showing (but after creating)
         for (let groupSettings of insertGroupSettings) {
             const inputs = Flow.extractInputElements(groupSettings);
@@ -1066,32 +1276,199 @@ class Flow {
                 await Flow.requestValidation(settings);
             }
         }
-
+    
         // Splice settings
-        Flow.output.splice(start, deleteCount, ...insertGroupSettings);
-
-        // Splice elements
-        spliceChildren(Flow.outputElement, start, deleteCount, ...elements);
-
+        const deleted = Flow.output.splice(start, deleteCount, ...insertGroupSettings);
+    
+        // Remove deleted elements from their respective parent elements
+        deleted.forEach(s => {
+            s.htmlElement.remove();
+            Flow.groupByName.delete(s.name);
+            Flow.settingsByGroupNameAndName.get(s.group.name).delete(s.name);
+        });
+    
+        // Find the count of sticky and non-sticky elements up to the start index
+        let stickyCountBeforeStart = 0;
+        let normalCountBeforeStart = 0;
+    
+        for (let i = 0; i < start; i++) {
+            if (Flow.output[i].sticky) {
+                stickyCountBeforeStart++;
+            } else {
+                normalCountBeforeStart++;
+            }
+        }
+    
+        // Insert new elements into their respective parent elements
+        const stickyParent = Flow.stickyOutputElement;
+        const normalParent = Flow.outputElement;
+    
+        let stickyInsertIndex = stickyCountBeforeStart;
+        let normalInsertIndex = normalCountBeforeStart;
+    
+        for (let i = 0; i < elements.length; i++) {
+            const element = elements[i];
+            const groupSettings = insertGroupSettings[i];
+    
+            if (groupSettings.sticky) {
+                // If sticky, insert into the stickyParent
+                if (stickyInsertIndex < stickyParent.children.length) {
+                    stickyParent.insertBefore(element, stickyParent.children[stickyInsertIndex]);
+                } else {
+                    stickyParent.appendChild(element);
+                }
+                stickyInsertIndex++;
+            } else {
+                // If not sticky, insert into the normalParent
+                if (normalInsertIndex < normalParent.children.length) {
+                    normalParent.insertBefore(element, normalParent.children[normalInsertIndex]);
+                } else {
+                    normalParent.appendChild(element);
+                }
+                normalInsertIndex++;
+            }
+        }
+    
         if (Flow.output.length == 0) Flow.outputElement.textContent = Flow.noOutputMessage;
     }
 
     static async onShowRequest(event) {
         const e = event;
         const content = e.data.content;
-        const settings = Flow.extractSettingsFromGroup(content.group);
+        content.options ??= {};
+        content.options.sticky ??= false;
+        content.options.insertAt ??= -1;
+        content.options.deleteAfter ??= 0;
+        content.options.deleteBefore ??= 0;
+
+        const settings = Flow.extractSettingsFromGroup(content);
         settings.event = e;
 
         const inputs = Flow.extractInputElements(settings);
-        await Flow.spliceOutput(content.insertAt, content.deleteAfter, settings);
+        await Flow.spliceOutput(content.options.insertAt, content.options.deleteAfter, settings);
+        if (content.options.deleteBefore > 0) {
+            await Flow.spliceOutput(content.options.insertAt - content.options.deleteBefore, content.options.deleteBefore);
+        }
 
         if (inputs.length == 0) Flow.postSuccessResponse(e);
     }
 
+    static async onUpdate(event) {
+        const e = event;
+        const content = e.data.content;
+    
+        const settings = Flow.settingsByGroupNameAndName.get(content.groupName).get(content.elementName);
+        if (Flow.inputTypes.has(settings.type) && settings.group.accepted) return;
+    
+        // Update settings and corresponding elements
+        if (content.hide !== undefined) {
+            settings.hide = content.hide;
+            settings.htmlElement.classList.toggle('hide', content.hide);
+        }
+        if (content.text !== undefined) {
+            settings.text = content.text;
+            if (settings.type === Flow.paragraphType || settings.type === Flow.titleType || settings.type === Flow.subTitleType) {
+                settings.textElement.textContent = content.text;
+            } else if (settings.type === Flow.codeType) {
+                settings.codeElement.textContent = content.text;
+            } else if (settings.type === Flow.textInputType || settings.type === Flow.codeInputType) {
+                settings.codeEditor.textContent = content.text;
+            }
+        }
+        if (content.url !== undefined) {
+            settings.url = content.url;
+            if (settings.type === Flow.imageType) {
+                settings.imgElement.setAttribute('src', content.url);
+            }
+        }
+        if (content.caption !== undefined) {
+            settings.caption = content.caption;
+            if (settings.type === Flow.imageType) {
+                settings.captionElement.textContent = content.caption;
+            }
+        }
+        if (content.ticked !== undefined && settings.type === Flow.checkboxInputType) {
+            settings.ticked = content.ticked;
+            settings.checkboxElement.checked = content.ticked;
+        }
+        if (content.value !== undefined && settings.type === Flow.selectInputType) {
+            settings.value = content.value;
+            settings.selectElement.value = content.value;
+        }
+        if (content.spellcheck !== undefined && settings.type === Flow.textInputType) {
+            settings.spellcheck = content.spellcheck;
+            settings.codeEditor.setAttribute('spellcheck', content.spellcheck);
+        }
+        if (content.placeholder !== undefined && (settings.type === Flow.textInputType || settings.type === Flow.codeInputType || settings.type === Flow.passwordInputType)) {
+            settings.placeholder = content.placeholder;
+            settings.codeEditor.setAttribute('placeholder', content.placeholder);
+        }
+        if (content.number !== undefined && settings.type === Flow.numberInputType) {
+            settings.number = content.number;
+            settings.inputElement.value = content.number;
+        }
+        if (content.password !== undefined && settings.type === Flow.passwordInputType) {
+            settings.password = content.password;
+            settings.passwordElement.value = content.password;
+        }
+        if (content.markdown !== undefined) {
+            settings.markdown = content.markdown;
+            if (settings.type === Flow.markdownType) {
+                settings.rawTextElement.textContent = settings.markdown;
+                renderMarkdown(settings.markdownElement, settings.markdown, {
+                    options: { delimiters: settings.katexDelimiters },
+                    sanitize: true,
+                    katex: settings.katex
+                });
+            } else if (settings.type === Flow.markdownInputType) {
+                settings.codeEditor.value = settings.markdown;
+                renderMarkdown(settings.markdownElement, settings.markdown, {
+                    options: { delimiters: settings.katexDelimiters },
+                    sanitize: true,
+                    katex: settings.katex
+                });
+            }
+         
+
+        }
+        if (content.files !== undefined && settings.type === Flow.fileInputType) {
+            settings.filesDisplayElement.innerHTML = '';
+            settings.files = [];
+            Flow.addFiles(content.files, settings);
+        }
+        if (settings.type === Flow.pasteInputType) {
+            if (content.html !== undefined ||
+                content.rtf !== undefined ||
+                content.text !== undefined ||
+                content.files !== undefined) {
+                Flow.updatePaste(settings, content);
+            }
+            if (content.emptyDescription !== undefined) {
+                settings.emptyDescription = content.pasemptyDescriptionsword;
+            }
+            if (content.replaceDescription !== undefined) {
+                settings.replaceDescription = content.replaceDescription;
+            }
+        }
+
+    
+        Flow.postSuccessResponse(e);
+    }
+    
+
     static async onRemove(event) {
         const e = event;
         const content = e.data.content;
-        Flow.spliceOutput(content.start, content.deleteCount);
+        if (content.elementName == null) {
+            const start = Flow.output.findIndex(s => s.name == content.groupName);
+            Flow.spliceOutput(start, 1);
+        } else {
+            const settings = Flow.settingsByGroupNameAndName.get(content.groupName).get(content.elementName);
+            Flow.settingsByGroupNameAndName.get(content.groupName).delete(content.elementName);
+            const start = settings.parent.children.findIndex(s => s.name == content.elementName);
+            settings.parent.children.splice(start, 1);
+            settings.htmlElement.remove();
+        }
         Flow.postSuccessResponse(e);
     }
 
@@ -1099,6 +1476,95 @@ class Flow {
         const e = event;
         const id = e.data.content;
         Flow.clickEventById.set(id, event);
+        // No response here
+    }
+
+    static async onChat(event) {
+        const e = event;
+        const content = e.content;
+        const context = [];
+        for (let message of content.context) {
+            if (message.url) context.push(ChatGptApi.ToImageMessage(message.prompt, message.url));
+            else context.push(ChatGptApi.toMessage(message.role, message.prompt));
+        }
+        const options = content.options ?? {};
+        const chatOptions = {model: options.model, seed: options.seed};
+
+        let result = '';
+        try {
+            if (options.hasOnUpdate || options.element?.length == 2) {
+                // Stream
+                result = await ChatGptApi.streamChat(context, text => {
+                    if (options.hasOnUpdate) Flow.requireResponse(Flow.chatEventType, text, null, e);
+                    if (options.element?.length == 2) {
+                        const settings = Flow.settingsByGroupNameAndName.get(options.element[1]).get(options.element[0]);
+                
+                        // Update the string value of the element based on its type
+                        if (settings.type === Flow.paragraphType) {
+                            settings.text = text;
+                            settings.textElement.textContent = text;
+                        } else if (settings.type === Flow.titleType) {
+                            settings.text = text;
+                            settings.textElement.textContent = text;
+                        } else if (settings.type === Flow.subTitleType) {
+                            settings.text = text;
+                            settings.textElement.textContent = text;
+                        } else if (settings.type === Flow.codeType) {
+                            settings.code = text;
+                            settings.codeElement.textContent = text;
+                        } else if (settings.type === Flow.markdownType) {
+                            settings.markdown = text;
+                            settings.rawTextElementElement.textContent = text;
+                            renderMarkdown(settings.markdownElement, text, {
+                                options: { delimiters: settings.katexDelimiters },
+                                sanitize: true,
+                                katex: settings.katex
+                            });
+                        } else if (settings.type === Flow.imageType) {
+                            settings.caption = text;
+                            settings.captionElement.textContent = text;
+                        } else if (settings.type === Flow.textInputType) {
+                            settings.text = text;
+                            settings.codeEditor.textContent = text;
+                        } else if (settings.type === Flow.codeInputType) {
+                            settings.code = text;
+                            settings.codeEditor.textContent = text;
+                        } else if (settings.type === Flow.markdownType) {
+                            settings.markdown = text;
+                            settings.codeEditor.textContent = text;
+                            settings.markdownElement.innerHTML = '';
+                            renderMarkdown(settings.markdownElement, text, {
+                                options: { delimiters: settings.katexDelimiters },
+                                sanitize: true,
+                                katex: settings.katex
+                            });
+                        } else {
+                            console.warn(`Unsupported type for streaming updates: ${settings.type}`);
+                        }
+                    }
+                }, chatOptions);
+            } else {
+                // Don't stream
+                result = await ChatGptApi.chat(context, chatOptions);
+            }
+
+            Flow.postSuccessResponse(e, result);
+        } catch(error) {
+            Flow.postErrorResponse(e, error.message);
+        }
+    }
+
+    static async onSetProgressRequest(event) {
+        const e = event;
+        Flow.showProgress();
+        Flow.setProgress(e.data.content);
+        Flow.postSuccessResponse(e);
+    }
+
+    static async onSetStatusRequest(event) {
+        const e = event;
+        Flow.setStatus(e.data.content);
+        Flow.postSuccessResponse(e);
     }
 
     static import(){
@@ -1440,7 +1906,8 @@ function getFlowPage() {
     const locked = getHashQueryVariable('locked') ?? false;
     if (locked) mode = Flow.runMode;
 
-    const bar = fromHTML(`<div class="listContainerHorizontal sticky">`);
+    const sticky = fromHTML(`<div class="sticky" style="outline: var(--background-color) 1px solid;">`); // Outline to overshadow input outlines
+    const bar = fromHTML(`<div class="listContainerHorizontal">`);
     const leftBarList = fromHTML(`<div class="listHorizontal">`);
     bar.appendChild(leftBarList);
 
@@ -1470,14 +1937,31 @@ function getFlowPage() {
     runButton.addEventListener('click', e => Flow.run());
     runButton.appendChild(icons.play());
     leftBarList.appendChild(runButton);
+    elements.push(hb(7));
 
-    elements.push(bar);
+    sticky.appendChild(bar);
+    sticky.appendChild(hb(2));
+    const progressBar = fromHTML(`<progress value="0" max="100" class="w-100 hide">`);
+    Flow.progressBar = progressBar;
+    sticky.appendChild(progressBar);
+    const status = fromHTML(`<div class="info indented">Not running...`);
+    Flow.statusElement = status;
+    sticky.appendChild(status);
+    const stickyOutputContainer = fromHTML(`<div>`);
+    stickyOutputContainer.appendChild(hb(2));
+    const stickyOutputElement = fromHTML(`<div>`);
+    Flow.stickyOutputElement = stickyOutputElement;
+    stickyOutputContainer.appendChild(stickyOutputElement);
+    Flow.stickyOutputContainer = stickyOutputContainer;
+    sticky.appendChild(stickyOutputContainer);
+    stickyOutputContainer.appendChild(hb(1));
+    elements.push(sticky);
     elements.push(hb(7));
 
     if (mode == Flow.editMode) {
         // Code editor
-        const codeEditorContainer = fromHTML(`<div class="contenteditableContainer">`);
-        const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter code here...">`);
+        const codeEditorContainer = fromHTML(`<pre class="contenteditableContainer">`);
+        const codeEditor = fromHTML(`<code contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter code here...">`);
         codeEditor.setAttribute('spellcheck', false);
         codeEditor.textContent = code;
         codeEditor.addEventListener('input', e => Flow.onCodeInput(e));

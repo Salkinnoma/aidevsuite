@@ -8,13 +8,6 @@ p code {
     background: var(--inline-code-background-color);
 }
 
-.codeCopyButton {
-    border: none;
-    padding: 5px 10px;
-    cursor: pointer;
-    border-radius: 5px;
-    color: inherit;
-}
 
 .codeBar {
     background-color: var(--code-bar-background-color);
@@ -23,15 +16,24 @@ p code {
 }
 
 pre {
-    padding: 8px 16px;
+    padding: 0;
     margin: 0;
+}
+
+pre code {
+    display: block;
+    padding: 8px 16px;
 }
 
 .preContainer {
     background-color: var(--codeblock-background-color);
     border-radius: 8px;
-    margin: 16px 0;
+    margin: 0;
     color: var(--codeblock-color);
+}
+
+.markdown .preContainer {
+    margin: 16px 0;
 }
 
 .codeLanguage {

@@ -1,49 +1,37 @@
 class ChatGptApi {
-    static ToSystemMessage(prompt){
-        let message = {
-            "role": "system",
-            "content": prompt
-        };
+    static systemRole = "system";
+    static userRole = "user";
+    static assistantRole = "assistant";
 
-        return message;
+    static toMessage(role, content) {
+        return { role, content };
     }
 
-    static ToUserMessage(prompt){
-        let message = {
-            "role": "user",
-            "content": prompt
-        };
-
-        return message;
+    static toSystemMessage(prompt){
+        return ChatGptApi.toMessage(ChatGptApi.systemRole, prompt);
     }
 
-    static ToAssistantMessage(prompt){
-        let message = {
-            "role": "assistant",
-            "content": prompt
-        };
-
-        return message;
+    static toUserMessage(prompt){
+        return ChatGptApi.toMessage(ChatGptApi.userRole, prompt);
     }
 
-    static ToImageMessage(prompt, url){
-        let message = {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": prompt
+    static toAssistantMessage(prompt){
+        return ChatGptApi.toMessage(ChatGptApi.assistantRole, prompt);
+    }
+
+    static toImageMessage(prompt, url){
+        return ChatGptApi.toMessage(ChatGptApi.userRole, [
+            {
+                "type": "text",
+                "text": prompt
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": url
                 },
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": url
-                    },
-                },
-            ],
-        };
-
-        return message;
+            },
+        ]);
     }
 
     static logMessage(message){
@@ -91,9 +79,11 @@ class ChatGptApi {
 
     /**
      * options:
-     * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null, continueAfterMaxTokens = true
+     * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null, continueAfterMaxTokens = true, maxTokens = 4096
+     * 
+     * Returns the full response string.
      */
-    static async getChatResponse(messages, options = null) {
+    static async chat(messages, options = null) {
         options ??= {};
         options.continueAfterMaxTokens ??= true;
 
@@ -103,7 +93,7 @@ class ChatGptApi {
         do {
             response = await ChatGptApi._internalGetChatResponse(messages, options);
             result += response.response;
-            messagesCopy.push(ChatGptApi.ToAssistantMessage(response.response));
+            messagesCopy.push(ChatGptApi.toAssistantMessage(response.response));
         } while (options.continueAfterMaxTokens && response.finish_reason == 'length');
 
         return result;
@@ -119,7 +109,7 @@ class ChatGptApi {
 
         let body = {
             model: model,
-            max_tokens: 4096,
+            max_tokens: options.maxTokens ?? 4096,
             messages: messagesCopy,
         };
         if (options.seed != null) {
@@ -178,7 +168,7 @@ class ChatGptApi {
     }
     /**
      * options:
-     * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null
+     * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null, maxTokens = 4096
      */
     static async getChatStream(messages, options = null) {
         options ??= {};
@@ -190,7 +180,7 @@ class ChatGptApi {
 
         let body = {
             model: model,
-            max_tokens: 4096,
+            max_tokens: options.maxTokens ?? 4096,
             messages: messagesCopy,
             stream: true
         };
@@ -245,12 +235,12 @@ class ChatGptApi {
     }
 
     /**
-     * Fetches and reads a stream.
+     * Fetches and reads a stream. The onUpdate parameter is a function that is called whenever the stream updates. This function has a string parameter of the updated full response string.
      * 
      * options:
-     * gptModel = ChatGptApi.defaultModel, applyToText = t => t, seed = null, apiKey = null, stopStream = false, continueAfterMaxTokens = true
+     * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null, stopStream = false, continueAfterMaxTokens = true, maxTokens = 4096
      * 
-     * Note: Keep the options object, so you can later set stopStream to true to stop the stream as soon as possible.
+     * Returns the full response string.
      */
     static async streamChat(messages, onUpdate, options) {
         options ??= {};
@@ -262,7 +252,7 @@ class ChatGptApi {
         do {
             response = await ChatGptApi._internalStreamChat(messagesCopy, onUpdate, options);
             result = response.response;
-            messagesCopy.push(ChatGptApi.ToAssistantMessage(response.response));
+            messagesCopy.push(ChatGptApi.toAssistantMessage(response.response));
         } while (options.continueAfterMaxTokens && response.finish_reason == 'length');
 
         return result;
