@@ -136,3 +136,13 @@ function wrapElement(element, wrapper) {
     // Start observing the document element for added nodes (the body)
     observer.observe(document.documentElement, { childList: true, subtree: true });
 })();
+
+function onBodyCreated(callback) {
+    if (document.body) {
+        callback();
+    } else {
+        window.addEventListener('body-created', e => callback());
+    }
+}
+
+const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');

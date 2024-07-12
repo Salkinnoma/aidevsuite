@@ -462,19 +462,19 @@ class Flow {
 
         settings.isInvalid = !response.valid;
         if (response.valid) {
-            settings.validationMessageElement.classList.add('hide');
+            settings.validationContainer.classList.add('hide');
         } else {
             settings.validationMessageElement.textContent = response.message ?? 'Invalid value. Please choose a different value.';
-            settings.validationMessageElement.classList.remove('hide');
+            settings.validationContainer.classList.remove('hide');
         }
 
         settings.group.isInvalid = inputs.some(s => s.isInvalid);
         
         if (settings.group.isInvalid) {
-            settings.group.validationMessageElement.classList.remove('hide');
+            settings.group.validationContainer.classList.remove('hide');
             settings.group.acceptButtonElement.setAttribute('disabled', '');
         } else {
-            settings.group.validationMessageElement.classList.add('hide');
+            settings.group.validationContainer.classList.add('hide');
             settings.group.acceptButtonElement.removeAttribute('disabled');
         }
     }
@@ -500,8 +500,11 @@ class Flow {
             settings.rightChildren.forEach(s => s.parent = settings);
         }
         settings.name = element.name ?? element.id;
-        settings.hide = element.hide ?? false;
-        settings.disabled = element.disabled ?? false;
+        settings.hide = options.hide ?? false;
+        settings.disabled = options.disabled ?? false;
+        settings.bordered = options.bordered ?? false;
+        settings.breakBefore = Math.min(8, Math.max(0, options.breakBefore ?? 0));
+        settings.breakAfter = Math.min(8, Math.max(0, options.breakAfter ?? 0));
         Flow.settingsByGroupNameAndName.get(groupSettings.name).set(settings.name, settings);
 
         if (Flow.textTypes.has(type)) {
@@ -511,7 +514,7 @@ class Flow {
         } else if (type === Flow.emptyType) {
             // Do nothing
         } else if (type === Flow.breakType) {
-            settings.size = Math.min(8, Math.max(0, options.size));
+            settings.size = Math.min(8, Math.max(0, element.size ?? 4));
         } else if (type === Flow.rulerType) {
             settings.vertical = options.vertical;
         } else if (type === Flow.codeType) {
@@ -538,6 +541,7 @@ class Flow {
             settings.children.forEach(s => s.parent = settings);
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
+            settings.gap = Math.min(8, Math.max(0, options.gap ?? 4));
 
             if (type === Flow.barType) {
                 settings.barSubType = options.barSubType ?? Flow.navBarType;
@@ -557,6 +561,7 @@ class Flow {
                 settings.text = options.defaultValue ?? '';
                 settings.placeholder = options.placeholder ?? 'Enter text here...';
                 settings.spellcheck = options.spellcheck ?? false;
+                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
             } else if (type === Flow.numberInputType) {
                 settings.number = options.defaultValue ?? 0;
             } else if (type === Flow.passwordInputType) {
@@ -567,12 +572,14 @@ class Flow {
                 settings.language = options.language;
                 settings.context = options.context;
                 settings.placeholder = options.placeholder ?? 'Enter code here...';
+                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
             } else if (type === Flow.markdownInputType) {
                 settings.markdown = options.defaultValue ?? '';
                 settings.placeholder = options.placeholder ?? 'Enter markdown here...';
                 settings.spellcheck = options.spellcheck ?? false;
                 settings.katex = options.katex ?? true;
                 settings.katexDelimiters = options.katexDelimiters;
+                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
             } else if (type === Flow.checkboxInputType) {
                 settings.ticked = options.defaultValue ?? false;
                 settings.description = options.description ?? '';
@@ -590,6 +597,8 @@ class Flow {
                 settings.placeholder = options.placeholder ?? 'Enter url here...';
                 settings.captionPlaceholder = options.captionPlaceholder ?? 'Enter caption here...';
                 settings.spellcheck = options.spellcheck ?? false;
+                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
+                settings.captionMaxHeight = Math.min(8, Math.max(0, options.captionMaxHeight ?? 6));
             } else if (type === Flow.fileInputType) {
                 settings.files = [];
                 settings.allowedMimeTypes = options.allowedMimeTypes ?? [];
@@ -625,6 +634,9 @@ class Flow {
         settings.accepted = false;
         settings.bordered = options.bordered ?? false;
         settings.sticky = options.sticky ?? false;
+        settings.gap = Math.min(8, Math.max(0, options.gap ?? 4));
+        settings.breakBefore = Math.min(8, Math.max(0, options.breakBefore ?? 0));
+        settings.breakAfter = Math.min(8, Math.max(0, options.breakAfter ?? 0));
         const inputs = Flow.extractInputElements(settings.children);
         settings.isInvalid = inputs.some(s => s.isInvalid);
         return settings;
@@ -786,6 +798,16 @@ class Flow {
         const containered = Flow.containerTypes.has(settings.parent.type);
         let decorated = settings.leftChildren != null || settings.rightChildren != null;
         let element = container;
+        if (settings.breakBefore != 0 || settings.breakAfter != 0) {
+            const horizontal = settings.parent.type == Flow.listBarType || settings.parent.type == Flow.buttonType;
+            const name = horizontal ? 'h' : 'b';
+            const subContainer = fromHTML(`<div>`);
+            if (settings.breakBefore) container.appendChild(name + 'b-' + settings.breakBefore);
+            container.appendChild(subContainer);
+            if (settings.breakAfter) container.appendChild(name + 'b-' + settings.breakBefore);
+            element = subContainer;
+        }
+
         if (decorated && type != Flow.textInputType) {
             console.log(settings);
             container.classList.add('decoratedContainer');
@@ -797,6 +819,10 @@ class Flow {
             const rightElement = fromHTML(`<div>`);
             settings.rightElement = rightElement;
             container.appendChild(rightElement);
+        }
+        if (settings.bordered) {
+            container.classList.add('bordered');
+            container.classList.add('largeElement');
         }
         if (settings.disabled) element.setAttribute('disabled', '');
         settings.contentElement = element;
@@ -842,7 +868,7 @@ class Flow {
             console.log(markdownContainer, settings);
             renderMarkdown(markdownContainer, settings.markdown, { options: { delimiters: settings.katexDelimiters }, sanitize: true, katex: settings.katex });
             settings.markdownElement = markdownContainer;
-            const rawTextElement = fromHTML(`<div class="w-100 fixText hide">`);
+            const rawTextElement = fromHTML(`<div class="w-100 markdownRawText hide">`);
             rawTextElement.textContent = settings.markdown;
             settings.rawTextElement = rawTextElement;
 
@@ -897,6 +923,7 @@ class Flow {
                         return wrapper;
                     });
                 }
+                element.classList.add('gap-' + settings.gap);
                 mainChildElements.forEach(e => element.appendChild(e));
             } else if (type == Flow.verticalType) {
                 if (settings.centered == true) {
@@ -925,6 +952,7 @@ class Flow {
                 editorContainer.classList.add('decoratedContainer');
             }
             const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText">`);
+            if (settings.maxHeight != 0) codeEditor.classList.add('maxHeight-' + settings.maxHeight);
             codeEditor.setAttribute('spellcheck', settings.spellcheck);
             codeEditor.setAttribute('placeholder', settings.placeholder);
             codeEditor.textContent = settings.text;
@@ -943,7 +971,7 @@ class Flow {
                 editorContainer.appendChild(codeEditor);
             }
 
-            const streamTarget = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText hide">`);
+            const streamTarget = fromHTML(`<div contenteditable="false" class="w-100 fixText hide">`);
             settings.streamTarget = streamTarget;
             editorContainer.appendChild(streamTarget);
 
@@ -975,6 +1003,7 @@ class Flow {
                 editorContainer.classList.add('decoratedContainer');
             }
             const codeEditor = fromHTML(`<code contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText">`);
+            if (settings.maxHeight != 0) codeEditor.classList.add('maxHeight-' + settings.maxHeight);
             codeEditor.setAttribute('spellcheck', false);
             codeEditor.setAttribute('placeholder', settings.placeholder);
             codeEditor.textContent = settings.code;
@@ -993,7 +1022,7 @@ class Flow {
                 editorContainer.appendChild(codeEditor);
             }
 
-            const streamTarget = fromHTML(`<code contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText hide">`);
+            const streamTarget = fromHTML(`<code contenteditable="false" class="w-100 fixText hide">`);
             settings.streamTarget = streamTarget;
             editorContainer.appendChild(streamTarget);
 
@@ -1007,6 +1036,7 @@ class Flow {
                 editorContainer.classList.add('decoratedContainer');
             }
             const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText">`);
+            if (settings.maxHeight != 0) codeEditor.classList.add('maxHeight-' + settings.maxHeight);
             codeEditor.setAttribute('spellcheck', settings.spellcheck);
             codeEditor.setAttribute('placeholder', settings.placeholder);
             codeEditor.textContent = settings.markdown;
@@ -1028,7 +1058,7 @@ class Flow {
                 editorContainer.appendChild(codeEditor);
             }
 
-            const streamTarget = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText hide">`);
+            const streamTarget = fromHTML(`<div contenteditable="false" class="w-100 fixText hide">`);
             settings.streamTarget = streamTarget;
             editorContainer.appendChild(streamTarget);
 
@@ -1067,6 +1097,7 @@ class Flow {
             }
             const contentContainer = fromHTML(`<div>`);
             const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText">`);
+            if (settings.maxHeight != 0) codeEditor.classList.add('maxHeight-' + settings.maxHeight);
             codeEditor.setAttribute('placeholder', settings.placeholder);
             codeEditor.textContent = settings.url;
             codeEditor.addEventListener('input', e => {
@@ -1084,6 +1115,7 @@ class Flow {
             figureElement.appendChild(imgElement);
             const captionCodeEditor = fromHTML(`<figcaption contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 contenteditableContainerFooter fixText">`);
             if (!settings.editableCaption) captionCodeEditor.classList.add('hide');
+            if (settings.captionMaxHeight != 0) codeEditor.classList.add('maxHeight-' + settings.captionMaxHeight);
             figureElement.appendChild(captionCodeEditor);
 
             const streamTarget = fromHTML(`<figcaption class="w-100 contenteditableContainerFooter fixText hide">`);
@@ -1171,12 +1203,15 @@ class Flow {
         }
     
         if (Flow.inputTypes.has(type)) {
-            element.appendChild(hb(1));
+            const validationContainer = fromHTML(`<div>`);
+            if (!settings.isInvalid) validationContainer.classList.add('hide');
+            validationContainer.appendChild(hb(1));
             const validationMessageElement = fromHTML(`<div class="validationMessage">`);
-            if (!settings.isInvalid) validationMessageElement.classList.add('hide');
             validationMessageElement.textContent = settings.validationMessage;
-            element.appendChild(validationMessageElement);
+            validationContainer.appendChild(validationMessageElement);
+            element.appendChild(validationContainer);
             settings.validationMessageElement = validationMessageElement;
+            settings.validationContainer = validationContainer;
         }
 
         settings.leftChildren?.forEach(s => settings.leftElement.appendChild(Flow.fromElementSettings(s)));
@@ -1330,29 +1365,48 @@ class Flow {
     }
 
     static fromGroupSettings(settings) {
-        const groupElement = fromHTML(`<div class="w-100">`);
-        settings.htmlElement = groupElement;
+        const container = fromHTML(`<div class="w-100">`);
+        settings.htmlElement = container;
         if (settings.bordered) {
-            groupElement.classList.add('bordered');
-            groupElement.classList.add('largeElement');
+            container.classList.add('bordered');
+            container.classList.add('largeElement');
+        }
+
+        let element = container;
+        if (settings.breakBefore != 0 || settings.breakAfter != 0) {
+            const horizontal = settings.parent.type == Flow.listBarType || settings.parent.type == Flow.buttonType;
+            const name = horizontal ? 'h' : 'b';
+            const subContainer = fromHTML(`<div class="w-100">`);
+            if (settings.breakBefore) container.appendChild(name + 'b-' + settings.breakBefore);
+            container.appendChild(subContainer);
+            if (settings.breakAfter) container.appendChild(name + 'b-' + settings.breakBefore);
+            element = subContainer;
+        }
+
+        if (settings.gap != 0) {
+            element.classList.add('divList');
+            element.classList.add('w-100');
+            element.classList.add('gap-' + settings.gap);
         }
 
         for (const child of settings.children) {
             const childElement = Flow.fromElementSettings(child);
-            groupElement.appendChild(childElement);
+            element.appendChild(childElement);
         }
 
         const inputs = Flow.extractInputElements(settings);
         if (inputs.length != 0) {
-            groupElement.appendChild(hb(1));
             const validationContainer = fromHTML(`<div class="listContainerHorizontal">`);
+            if (!settings.isInvalid) validationContainer.classList.add('hide');
+            validationContainer.appendChild(hb(1));
             validationContainer.appendChild(fromHTML(`<div>`));
             const validationMessageElement = fromHTML(`<div class="validationMessage">Some inputs are invalid.`);
-            if (!settings.isInvalid) validationMessageElement.classList.add('hide');
             settings.validationMessageElement = validationMessageElement;
+            settings.validationContainer = validationContainer;
             validationContainer.appendChild(validationMessageElement);
-            groupElement.appendChild(validationContainer);
-            groupElement.appendChild(hb(1));
+            validationContainer.appendChild(hb(1));
+
+            element.appendChild(validationContainer);
             const footer = fromHTML(`<div class="listContainerHorizontal">`);
             footer.appendChild(fromHTML(`<div>`));
             const acceptButton = fromHTML(`<button class="largeElement complexButton">`);
@@ -1360,12 +1414,12 @@ class Flow {
             acceptButton.textContent = "Accept";
             acceptButton.addEventListener('click', e => Flow.onAccept(settings));
             footer.appendChild(acceptButton);
-            groupElement.appendChild(footer);
+            element.appendChild(footer);
             settings.acceptButtonElement = acceptButton;
             if (settings.noAccept) footer.classList.add('hide');
         }
 
-        return groupElement;
+        return element;
     }
 
     static async spliceOutput(start = -1, deleteCount = 0, ...insertGroupSettings) {
@@ -1453,7 +1507,7 @@ class Flow {
         let insertAt = options.insertAt;
         if (options.insertBefore != null) {
             insertAt = Flow.output.findIndex(s => s.name == options.insertBefore);
-            if (options.insertAfterInstead) groupIndex += 1;
+            if (options.insertAfterInstead) insertAt += 1;
         }
 
         const settings = Flow.extractSettingsFromGroup(content);
@@ -1461,7 +1515,9 @@ class Flow {
 
         const inputs = Flow.extractInputElements(settings);
 
+        console.log(settings, options, this.output);
         await Flow.spliceOutput(insertAt, options.deleteAfter, settings);
+        console.log(this.output);
         if (options.deleteBefore > 0) {
             await Flow.spliceOutput(insertAt - options.deleteBefore, options.deleteBefore);
         }
@@ -2188,7 +2244,7 @@ function getFlowPage() {
         promptEditorContainer.appendChild(footer);
         elements.push(promptEditorContainer);
     } else {
-        const outputContainer = fromHTML(`<div>`);
+        const outputContainer = fromHTML(`<div class="divList gap-4">`);
         Flow.outputElement = outputContainer;
         outputContainer.textContent = Flow.noOutputMessage;
         elements.push(outputContainer);

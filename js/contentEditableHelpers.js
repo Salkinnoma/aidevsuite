@@ -36,9 +36,7 @@ class ContentEditableHelpers {
             event.preventDefault();
 
             // Get pasted data via clipboard API
-            let text = (event.clipboardData || window.clipboardData).getData('text');
-
-            // Insert text only at the current cursor position
+            const text = (event.clipboardData || window.clipboardData).getData('text');
             document.execCommand('insertText', false, text);
         });
     }
@@ -46,7 +44,12 @@ class ContentEditableHelpers {
     // Function to check and convert elements with contenteditable-type="plainTextOnly"
     static checkAndConvertPlainTextOnly(element) {
         if (element.getAttribute('contenteditable-type') === 'plainTextOnly') {
-            ContentEditableHelpers.convertToPlainText(element);
+            if (isFirefox) {
+                ContentEditableHelpers.convertToPlainText(element);
+            } else {
+                console.log(element, element.getAttribute('contenteditable'));
+               element.setAttribute('contenteditable', 'plaintext-only');
+            }
         }
     }
 

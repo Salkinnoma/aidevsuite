@@ -1,6 +1,11 @@
 
-.markdown p {
+.markdown p, .markdownRawText {
     margin-bottom: 16px;
+}
+
+.markdownRawText {
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .markdown table {

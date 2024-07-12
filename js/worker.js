@@ -203,14 +203,17 @@ onmessage = async function(e){
 
 /**
  * Create elements using various create functions. The `options` parameter of any elements can additionally take the following properties:
- * - **name** (string) [optional]: This is necessary for the `update`, `remove` and some other functions that require an element name functions.
+ * - **name** (string) [optional]: This is necessary for the `update`, `remove` and some other functions that require an element name functions. After calling `showGroup` or `show`, this can be accessed via element.name.
+ * - **bordered** (bool) [optional]: Whether to add a border around them.
+ * - **breakBefore** (number) [optional]: Adds a break before with the value as its size. Must be between 0 and 8. Default is `0`.
+ * - **breakAfter** (number) [optional]: Adds a break after with the value as its size. Must be between 0 and 8. Default is `0`.
  * - **hide** (bool) [optional]: This can be useful when smoothly wanting to add to elements of containers without recreating the entire container, as they can't be added via `update`. Default is `false`.
  * - **leftElements** (array) [optional]: An array of small elements to float to the left of an element.
  * - **rightElements** (array) [optional]: An array of small elements to float to the right of an element.
  */
 
 /**
- * Creates a break.
+ * Creates a break. Not really necessary due to the default `gap`s.
  * 
  * - **size** (number) [optional]: How large the break is. Must be between 1 and 8.
  */
@@ -347,6 +350,7 @@ function createIcon(ds, iconProvider, options = null) {
  * 
  * ## Options Configuration by Container Type
  * ### All Types
+ * - **gap** (number) [optional]: The gap between elements. Must be between `0` and `8`. Default is `4`.
  * - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
  * - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
  * 
@@ -420,6 +424,7 @@ function createFloatCenterWrapper(element, options = null) {
  * - **defaultValue** (string) [optional]: The default text value for the input. Default is an empty string `''`.
  * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter text here..."`.
  * - **spellcheck** (bool) [optional]: Whether to enable spellcheck. Default is `false`.
+ * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
  *
  * ### `numberInputType`
  * - **defaultValue** (number) [optional]: The default number value for the input. Default is `0`.
@@ -433,6 +438,7 @@ function createFloatCenterWrapper(element, options = null) {
  * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter code here..."`.
  * - **language** (string) [optional]: The language of the code.
  * - **context** (string) [optional]: Information about the context in which the code will be executed. Allows better integration with chatbots.
+ * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
  * 
  * ### `markdownInputType`
  * - **defaultValue** (string) [optional]: The default code value for the input. Default is an empty string `''`.
@@ -440,6 +446,7 @@ function createFloatCenterWrapper(element, options = null) {
  * - **spellcheck** (bool) [optional]: Whether to enable spellcheck. Default is `false`.
  * - **katex** (bool) [optional]: Whether to render katex. Default is `true`.
  * - **katexDelimiters** (array) [optional]: The delimiters to use to find find math equations. Default: Same as for `createText`.
+ * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
  * 
  * ### `checkboxInputType`
  * - **defaultValue** (number) [optional]: The default bool value for the input. Default is false.
@@ -458,6 +465,8 @@ function createFloatCenterWrapper(element, options = null) {
  * - **defaultCaptionValue** (string) [optional]: The default caption value for the input. Default is an empty string `''`.
  * - **captionPlaceholder** (string) [optional]: The placeholder text that appears when the caption input is empty. Default is `"Enter caption here..."`.
  * - **spellcheck** (bool) [optional]: Whether to enable spellcheck for the caption. Default is `false`.
+ * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
+ * - **captionMaxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
  *
  * ### `fileInputType`
  * - **allowedMimeTypes** (array of strings) [optional]: Specifies the mime types (e.g application/json) that are allowed. Wildcards are supported. Default is an empty array `[]`.
@@ -521,6 +530,9 @@ function _mapGroup(group) {
  *     - **insertAfterInstead** (bool) [optional]: Modifies insertBefore to insert after that group instead. Default is `false`.
  *     - **deleteAfter** (number) [optional]: How many to delete after this. The default is `0`.
  *     - **deleteBefore** (number) [optional]: How many to delete before this. The default is `0`.
+ *     - **breakBefore** (number) [optional]: Adds a break before with the value as its size. Must be between 0 and 8. Default is `0`.
+ *     - **breakAfter** (number) [optional]: Adds a break after with the value as its size. Must be between 0 and 8. Default is `0`.
+ *     - **gap** (number) [optional]: The gap between elements. Must be between `0` and `8`. Default is `4`.
  *
  * ## Return value when awaited
  * When this function is awaited, it returns an object that contains each input element (only input elements) from the group parameter with their name as a key. If no name is defined, their flattened index within the group is used instead, and added to the element as a name property.
@@ -538,7 +550,6 @@ async function showGroup(group, options) {
         element.options ??= {};
 
         element.name = element.options.name ?? index;
-        delete element.options.name;
 
         if (element.options?.onValidate != null) {
             const onValidate = element.options.onValidate;
@@ -934,4 +945,38 @@ function extractCode(markdown, codeBlocksOnly = true) {
     }
 
     return codes;
+}
+
+class Samples {
+    static async runSimpleChatBot() {
+        const promptInputName = "promptInputName";
+        let counter = 0;
+        const context = [];
+    
+        async function run() {
+            const prompt = (await read(promptInputName)).text;
+            context.push(toUserMessage(prompt));
+    
+            const userMessageElement = createText(paragraphType, `User:\n${prompt}`, {bordered: true});
+            const assistantMessageElement = createMarkdown("", {name: counter});
+            await showGroup([userMessageElement, assistantMessageElement], {insertAt: context.length - 1, name: counter});
+    
+            const result = await chat(context, {element: counter});
+            context.push(toAssistantMessage(result));
+    
+            counter++;
+        }
+    
+        await setStatus("Ready to chat");
+         // Show input box for the user to enter their prompt
+        const inputElement = createInput(textInputType, {
+            name: promptInputName,
+            placeholder: "Enter your prompt here...",
+        });
+        show(inputElement, {noAccept: true}); // No await here
+        const button = createContainer(buttonType, createText(paragraphType, "Chat"), {onClick:run});    
+        const wrapper = createFloatRightWrapper(button);
+        await show(wrapper);
+        // Continues to run in the background
+    }
 }

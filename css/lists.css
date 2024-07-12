@@ -12,7 +12,7 @@
     flex-direction: column;
 }
 
-.listHorizontal, .listVertical, .divList {
+.listHorizontal, .listVertical {
     display: flex;
     flex-wrap: wrap;
     padding: 0;
@@ -31,7 +31,8 @@
 }
 
 .divList {
-    align-items: start;
+    flex-direction: column;
+    display: flex;
 }
 
 .nowrap {

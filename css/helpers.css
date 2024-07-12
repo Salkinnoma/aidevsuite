@@ -168,3 +168,35 @@ b {
 *:disabled, [disabled] {
     opacity: 0.3;
 }
+
+.maxHeight-1 {
+    max-height: 100px;
+}
+
+.maxHeight-2 {
+    max-height: 200px;
+}
+
+.maxHeight-3 {
+    max-height: 300px;
+}
+
+.maxHeight-4 {
+    max-height: 400px;
+}
+
+.maxHeight-5 {
+    max-height: 500px;
+}
+
+.maxHeight-6 {
+    max-height: 600px;
+}
+
+.maxHeight-7 {
+    max-height: 700px;
+}
+
+.maxHeight-8 {
+    max-height: 800px;
+}
