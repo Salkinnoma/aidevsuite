@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Worker Iframe</title>
+</head>
+<body>
+<script>
+    window.addEventListener('message', async (event) => {
+        if (event.data === 'loadWorker') {
+            const worker = new Worker('js/worker.js');
+            window.worker = worker;
+
+            worker.onmessage = (e) => {
+                window.parent.postMessage(e.data, '*');
+            };
+        } else if (event.data.workerCommand) {
+            window.worker.postMessage(event.data.workerCommand);
+        }
+    });
+</script>
+</body>
+</html>

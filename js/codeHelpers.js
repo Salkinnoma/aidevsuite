@@ -4,6 +4,13 @@ class CodeHelpers {
         const preContainer = fromHTML(`<div class="preContainer ">`);
         const languageClass = language != null ? 'language-' + escapeHTML(language) : null;
 
+        const pre = fromHTML(`<pre>`);
+        const codeElement = fromHTML(`<code>`);
+        if (language != null) codeElement.classList.add(languageClass);
+        codeElement.textContent = code;
+        if (language != null) highlightCode(codeElement);
+
+
         // Code bar
         const codeBar = fromHTML(`<div class="codeBar listContainerHorizontal">`);
         const codeLanguage = fromHTML(`<div class="codeLanguage">`);
@@ -12,7 +19,7 @@ class CodeHelpers {
         const copyButton = fromHTML('<button tooltip="Copy Code" class="largeElement hoverable">');
         let copyTime = Date.now();
         copyButton.addEventListener('click', e => {
-            copyToClipboard(code.innerText);
+            copyToClipboard(codeElement.innerText);
             copyButton.setAttribute('tooltip', 'Copied!');
             copyTime = Date.now();
             const oldCopyTime = copyTime;
@@ -26,11 +33,6 @@ class CodeHelpers {
         codeBar.appendChild(copyButton);
         preContainer.appendChild(codeBar);
 
-        const pre = fromHTML(`<pre>`);
-        const codeElement = fromHTML(`<code>`);
-        if (language != null) codeElement.classList.add(languageClass);
-        codeElement.textContent = code;
-        if (language != null) highlightCode(codeElement);
         pre.appendChild(codeElement);
         preContainer.appendChild(pre);
 
