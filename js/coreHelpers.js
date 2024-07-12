@@ -146,3 +146,7 @@ function onBodyCreated(callback) {
 }
 
 const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+
+function intDivision(a, b) {
+    return Math.floor(a / b);
+}
