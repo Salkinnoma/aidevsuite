@@ -959,7 +959,7 @@ class Samples {
     
             const userMessageElement = createText(paragraphType, `User:\n${prompt}`, {bordered: true});
             const assistantMessageElement = createMarkdown("", {name: counter});
-            await showGroup([userMessageElement, assistantMessageElement], {insertAt: context.length - 1, name: counter});
+            await showGroup([userMessageElement, assistantMessageElement], {insertAt: counter, name: counter});
     
             const result = await chat(context, {element: counter});
             context.push(toAssistantMessage(result));
