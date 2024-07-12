@@ -143,17 +143,7 @@ class Flow {
         Flow.codeEditorContainerElement.classList.remove('hide');
         Flow.streamTargetElement.classList.add('hide');
 
-        Flow.codeEditorElement.focus();
-
-        // Get the current selection
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-
-        const range = document.createRange();
-        range.selectNodeContents(Flow.codeEditorElement);
-        selection.addRange(range);
-
-        document.execCommand('insertText', false, code);
+        InputHelpers.replaceTextWithUndo(Flow.codeEditorElement, code);
 
         Flow.updateCode(code);
 
@@ -243,12 +233,14 @@ class Flow {
     static logEventType = "logEventType";
     static evalEventType = "evalEventType";
     static showEventType = "showEventType";
+    static readEventType = "readEventType";
     static updateEventType = "updateEventType";
     static removeEventType = "removeEventType";
     static validateInputEventType = "validateInputEventType";
     static delayedValidateInputEventType = "delayedValidateInputEventType";
     static clickEventType = "clickEventType";
     static chatEventType = "chatEventType";
+    static chatStreamEventType = "chatStreamEventType";
     static fileDownloadEventType = "fileDownloadEventType";
     static dataURLDownloadEventType = "dataURLDownloadEventType";
     static setProgressEventType = "setProgressEventType";
@@ -375,7 +367,7 @@ class Flow {
                 pingId = generateUniqueId();
                 Flow.onPingEvent.set(pingId, async (event) => {
                     try {
-                        const result = await onPing(event.data.type, event.data.content);
+                        const result = await onPing(event.data.content, event);
                         Flow.postSuccessResponse(event, result);
                     } catch (e) {
                         Flow.postErrorResponse(event, "Executing request produced an error.");
@@ -387,7 +379,7 @@ class Flow {
                 Flow.onEvent.delete(id);
                 if (pingId != null) Flow.onPingEvent.delete(pingId);
 
-                if (event.data.status === Flow.errorStatus) reject(event.data.message);
+                if (event.data.status === Flow.errorStatus) reject(event.data.stack);
                 else resolve(event.data.content);
             });
     
@@ -409,6 +401,8 @@ class Flow {
                 Flow.onLogRequest(e);
             } else if (e.data.type === Flow.showEventType) {
                 Flow.onShowRequest(e);
+            } else if (e.data.type === Flow.readEventType) {
+                Flow.onRead(e);
             } else if (e.data.type === Flow.updateEventType) {
                 Flow.onUpdate(e);
             }  else if (e.data.type === Flow.removeEventType) {
@@ -507,9 +501,9 @@ class Flow {
         }
         settings.name = element.name ?? element.id;
         settings.hide = element.hide ?? false;
+        settings.disabled = element.disabled ?? false;
         Flow.settingsByGroupNameAndName.get(groupSettings.name).set(settings.name, settings);
 
-        console.log(element);
         if (Flow.textTypes.has(type)) {
             settings.text = element.text;
             settings.title = options.title;
@@ -620,14 +614,15 @@ class Flow {
         console.log(group);
         const options = group.options;
         const settings = {};
-        settings.name ??= options.name ?? generateUniqueId();
+        settings.name = group.options?.name ?? generateUniqueId();
+        settings.noAccept = options.noAccept ?? false;
         Flow.groupByName.set(settings.name, settings);
         Flow.settingsByGroupNameAndName.set(settings.name, new Map());
         settings.children = group.children.map(e => Flow.extractSettingsFromElement(e, settings));
         settings.children.forEach(s => s.parent = settings);
         settings.accepted = false;
-        settings.bordered ??= options.bordered;
-        settings.sticky ??= options.sticky;
+        settings.bordered = options.bordered ?? false;
+        settings.sticky = options.sticky ?? false;
         const inputs = Flow.extractInputElements(settings.children);
         settings.isInvalid = inputs.some(s => s.isInvalid);
         return settings;
@@ -801,6 +796,8 @@ class Flow {
             settings.rightElement = rightElement;
             container.appendChild(rightElement);
         }
+        if (settings.disabled) element.setAttribute('disabled', '');
+        settings.contentElement = element;
     
         if (type == Flow.breakType) {
             if (containered) element.classList.add('vb-1');
@@ -843,14 +840,15 @@ class Flow {
             console.log(markdownContainer, settings);
             renderMarkdown(markdownContainer, settings.markdown, { options: { delimiters: settings.katexDelimiters }, sanitize: true, katex: settings.katex });
             settings.markdownElement = markdownContainer;
-            const rawTextContainer = fromHTML(`<div class="w-100 fixText hide">`);
-            rawTextContainer.textContent = settings.markdown;
+            const rawTextElement = fromHTML(`<div class="w-100 fixText hide">`);
+            rawTextElement.textContent = settings.markdown;
+            settings.rawTextElement = rawTextElement;
 
-            const topBar = MarkdownHelpers.createBar(markdownContainer, rawTextContainer);
-            const bottomBar = MarkdownHelpers.createBar(markdownContainer, rawTextContainer, true);
+            const topBar = MarkdownHelpers.createBar(markdownContainer, rawTextElement);
+            const bottomBar = MarkdownHelpers.createBar(markdownContainer, rawTextElement, true);
             element.appendChild(topBar);
             element.appendChild(markdownContainer);
-            element.appendChild(rawTextContainer);
+            element.appendChild(rawTextElement);
             element.appendChild(bottomBar);
         } else if (type == Flow.imageType) {
             Flow.tryAddTitle(element, settings);
@@ -942,6 +940,11 @@ class Flow {
             } else {
                 editorContainer.appendChild(codeEditor);
             }
+
+            const streamTarget = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText hide">`);
+            settings.streamTarget = streamTarget;
+            editorContainer.appendChild(streamTarget);
+
             element.appendChild(editorContainer);
             settings.editorContainer = editorContainer;
             settings.codeEditor = codeEditor;
@@ -987,6 +990,11 @@ class Flow {
             } else {
                 editorContainer.appendChild(codeEditor);
             }
+
+            const streamTarget = fromHTML(`<code contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText hide">`);
+            settings.streamTarget = streamTarget;
+            editorContainer.appendChild(streamTarget);
+
             element.appendChild(editorContainer);
             settings.editorContainer = editorContainer;
             settings.codeEditor = codeEditor;
@@ -1002,7 +1010,6 @@ class Flow {
             codeEditor.textContent = settings.markdown;
             codeEditor.addEventListener('input', e => {
                 Flow.processContentEditableInput(e.srcElement, settings, 'markdown');
-                settings.markdownElement.innerHTML = '';
                 renderMarkdown(settings.markdownElement, settings.markdown, { options: { delimiters: settings.katexDelimiters }, sanitize: true, katex: settings.katex });
             });
             codeEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
@@ -1018,6 +1025,11 @@ class Flow {
             } else {
                 editorContainer.appendChild(codeEditor);
             }
+
+            const streamTarget = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText hide">`);
+            settings.streamTarget = streamTarget;
+            editorContainer.appendChild(streamTarget);
+
             contentContainer.appendChild(editorContainer);
             settings.editorContainer = editorContainer;
             settings.codeEditor = codeEditor;
@@ -1071,6 +1083,11 @@ class Flow {
             const captionCodeEditor = fromHTML(`<figcaption contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 contenteditableContainerFooter fixText">`);
             if (!settings.editableCaption) captionCodeEditor.classList.add('hide');
             figureElement.appendChild(captionCodeEditor);
+
+            const streamTarget = fromHTML(`<figcaption class="w-100 contenteditableContainerFooter fixText hide">`);
+            settings.streamTarget = streamTarget;
+            figureElement.appendChild(streamTarget);
+
             contentContainer.appendChild(figureElement);
             settings.imgElement = imgElement;
             settings.figureElement = figureElement;
@@ -1343,6 +1360,7 @@ class Flow {
             footer.appendChild(acceptButton);
             groupElement.appendChild(footer);
             settings.acceptButtonElement = acceptButton;
+            if (settings.noAccept) footer.classList.add('hide');
         }
 
         return groupElement;
@@ -1423,21 +1441,41 @@ class Flow {
         const e = event;
         const content = e.data.content;
         content.options ??= {};
-        content.options.sticky ??= false;
-        content.options.insertAt ??= -1;
-        content.options.deleteAfter ??= 0;
-        content.options.deleteBefore ??= 0;
+        const options = content.options;
+        options.sticky ??= false;
+        options.insertAt ??= -1;
+        options.insertBefore ??= null;
+        options.insertAfterInstead ??= false;
+        options.deleteAfter ??= 0;
+        options.deleteBefore ??= 0;
+        let insertAt = options.insertAt;
+        if (options.insertBefore != null) {
+            insertAt = Flow.output.findIndex(s => s.name == options.insertBefore);
+            if (options.insertAfterInstead) groupIndex += 1;
+        }
 
         const settings = Flow.extractSettingsFromGroup(content);
         settings.event = e;
 
         const inputs = Flow.extractInputElements(settings);
-        await Flow.spliceOutput(content.options.insertAt, content.options.deleteAfter, settings);
-        if (content.options.deleteBefore > 0) {
-            await Flow.spliceOutput(content.options.insertAt - content.options.deleteBefore, content.options.deleteBefore);
+
+        await Flow.spliceOutput(insertAt, options.deleteAfter, settings);
+        if (options.deleteBefore > 0) {
+            await Flow.spliceOutput(insertAt - options.deleteBefore, options.deleteBefore);
         }
 
         if (inputs.length == 0) Flow.postSuccessResponse(e);
+    }
+
+    static async onRead(event) {
+        const e = event;
+        const content = e.data.content;
+        console.log(content);
+        const group = Flow.groupByName.get(content.groupName);
+        let values = Flow.extractInputValues(group);
+        if (content.elementName != null) values = values.find(v => v.name == content.elementName);
+        
+        Flow.postSuccessResponse(e, values);
     }
 
     static async onUpdate(event) {
@@ -1450,7 +1488,16 @@ class Flow {
         // Update settings and corresponding elements
         if (content.hide !== undefined) {
             settings.hide = content.hide;
-            settings.htmlElement.classList.toggle('hide', content.hide);
+            if (content.hide) settings.htmlElement.classList.add('hide');
+            else settings.htmlElement.classList.remove('hide');
+        }
+        if (content.disabled !== undefined) {
+            settings.disabled = content.disabled;
+            if (settings.disabled) {
+                settings.contentElement.setAttribute('disabled', '');
+            } else {
+                settings.contentElement.removeAttribute('disabled');
+            }
         }
         if (content.text !== undefined) {
             settings.text = content.text;
@@ -1581,7 +1628,7 @@ class Flow {
 
     static async onChat(event) {
         const e = event;
-        const content = e.content;
+        const content = e.data.content;
         const context = [];
         for (let message of content.context) {
             if (message.url) context.push(ChatGptApi.ToImageMessage(message.prompt, message.url));
@@ -1589,25 +1636,31 @@ class Flow {
         }
         const options = content.options ?? {};
         const chatOptions = {model: options.model, seed: options.seed};
+        let settings;
+        if (!Array.isArray(options.element)) options.element = [options.element, options.element];
+        else if (options.element?.length == 1) options.element.push(options.element[0]);
+        if (options.element?.length == 2) settings = Flow.settingsByGroupNameAndName.get(options.element[0]).get(options.element[1]);
 
         let result = '';
         try {
             if (options.hasOnUpdate || options.element?.length == 2) {
-                if (options.element?.length == 2) {
-                    const settings = Flow.settingsByGroupNameAndName.get(options.element[1]).get(options.element[0]);
+                if (options.element?.length == 2 && Flow.inputTypes.has(settings.type)) {
                     if (settings.type == Flow.imageInputType) {
-                        settings.captionCodeEditor.setAttribute('contenteditable', 'false');
+                        settings.captionCodeEditor.classList.add('hide');
                     } else if (Flow.inputTypes.has(settings.type)) {
-                        settings.codeEditor.setAttribute('contenteditable', 'false');
+                        settings.codeEditor.classList.add('hide');
                     }
+
+                    settings.streamTarget.classList.remove('hide');
                 }
 
                 // Stream
-                result = await ChatGptApi.streamChat(context, text => {
-                    if (options.hasOnUpdate) Flow.requireResponse(Flow.chatEventType, text, null, e);
+                result = await ChatGptApi.streamChat(context, async text => {
+                    if (options.hasOnUpdate) {
+                        const transformed = await Flow.requireResponse(Flow.chatStreamEventType, text, null, e);
+                        if (transformed != null) text = transformed;
+                    }
                     if (options.element?.length == 2) {
-                        const settings = Flow.settingsByGroupNameAndName.get(options.element[1]).get(options.element[0]);
-                
                         // Update the string value of the element based on its type
                         if (settings.type === Flow.paragraphType) {
                             settings.text = text;
@@ -1623,7 +1676,7 @@ class Flow {
                             settings.codeElement.textContent = text;
                         } else if (settings.type === Flow.markdownType) {
                             settings.markdown = text;
-                            settings.rawTextElementElement.textContent = text;
+                            settings.rawTextElement.textContent = text;
                             renderMarkdown(settings.markdownElement, text, {
                                 options: { delimiters: settings.katexDelimiters },
                                 sanitize: true,
@@ -1634,14 +1687,10 @@ class Flow {
                             settings.captionElement.textContent = text;
                         } else if (settings.type === Flow.textInputType) {
                             settings.text = text;
-                            settings.codeEditor.textContent = text;
                         } else if (settings.type === Flow.codeInputType) {
                             settings.code = text;
-                            settings.codeEditor.textContent = text;
-                        } else if (settings.type === Flow.markdownType) {
+                        } else if (settings.type === Flow.markdownInputType) {
                             settings.markdown = text;
-                            settings.codeEditor.textContent = text;
-                            settings.markdownElement.innerHTML = '';
                             renderMarkdown(settings.markdownElement, text, {
                                 options: { delimiters: settings.katexDelimiters },
                                 sanitize: true,
@@ -1653,16 +1702,18 @@ class Flow {
                         }  else {
                             console.warn(`Unsupported type for streaming updates: ${settings.type}`);
                         }
+
+                        if (options.element?.length == 2 && Flow.inputTypes.has(settings.type)) settings.streamTarget.textContent = text;
                     }
                 }, chatOptions);
 
-                if (options.element?.length == 2) {
-                    const settings = Flow.settingsByGroupNameAndName.get(options.element[1]).get(options.element[0]);
-                    if (settings.type == Flow.imageInputType) {
-                        settings.captionCodeEditor.setAttribute('contenteditable', 'true');
-                    } else if (Flow.inputTypes.has(settings.type)) {
-                        settings.codeEditor.setAttribute('contenteditable', 'true');
-                    }
+                if (options.element?.length == 2 && Flow.inputTypes.has(settings.type)) {
+                    settings.streamTarget.classList.add('hide');
+
+                    const targetElement = Flow.imageInputType ? settings.captionCodeEditor : settings.codeEditor;
+                    targetElement.classList.remove('hide');    
+
+                    InputHelpers.replaceTextWithUndo(targetElement, result);
                 }
             } else {
                 // Don't stream
@@ -1671,6 +1722,7 @@ class Flow {
 
             Flow.postSuccessResponse(e, result);
         } catch(error) {
+            console.log(error.stack);
             Flow.postErrorResponse(e, error.message);
         }
     }

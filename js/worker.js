@@ -9,12 +9,14 @@ const errorStatus = 'errorStatus';
 const logEventType = "logEventType";
 const evalEventType = "evalEventType";
 const showEventType = "showEventType";
+const readEventType = "readEventType";
 const updateEventType = "updateEventType";
 const removeEventType = "removeEventType";
 const validateInputEventType = "validateInputEventType";
 const delayedValidateInputEventType = "delayedValidateInputEventType";
 const clickEventType = "clickEventType";
 const chatEventType = "chatEventType";
+const chatStreamEventType = "chatStreamEventType";
 const fileDownloadEventType = "fileDownloadEventType";
 const dataURLDownloadEventType = "dataURLDownloadEventType";
 const setProgressEventType = "setProgressEventType";
@@ -125,6 +127,11 @@ function generateUniqueId() {
     return Date.now() + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
 }
 
+async function waitForever() {
+    await new Promise(() => {});
+    console.log('This will never run!');
+  }
+
 // Event logic to communicate with origin
 function postRequest(type, content, id = null, pingId = null, pingSourceEvent = null) {
     postMessage({id, pingId, pingSourceId: pingSourceEvent?.data.pingId, type, content});
@@ -146,7 +153,8 @@ function requireResponse(type, content, onPing = null, pingSourceEvent = null){
             pingId = generateUniqueId();
             onPingEvent.set(pingId, async (event) => {
                 try {
-                    const result = await onPing(event.data.type, event.data.content);
+                    // Important: Your code will be evaluated in here. The moment it ends, the worker will be terminated and callbacks cease to work. To never terminate, await `waitForever` at the end of the script.
+                    const result = await onPing(event.data.content, event);
                     postSuccessResponse(event, result);
                 } catch (e) {
                     postErrorResponse(event, e.stack);
@@ -171,24 +179,24 @@ async function log(...data) {
 }
 
 async function onEvalRequest(e){
-    try {
-        const result = await eval("(async () => {" + e.data.content.code + "})()");  // Evaluate the incoming code
-        const content = result;
-        postSuccessResponse(e, content);
-    } catch (error) {
-        postErrorResponse(e, error.stack);
-    }
+    const result = await eval("(async () => {" + e.data.content.code + "})()");  // Evaluate the incoming code
+    const content = result;
+    postSuccessResponse(e, content);
 }
 
 onmessage = async function(e){
     if (e.data.type !== logEventType) await log("Origin Message Received:", e.data);
 
-    if (onEvent.has(e.data.id)) {
-        onEvent.get(e.data.id)(e);
-    } else if (onPingEvent.has(e.data.pingSourceId)) {
-        onPingEvent.get(e.data.pingSourceId)(e);
-    } else if (e.data.type === evalEventType) {
-        onEvalRequest(e);
+    try {
+        if (onEvent.has(e.data.id)) {
+            onEvent.get(e.data.id)(e);
+        } else if (onPingEvent.has(e.data.pingSourceId)) {
+            onPingEvent.get(e.data.pingSourceId)(e);
+        } else if (e.data.type === evalEventType) {
+            onEvalRequest(e);
+        }
+    } catch (error) {
+        postErrorResponse(e, error.stack);
     }
 };
 
@@ -308,8 +316,8 @@ function createImage(url, options = null) {
 
 /**
  * ## Parameters
- * - **ds** (array of strings or a string): If it is an array, it creates a path element for each d. If it is a string, it uses predefined paths. The following string values are supported: `"close"`, `"expandMore"`, `"expandLess"`, `"menu"`, `"menuClose"`, `"menuHorizontal"`, `"download"`, `"upload"`, `"lock"`, `"noLock"`, `"edit"`, `"noEdit"`, `"delete"`, `"highlight"`, `"highlightOff"`, `"play"`, `"settings"`, `"sparkles"`, `"star"`, `"starFilled"`, `"copy"`, `"user"`, `"cpu"`, `"link"`, `"dollar"`, `"at"`, `"photo"`, `"retry"`, `"undo"`, `"redo"`.
- * - **iconProvider** (string): The type of the icon. Supported values are:
+ * - **ds** (array of strings or a string): If it is an array, it creates a path element for each d. If it is a string, it uses predefined paths. *Only* the following string values are supported (Do not use any other string values): `"close"`, `"expandMore"`, `"expandLess"`, `"menu"`, `"menuClose"`, `"menuHorizontal"`, `"download"`, `"upload"`, `"lock"`, `"noLock"`, `"edit"`, `"noEdit"`, `"delete"`, `"highlight"`, `"highlightOff"`, `"play"`, `"settings"`, `"sparkles"`, `"star"`, `"starFilled"`, `"copy"`, `"user"`, `"cpu"`, `"link"`, `"dollar"`, `"at"`, `"photo"`, `"retry"`, `"undo"`, `"redo"`.
+ * - **iconProvider** (string): The type of the icon. Can be null if `ds` is a string. Supported values are:
  *     - `materialIconProvider`
  *     - `heroIconProvider`
  * - **options** (object): An object that can have the following properties:
@@ -331,7 +339,7 @@ function createIcon(ds, iconProvider, options = null) {
  * - **type** (string): Specifies the type of the container. Supported values are:
  *     - `barType`
  *     - `verticalType`
- * - **elements** (array): A list of elements displayed within the container. Please do not put buttons or interactables within buttons.
+ * - **elements** (object or array): A single element or a list of elements displayed within the container. Please do not put buttons or interactables within buttons.
  * - **options** (object): An object that contains various options specific to the `type` of input. The options available depend on the input type.
  * 
  * ## Options Configuration by Container Type
@@ -354,12 +362,33 @@ function createIcon(ds, iconProvider, options = null) {
  *     - `complexButtonType` // Use this for buttons that should be strongly visible, such as a Save or Cancel button.
  * - **onClick** (function): A callback function that is called whenever the button is clicked. It has neither parameters nor a return value.
  * - **fullWidth** (bool) [optional]: Whether its width should be stretched to 100%. Default is `false`.
+ * - **disabled** (bool) [optional]: Whether the button is disabled. Default is `false`.
  */
 function createContainer(type, elements, options = null) {
     options ??= {};
     const content = {
         type,
-        elements,
+        elements: Array.isArray(elements) ? elements : [elements],
+        options,
+    };
+    return content;
+}
+
+function createFloatRightWrapper(element, options = null) {
+    options ??= {};
+    const content = {
+        type: barType,
+        elements: [createEmpty(), element],
+        options,
+    };
+    return content;
+}
+
+function createFloatCenterWrapper(element, options = null) {
+    options ??= {};
+    const content = {
+        type: barType,
+        elements: [createEmpty(), element, createEmpty(),],
         options,
     };
     return content;
@@ -370,21 +399,19 @@ function createContainer(type, elements, options = null) {
  * - **type** (string): Specifies the type of input. All `inputTypes` are supported.
  * - **options** (object): An object that contains various options specific to the `type` of input. The options available depend on the input type.
  *
- *
  * ## Options Configuration by Input Type
  *
  * ### All Types
  * - **name** (string) [optional]: Recommended for use as part of the `showGroup` function.
+ * - **disabled** (bool) [optional]: Whether user input is disabled. Default is `false`.
  *
  * ### All Input Types
  * - **onValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called whenever the value of an input changes. Its parameters are group, element. The return value of onValidate must be an object with the following properties:
  *     - **valid** (bool): Whether the value is valid.
  *     - **message** (string) [optional]: An error message. Defaults to `'Invalid value. Please choose a different value.'`.
- *     - **override** (object) [optional]: Allows overwriting the value of elements within the group. The object must be any number of elements mapped by their names.
- * - **onDelayedValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called only when a user wants to accept input. Its parameters are group, element. The return value of onValidate must be an object with the following properties:
+ * - **onDelayedValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called only when a user wants to accept input. This doesn't work in combination with `noAccept`. Its parameters are group, element. The return value of onValidate must be an object with the following properties:
  *     - **valid** (bool): Whether the value is valid.
  *     - **message** (string) [optional]: An error message. Defaults to `'Invalid value. Please choose a different value.'`.
- *     - **override** (object) [optional]: Allows overwriting the value of elements within the group. The object must be any number of elements mapped by their names.
  *
  * ### `textInputType`
  * - **defaultValue** (string) [optional]: The default text value for the input. Default is an empty string `''`.
@@ -483,14 +510,17 @@ function _mapGroup(group) {
  * - **group** (array): The group parameter accepts an array of elements created via any of the create functions. For inputs, it is recommended to define a name, to allow easy access of the return values.
  * - **options** (object) [optional]: An object that can have the following properties:
  *     - **name** (string) [optional]: This is necessary for the `update`, `remove` and some other functions that require a group name functions.
+ *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If an input can be accepted multiple times, set this to `true` and add custom logic that uses the `read` function to read the input values upon a click on a custom button. Default is `false`.
  *     - **bordered** (number) [optional]: Whether the group should be bordered. Default is `false`.
  *     - **sticky** (number) [optional]: Whether it should stick to the top. Default is `false`.
- *     - **insertAt** (number) [optional]: Where to insert. The default is `-1`.
+ *     - **insertAt** (number) [optional]: Where to insert. This allows negative indices. The default is `-1`.
+ *     - **insertBefore** (string) [optional]: Name of the group to insert before.
+ *     - **insertAfterInstead** (bool) [optional]: Modifies insertBefore to insert after that group instead. Default is `false`.
  *     - **deleteAfter** (number) [optional]: How many to delete after this. The default is `0`.
  *     - **deleteBefore** (number) [optional]: How many to delete before this. The default is `0`.
  *
  * ## Return value when awaited
- * When this function is awaited, it returns an object that contains each input element from the group parameter with their name as a key. If no name is defined, their flattened index within the group is used instead, and added to the element as a name property.
+ * When this function is awaited, it returns an object that contains each input element (only input elements) from the group parameter with their name as a key. If no name is defined, their flattened index within the group is used instead, and added to the element as a name property.
  * Each returned input element contains data as described by the `show` function.
  * */
 async function showGroup(group, options) {
@@ -533,11 +563,11 @@ async function showGroup(group, options) {
         requireResponse(clickEventType, element.id, _ => onClickMap.get(element.name)()); // Don't await
     }
 
-    const response = await requireResponse(showEventType, {children: group, options}, async (type, content) => {
+    const response = await requireResponse(showEventType, {children: group, options}, async (content, event) => {
         let map = null;
-        if (type == validateInputEventType) {
+        if (event.type == validateInputEventType) {
             map = onValidateMap;
-        } else if (type == delayedValidateInputEventType) {
+        } else if (event.type == delayedValidateInputEventType) {
             map = onDelayedValidateMap;
         }
         return await map.get(content.element.name)(_mapGroup(content.group), content.element);
@@ -549,13 +579,14 @@ async function showGroup(group, options) {
 /**
  * The element parameter should be created via any of the create functions.
  * For showing multiple elements at once, use the `showGroup` function.
+ * Important: The returned objects are deep copies. They are not updated on input. The updated values must be fetched either via the `onValidate` callback or the `read` function.
  * 
  * ## Parameters
- * The parameters are the same as for the `showGroup` function.
+ * The parameters are the same as for the `showGroup` function. Take special note of the `name`, `noAccept` and delete options. By default the `name` will be the same as the element `name`.
  *
  * ## Return value when awaited
  * When this function is awaited:
- * - If the element is not an input, it returns the input element with following properties:
+ * - If and only if the element is an input, it returns an object with following properties:
  *
  * ### All Types
  * - **name** (string): The name assigned to the element.
@@ -608,9 +639,28 @@ async function showGroup(group, options) {
  *     - **text** (string): The text content of the file.
  *     - **dataURL** (string): The Data URL of the file.
  * */
-async function show(element, options) {
+async function show(element, options = null) {
+    options ??= {};
+    options.name ??= element.options?.name;
     let result = await showGroup([element], options);
     return result[element.name];
+}
+
+/**
+ * If the element is an input element, it returns the current values of the input as described by the `show` function.
+ * 
+ * If `elementName` is null, it will be set to `groupName`.
+ */
+async function read(groupName, elementName = null) {
+    elementName ??= groupName;
+    return await requireResponse(readEventType, {groupName, elementName});
+}
+
+/**
+ * Returns the current values of all inputs of the group as described by the `show` function.
+ */
+async function readGroup(groupName) {
+    return await requireResponse(readEventType, {groupName, elementName: null});
 }
 
 /**
@@ -634,26 +684,31 @@ async function remove(groupName = null, elementName = null) {
 }
 
 /**
- * This allows communicating with a chatbot.
+ * This allows communicating with a chatbot. A chatbot always responds with markdown.
  * - **context** (array): A list of message objects.
  * - **options** (object): An object that can have the following properties:
- *     - **element** (array of 2 strings) [optional]: Allows streaming to an element. The first string must be the `name` of the group, the second must be the `name` of the element. If streaming to an input, it will be disabled for user input while streaming. This only works on elements with a string value, such as text, caption, code etc..
- *     - **onUpdate** (function) [optional]: Allows streaming to a callback function. The function takes in the following parameters:
- *         - **response** (string): The updated full response text.
+ *     - **element** (string or array of 2 strings) [optional]: Allows streaming to an element. If it is a string, it must represent both the group name and the element name. If it is an array, the first string must be the `name` of the group, the second must be the `name` of the element. If streaming to an input, it will be disabled for user input while streaming. This only works on elements with a string value, such as text, caption, code etc..
+ *     - **onUpdate** (function) [optional]: Allows streaming to a callback function. The function can optionally return a string to update the value to e.g. extract code blocks. The function takes in the following parameters:
+ *         - **response** (string): The newly streamed tokens concatenated with the previous response text.
  *     - **model** (string) [optional]: The model to be used. Default is `ChatHelpers.gpt4OmniIdentifier`.
  *     - **seed** (number) [optional]: The seed to be used. Very unreliable.
  */
 async function chat(context, options = null) {
     const onUpdate = options?.onUpdate;
+
+    let response;
     if (onUpdate == null) {
-        await requireResponse(chatEventType, {context, options});
+        response = await requireResponse(chatEventType, {context, options});
     } else {
         delete options.onUpdate;
         options.hasOnUpdate = true;
-        await requireResponse(chatEventType, {context, options}, e => onUpdate(e.data.content));
+        response = await requireResponse(chatEventType, {context, options}, (content, event) => {
+            const transformed = onUpdate(content);
+            postSuccessResponse(event, transformed);
+        });
     }
 
-  
+    return response;
 }
 
 async function requestFileDownload(name, type, content) {
@@ -805,8 +860,8 @@ class ChatHelpers {
     ]);
 }
 
-function toMessage(role, content, url = null){
-    return {role, content, url};
+function toMessage(role, prompt, url = null){
+    return {role, prompt, url};
 }
 
 function toSystemMessage(prompt){
@@ -822,4 +877,58 @@ function toUserMessage(prompt, url = null){
 
 function toAssistantMessage(prompt){
     return toMessage(assistantRole, prompt);
+}
+
+function extractCode(markdown, codeBlocksOnly = true) {
+    let amount = 0;
+    let isCodeBlock = false;
+    let isIndentedCode = false;
+    let codes = [];
+    let codeStart = 0;
+    for (let i = 0; i < markdown.length; i++) {
+        if (markdown[i] === "\`") {
+            amount++;
+        } else {
+            if (amount === 3) {
+                if (isCodeBlock) {
+                    codes.push(markdown.substring(codeStart, i - 2));
+                    isCodeBlock = false;
+                } else if (isIndentedCode) {
+                    continue;
+                } else {
+                    let cutOff = false;
+                    while (markdown[i] !== "\n") {
+                        i++;
+                        if (i === markdown.length || i + 1 === markdown.length) {
+                            cutOff = true;
+                            break;
+                        }
+                    }
+                    if (cutOff) break;
+                    codeStart = i + 1;
+                    isCodeBlock = true;
+                }
+            } else if (amount === 1) {
+                if (isIndentedCode) {
+                    if (!codeBlocksOnly) codes.push(markdown.substring(codeStart, i));
+                    isIndentedCode = false;
+                } else if (isCodeBlock) {
+                    continue;
+                } else {
+                    if (i + 1 === markdown.length) break;
+                    codeStart = i + 1;
+                    isIndentedCode = true;
+                }
+            }
+            amount = 0;
+        }
+    }
+
+    if (isCodeBlock) {
+        codes.push(markdown.substring(codeStart, markdown.length - amount));
+    } else if (isIndentedCode) {
+        if(!codeBlocksOnly) codes.push(markdown.substring(codeStart, markdown.length - amount));
+    }
+
+    return codes;
 }
