@@ -510,6 +510,8 @@ class Flow {
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
         } else if (type === Flow.emptyType) {
             // Do nothing
+        } else if (type === Flow.breakType) {
+            settings.size = Math.min(8, Math.max(0, options.size));
         } else if (type === Flow.rulerType) {
             settings.vertical = options.vertical;
         } else if (type === Flow.codeType) {
@@ -800,8 +802,8 @@ class Flow {
         settings.contentElement = element;
     
         if (type == Flow.breakType) {
-            if (containered) element.classList.add('vb-1');
-            else element.classList.add('hb-1');
+            if (containered) element.classList.add('vb-' + settings.size);
+            else element.classList.add('hb-' + settings.size);
         } else if (type == Flow.rulerType) {
             const ruler = element.vertical ? vr() : hr();
             element.appendChild(ruler);

@@ -211,10 +211,13 @@ onmessage = async function(e){
 
 /**
  * Creates a break.
+ * 
+ * - **size** (number) [optional]: How large the break is. Must be between 1 and 8.
  */
-function createBreak(options = null) {
+function createBreak(size, options = null) {
     const content = {
         type: breakType,
+        size,
         options,
     };
     return content;
