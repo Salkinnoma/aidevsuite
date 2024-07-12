@@ -164,3 +164,7 @@ b {
     color: var(--placeholder-color);
     font-style: italic;
 }
+
+*:disabled, [disabled] {
+    opacity: 0.3;
+}

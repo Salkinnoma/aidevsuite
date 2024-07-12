@@ -292,6 +292,7 @@ class Flow {
     static markdownInputType = "markdownInputType";
     static checkboxInputType = "checkboxInputType";
     static selectInputType = "selectInputType";
+    static imageInputType = "imageInputType";
     static pasteInputType = "pasteInputType";
     static fileInputType = "fileInputType";
 
@@ -317,6 +318,7 @@ class Flow {
         Flow.markdownInputType,
         Flow.checkboxInputType,
         Flow.selectInputType,
+        Flow.imageInputType,
         Flow.pasteInputType,
         Flow.fileInputType,
     ]);
@@ -341,6 +343,7 @@ class Flow {
         Flow.markdownInputType,
         Flow.checkboxInputType,
         Flow.selectInputType,
+        Flow.imageInputType,
         Flow.pasteInputType,
         Flow.fileInputType,
     ]);
@@ -584,6 +587,13 @@ class Flow {
                 });
                 settings.value = options.defaultValue ?? options.choices[0].value;
                 settings.choices = options.choices;
+            } else if (type === Flow.imageInputType) {
+                settings.url = element.url ?? '';
+                settings.caption = options.caption ?? '';
+                settings.editableCaption = options.editableCaption ?? false;
+                settings.placeholder = options.placeholder ?? 'Enter url here...';
+                settings.captionPlaceholder = options.captionPlaceholder ?? 'Enter caption here...';
+                settings.spellcheck = options.spellcheck ?? false;
             } else if (type === Flow.fileInputType) {
                 settings.files = [];
                 settings.allowedMimeTypes = options.allowedMimeTypes ?? [];
@@ -1036,6 +1046,61 @@ class Flow {
             });
             element.appendChild(selectElement);
             settings.selectElement = selectElement;
+        } else if (type == Flow.imageInputType) {
+            const editorContainer = fromHTML(`<div class="contenteditableContainer">`);
+            if (decorated) {
+                editorContainer.classList.add('decoratedContainer');
+            }
+            const contentContainer = fromHTML(`<div>`);
+            const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText">`);
+            codeEditor.setAttribute('placeholder', settings.placeholder);
+            codeEditor.textContent = settings.url;
+            codeEditor.addEventListener('input', e => {
+                Flow.processContentEditableInput(e.srcElement, settings, 'url');
+                settings.imgElement.setAttribute('src', settings.url);
+            });
+            codeEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
+            contentContainer.appendChild(codeEditor);
+            settings.codeEditor = codeEditor;
+
+            const figureElement = fromHTML(`<figure class="contenteditableContainerContent">`);
+            const imgElement = fromHTML(`<img class="rounded-xl">`);
+            imgElement.setAttribute('src', settings.url);
+            imgElement.setAttribute('alt', settings.caption ?? "");
+            figureElement.appendChild(imgElement);
+            const captionCodeEditor = fromHTML(`<figcaption contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 contenteditableContainerFooter fixText">`);
+            if (!settings.editableCaption) captionCodeEditor.classList.add('hide');
+            figureElement.appendChild(captionCodeEditor);
+            contentContainer.appendChild(figureElement);
+            settings.imgElement = imgElement;
+            settings.figureElement = figureElement;
+
+            captionCodeEditor.setAttribute('placeholder', settings.captionPlaceholder);
+            captionCodeEditor.setAttribute('spellcheck', settings.spellcheck);
+            captionCodeEditor.textContent = settings.caption;
+            captionCodeEditor.addEventListener('input', e => {
+                Flow.processContentEditableInput(e.srcElement, settings, 'caption');
+            });
+            captionCodeEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
+            settings.captionCodeEditor = captionCodeEditor;
+            contentContainer.appendChild(captionCodeEditor);
+
+            if (decorated) {
+                codeEditor.style.padding = "10px 12px";
+                captionCodeEditor.style.padding = "10px 12px";
+                const leftElement = contentContainer.appendChild(fromHTML(`<div>`));
+                leftElement.style.margin = "10px 0 0 10px";
+                settings.leftElement = leftElement;
+                editorContainer.appendChild(contentContainer);
+                const rightElement = editorContainer.appendChild(fromHTML(`<div>`));
+                rightElement.style.margin = "10px 10px 0 0";
+                settings.rightElement = rightElement;
+            } else {
+                editorContainer.appendChild(contentContainer);
+            }
+
+            settings.editorContainer = editorContainer;
+            element.appendChild(editorContainer);
         } else if (type == Flow.fileInputType) {
             const fileElement = fromHTML(`<div class="w-100 largeElement bordered">`);
             const dropArea = fromHTML(`<div class="dropArea">`);
@@ -1131,11 +1196,16 @@ class Flow {
                 value.password = settings.password;
             } else if (type == Flow.codeInputType) {
                 value.code = settings.code;
+            } else if (type == Flow.markdownInputType) {
+                value.markdown = settings.markdown;
             } else if (type == Flow.checkboxInputType) {
                 value.ticked = settings.ticked;
             } else if (type == Flow.selectInputType) {
                 value.value = settings.value;
-            } else if (type == Flow.fileInputType) {
+            } else if (type == Flow.imageInputType) {
+                value.url = settings.url;
+                value.caption = settings.caption;
+            }  else if (type == Flow.fileInputType) {
                 value.files = settings.files;
             } else if (type == Flow.pasteInputType) {
                 value.html = settings.html;
@@ -1204,6 +1274,23 @@ class Flow {
                 element.classList.add('fixText');
                 const selectedChoice = settings.choices.find(c => c.value == settings.value);
                 element.textContent = selectedChoice ? selectedChoice.name : '';
+            } else if (type == Flow.imageInputType) {
+                const figureElement = fromHTML(`<figure>`);
+                const imgElement = fromHTML(`<img class="rounded-xl">`);
+                imgElement.setAttribute('src', settings.url);
+                imgElement.setAttribute('alt', settings.caption ?? "");
+                figureElement.appendChild(imgElement);
+                const captionElement = fromHTML(`<figcaption>`);
+                figureElement.appendChild(captionElement);
+                settings.captionElement = captionElement;
+                if (settings.caption) {
+                    captionElement.textContent = settings.caption;
+                } else {
+                    captionElement.classList.add('hide');
+                }
+                element.appendChild(figureElement);
+                settings.imgElement = imgElement;
+                settings.figureElement = figureElement;
             } else if (type == Flow.fileInputType) {
                 const fileList = settings.filesDisplayElement.children;
                 const displayList = document.createElement('div');
@@ -1385,6 +1472,15 @@ class Flow {
             settings.caption = content.caption;
             if (settings.type === Flow.imageType) {
                 settings.captionElement.textContent = content.caption;
+            } else if (settings.type === Flow.imageInputType) {
+                settings.captionCodeEditor.textContent = content.caption;
+            }
+        }
+        if (content.editableCaption !== undefined && settings.type === Flow.imageInputType) {
+            if (content.editableCaption) {
+                settings.captionCodeEditor.classList.remove('hide');
+            } else {
+                settings.captionCodeEditor.classList.add('hide');
             }
         }
         if (content.ticked !== undefined && settings.type === Flow.checkboxInputType) {
@@ -1395,9 +1491,13 @@ class Flow {
             settings.value = content.value;
             settings.selectElement.value = content.value;
         }
-        if (content.spellcheck !== undefined && settings.type === Flow.textInputType) {
+        if (content.spellcheck !== undefined) {
             settings.spellcheck = content.spellcheck;
-            settings.codeEditor.setAttribute('spellcheck', content.spellcheck);
+            if (settings.type === Flow.textInputType || settings.type === Flow.markdownInputType) {
+                settings.codeEditor.setAttribute('spellcheck', content.spellcheck);
+            } else if (settings.type === Flow.imageInputType) {
+                settings.captionCodeEditor.setAttribute('spellcheck', content.spellcheck);
+            }
         }
         if (content.placeholder !== undefined && (settings.type === Flow.textInputType || settings.type === Flow.codeInputType || settings.type === Flow.passwordInputType)) {
             settings.placeholder = content.placeholder;
@@ -1493,6 +1593,15 @@ class Flow {
         let result = '';
         try {
             if (options.hasOnUpdate || options.element?.length == 2) {
+                if (options.element?.length == 2) {
+                    const settings = Flow.settingsByGroupNameAndName.get(options.element[1]).get(options.element[0]);
+                    if (settings.type == Flow.imageInputType) {
+                        settings.captionCodeEditor.setAttribute('contenteditable', 'false');
+                    } else if (Flow.inputTypes.has(settings.type)) {
+                        settings.codeEditor.setAttribute('contenteditable', 'false');
+                    }
+                }
+
                 // Stream
                 result = await ChatGptApi.streamChat(context, text => {
                     if (options.hasOnUpdate) Flow.requireResponse(Flow.chatEventType, text, null, e);
@@ -1538,11 +1647,23 @@ class Flow {
                                 sanitize: true,
                                 katex: settings.katex
                             });
-                        } else {
+                        } else if (settings.type === Flow.imageInputType) {
+                            settings.caption = text;
+                            settings.captionCodeEditor.textContent = text;
+                        }  else {
                             console.warn(`Unsupported type for streaming updates: ${settings.type}`);
                         }
                     }
                 }, chatOptions);
+
+                if (options.element?.length == 2) {
+                    const settings = Flow.settingsByGroupNameAndName.get(options.element[1]).get(options.element[0]);
+                    if (settings.type == Flow.imageInputType) {
+                        settings.captionCodeEditor.setAttribute('contenteditable', 'true');
+                    } else if (Flow.inputTypes.has(settings.type)) {
+                        settings.codeEditor.setAttribute('contenteditable', 'true');
+                    }
+                }
             } else {
                 // Don't stream
                 result = await ChatGptApi.chat(context, chatOptions);

@@ -3,9 +3,16 @@ img {
     border-radius: 10px;
 }
 
+figure {
+    margin: 0;
+}
+
 figcaption {
     color: var(--raised-text-color);
     font-style: italic;
     font-size: 0.8rem;
-    margin-left: 8px;
+    margin: 0;
+    margin-top: 4px;
+    padding: 0;
+    padding-left: 8px;
 }

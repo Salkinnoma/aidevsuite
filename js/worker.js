@@ -59,6 +59,7 @@ const codeInputType = "codeInputType";
 const markdownInputType = "markdownInputType";
 const checkboxInputType = "checkboxInputType";
 const selectInputType = "selectInputType";
+const imageInputType = "imageInputType";
 const pasteInputType = "pasteInputType";
 const fileInputType = "fileInputType";
 
@@ -108,6 +109,7 @@ const inputTypes = new Set([
     markdownInputType,
     checkboxInputType,
     selectInputType,
+    imageInputType,
     pasteInputType,
     fileInputType,
 ]);
@@ -233,10 +235,7 @@ function createEmpty(options = null) {
 }
 
 /**
- * - **type** (string): Specifies the type of element.  Supported values are:
- *     - `paragraphType`
- *     - `titleType`
- *     - `subTitleType`
+ * - **type** (string): Specifies the type of element. All `textTypes` are supported.
  * - **options** (object): An object that can have the following properties depending on its `type`:
  * 
  * ## All Types
@@ -368,14 +367,7 @@ function createContainer(type, elements, options = null) {
 
 /**
  * ## Parameters
- * - **type** (string): Specifies the type of input. Supported values are:
- *     - `textInputType`
- *     - `numberInputType`
- *     - `passwordInputType`
- *     - `checkboxInputType`
- *     - `selectInputType`
- *     - `fileInputType`
- *     - `pasteInputType`
+ * - **type** (string): Specifies the type of input. All `inputTypes` are supported.
  * - **options** (object): An object that contains various options specific to the `type` of input. The options available depend on the input type.
  *
  *
@@ -428,6 +420,14 @@ function createContainer(type, elements, options = null) {
  * - **choices** (array): An array of option objects that have the following properties.
  *     - **value** (string) [optional]: The value of the option. Default is its index.
  *     - **name** (string) [optional]: The name of the option. Default is its value.
+ * 
+ * ### `imageInputType`
+ * - **defaultValue** (string) [optional]: The default url value for the input. Default is an empty string `''`.
+ * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter image here..."`.
+ * - **editableCaption** (bool) [optional]: Whether the caption can be edited. Default is false.
+ * - **defaultCaptionValue** (string) [optional]: The default caption value for the input. Default is an empty string `''`.
+ * - **captionPlaceholder** (string) [optional]: The placeholder text that appears when the caption input is empty. Default is `"Enter caption here..."`.
+ * - **spellcheck** (bool) [optional]: Whether to enable spellcheck for the caption. Default is `false`.
  *
  * ### `fileInputType`
  * - **allowedMimeTypes** (array of strings) [optional]: Specifies the mime types (e.g application/json) that are allowed. Wildcards are supported. Default is an empty array `[]`.
@@ -580,6 +580,10 @@ async function showGroup(group, options) {
  * 
  * ### For `selectInputType`
  * - **value** (string): The selected value.
+ * 
+ * ### For `imageInputType`
+ * - **url** (string): The url value of the input.
+ * - **caption** (string): The caption value of the input.
  *
  * ### For `fileInputType`
  * - **files** (array): List of files with the following properties:
@@ -633,7 +637,7 @@ async function remove(groupName = null, elementName = null) {
  * This allows communicating with a chatbot.
  * - **context** (array): A list of message objects.
  * - **options** (object): An object that can have the following properties:
- *     - **element** (array of 2 strings) [optional]: Allows streaming to an element. The first string must be the `name` of the group, the second must be the `name` of the element. If streaming to an input, it will be disabled for user input while streaming. This only works on elements with a string value, such as text or code.
+ *     - **element** (array of 2 strings) [optional]: Allows streaming to an element. The first string must be the `name` of the group, the second must be the `name` of the element. If streaming to an input, it will be disabled for user input while streaming. This only works on elements with a string value, such as text, caption, code etc..
  *     - **onUpdate** (function) [optional]: Allows streaming to a callback function. The function takes in the following parameters:
  *         - **response** (string): The updated full response text.
  *     - **model** (string) [optional]: The model to be used. Default is `ChatHelpers.gpt4OmniIdentifier`.

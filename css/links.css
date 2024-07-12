@@ -17,3 +17,7 @@ a:hover, a:focus {
 .textLink, .textLink:hover, .textLink:focus {
     color: var(--stress-color);
 }
+
+.textLink:hover, .textLink:focus {
+    opacity: 0.8;
+}
