@@ -127,10 +127,10 @@ function generateUniqueId() {
     return Date.now() + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
 }
 
-async function waitForever() {
+async function forever() {
     await new Promise(() => {});
     console.log('This will never run!');
-  }
+}
 
 // Event logic to communicate with origin
 function postRequest(type, content, id = null, pingId = null, pingSourceEvent = null) {
@@ -153,7 +153,7 @@ function requireResponse(type, content, onPing = null, pingSourceEvent = null){
             pingId = generateUniqueId();
             onPingEvent.set(pingId, async (event) => {
                 try {
-                    // Important: Your code will be evaluated in here. The moment it ends, the worker will be terminated and callbacks cease to work. To never terminate, await `waitForever` at the end of the script.
+                    // Important: Your code will be evaluated in here. The moment it ends, the worker will be terminated and callbacks cease to work. To never terminate, await `forever` at the end of the script.
                     const result = await onPing(event.data.content, event);
                     postSuccessResponse(event, result);
                 } catch (e) {

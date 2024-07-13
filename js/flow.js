@@ -26,6 +26,26 @@ class Flow {
         if (mode == Flow.runMode) Flow.run();
     }
 
+    static setupIframe() {
+        const iframe = document.getElementById("sandbox");
+        Flow.iframe = iframe;
+        console.log(iframe);
+        const allowedOrigin = window.location.origin;
+
+        window.addEventListener('message', function setupWorker(event) {
+            console.log('IFrame Message Received:', event);
+            if (event.data?.workerData) {
+                Flow.onWorkerMessage({data: event.data?.workerData});
+            }
+        });
+    }
+
+    static postIframeMessage(message) {
+        //const allowedOrigin = window.location.origin; // Doesn't work because iframe is sandboxed with different origin (null)
+        console.log('Init iframe message', message);
+        Flow.iframe.contentWindow.postMessage(message, '*');
+    }
+
     static updateDefaultCode(code) {
         localStorage.setItem('lastCode', code);
     }
@@ -98,8 +118,10 @@ class Flow {
     static run() {
         const mode = getHashQueryVariable('mode') ?? Flow.editMode;
         if (Flow.isRunning) {
-            window.location.reload();
-        } else if (mode == Flow.runMode) {
+            Flow.interruptRun();
+        }
+        
+        if (mode == Flow.runMode) {
             Flow.executeCode();
         } else {
             goToUrl(getUrlWithChangedHashParam('mode', Flow.runMode));
@@ -109,13 +131,10 @@ class Flow {
 
     static edit() {
         if (Flow.isRunning) {
-            const url = getUrlWithChangedHashParam("mode", null);
-            window.location.assign(url);
-            window.location.reload();
-        } else {
-            goToUrl(getUrlWithChangedHashParam('mode', null));
-            return;
+            Flow.interruptRun();
         }
+
+        goToUrl(getUrlWithChangedHashParam('mode', null));
     }
 
     static async generateScript() {
@@ -123,6 +142,7 @@ class Flow {
         Flow.generating = true;
         Flow.generateScriptButton.setAttribute('disabled', '');
         Flow.setStatus('Generating script...');
+        Flow.setProgress(30);
 
         const systemPrompt = `The user will ask you to write a script for a custom interactive tool that clearly communicates with the user. Your script will be evaluated in the eval part of onmessage on a worker. Below is the worker script that will eval your script. All code you write will be executed within an async funciton within eval. Write the whole script and only the script within a single code block (use \`\`\`code here\`\`\`), such that it can be easily parsed.\n\n` +
             await Flow.getWorkerScript();
@@ -148,7 +168,9 @@ class Flow {
         Flow.updateCode(code);
 
         Flow.setStatus('Finished');
+        Flow.setProgress(100);
         Flow.generating = false;
+        Flow.generateScriptButton.removeAttribute('disabled');
     }
 
     static showProgress() {
@@ -175,6 +197,11 @@ class Flow {
         Flow.statusElement.textContent = Flow.status;
     }
 
+    static interruptRun() {
+        Flow.destroyWorker();
+        Flow.isRunning = false;
+    }
+
     static async executeCode() {
         Flow.isRunning = true;
 
@@ -183,14 +210,15 @@ class Flow {
         Flow.output = [];
         Flow.groupByElement.clear();
 
-        Flow.createWorker();
+        await Flow.createWorker();
         let error = false;
         try {
             let result = await Flow.evalOnWorker(Flow.getCode());
         } catch (e) {
             error = e;
+            console.log(error);
         }
-        Flow.worker.terminate();
+        Flow.destroyWorker();
         Flow.hideProgress();
 
         if (error) Flow.setStatus("Script Error: " + error);
@@ -200,21 +228,12 @@ class Flow {
         Flow.isRunning = false;
     }
     
-
     static destroyWorker() {
-        if (Flow.worker == null) return;
-
-        Flow.worker.terminate();
-        Flow.worker = null;
+        Flow.postIframeMessage({ command: 'terminateWorker' });
     }
 
-    static createWorker() {
-        Flow.destroyWorker();
-        const worker = new Worker('js/worker.js');
-        Flow.worker = worker;
-        console.log("Worker created:", worker);
-        worker.onmessage = Flow.onWorkerMessage;
-        return worker;
+    static async createWorker() {
+        Flow.postIframeMessage({loadWorker: await Flow.getWorkerScript()});
     }
 
     static async getWorkerScript() {
@@ -347,16 +366,20 @@ class Flow {
     static filesPasteItemType = "files";
     
     // Event logic to communicate with worker
+    static _postMessage(message) {
+        Flow.postIframeMessage({ workerCommand: message });
+    }
+
     static postRequest(type, content, id = null, pingId = null, pingSourceEvent = null) {
-        Flow.worker.postMessage({id, pingId, pingSourceId: pingSourceEvent?.data.pingId, type, content});
+        Flow._postMessage({id, pingId, pingSourceId: pingSourceEvent?.data.pingId, type, content});
     }
 
     static postSuccessResponse(requestEvent, content = null, message = null) {
-        Flow.worker.postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: Flow.successStatus, content, message });
+        Flow._postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: Flow.successStatus, content, message });
     }
 
     static postErrorResponse(requestEvent, message, content = null) {
-        Flow.worker.postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: Flow.errorStatus, content, message });
+        Flow._postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: Flow.errorStatus, content, message });
     }
 
     static requireResponse(type, content, onPing = null, pingSourceEvent = null){
@@ -1971,7 +1994,7 @@ class Flow {
     }
 
     static export() {
-        const item = {};
+        const item = {securityId};
 
         const name = getPathFromHash();
         if (name == 'flow') {
@@ -2117,6 +2140,7 @@ class Flow {
     }
 }
 
+window.addEventListener('load', e => Flow.setupIframe());
 window.addEventListener('load', e => Flow.setupDialogs());
 
 function getFlowPage() {

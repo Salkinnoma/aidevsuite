@@ -5,18 +5,47 @@
 </head>
 <body>
 <script>
-    window.addEventListener('message', async (event) => {
-        if (event.data === 'loadWorker') {
-            const worker = new Worker('js/worker.js');
-            window.worker = worker;
+    //const allowedOrigin = window.location.origin; // Doesn't work because script is sandboxed with different origin (null)
+    let worker;
+    let lastObjectUrl = "";
 
+
+    function postParentMessage(message) {
+        window.parent.postMessage(message, '*');
+    }
+
+    function postWorkerMessage(message) {
+        if (worker == null) return;
+        worker.postMessage(message);
+    }
+
+    function destroyWorker() {
+        if (worker == null) return;
+            worker.terminate();
+            worker = null;
+    }
+
+    window.addEventListener('message', async (event) => {
+        if (event.data.loadWorker != null) {
+            if (worker != null) destroyWorker();
+
+            if (lastObjectUrl != null) URL.revokeObjectURL(lastObjectUrl);
+            const blobUrl = window.URL.createObjectURL(
+                new Blob([event.data.loadWorker])
+            );
+            worker = new Worker(blobUrl);
             worker.onmessage = (e) => {
-                window.parent.postMessage(e.data, '*');
+                postParentMessage({workerData: e.data});
             };
+            postParentMessage('Worker created');
+        } else if (event.data.command === 'terminateWorker') {
+            destroyWorker();
         } else if (event.data.workerCommand) {
-            window.worker.postMessage(event.data.workerCommand);
+            postWorkerMessage(event.data.workerCommand);
         }
     });
+
+    postParentMessage('worker-loaded');
 </script>
 </body>
 </html>

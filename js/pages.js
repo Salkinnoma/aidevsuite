@@ -1,3 +1,5 @@
+const securityId = "aidevsuite";
+
 const defaultPages = new Set([
     'home',
     'flow',
@@ -25,9 +27,17 @@ function saveLocalPages() {
 }
 
 function addLocalPage(name, link, code) {
-    if (link.trim() == '') Flow.updateDefaultCode(code);
+    if (link.trim() == '') {
+        Flow.updateDefaultCode(code);
+        return;
+    }
 
-    localPages.set(link, {name, link, code});
+    localPages.set(link, {name, link, code, securityId});
+    saveLocalPages();
+}
+
+function updateLocalPage(page) {
+    localPages.set(page.link, page);
     saveLocalPages();
 }
 
@@ -36,14 +46,18 @@ function deleteLocalPage(link) {
     saveLocalPages();
 }
 
+async function fetchExternalPage(url) {
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.securityId !== securityId) throw new Error('Security check failed.');
+    
+    return data;
+}
+
 function suggestNameForPageLink(link) {
     return escapeFileNameMinimal(link);
 }
 
-function updateLocalPage(page) {
-    localPages.set(page.link, page);
-    saveLocalPages();
-}
 
 function moveLocalPage(page, newLink) {
     addLocalPage(page.name, newLink, page.code, page.prompt);
