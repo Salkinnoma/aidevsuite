@@ -117,10 +117,16 @@ const inputTypes = new Set([
 ]);
 
 
+// Paste item types
 const htmlPasteItemType = "html";
 const textPasteItemType = "text";
 const rtfPasteItemType = "rtf";
 const filesPasteItemType = "files";
+
+// Group locations
+const mainLocation = "main";
+const stickyLocation = "sticky";
+const dialogLocation = "dialog";
 
 // Helper functions
 function generateUniqueId() {
@@ -524,7 +530,10 @@ function _mapGroup(group) {
  *     - **name** (string) [optional]: This is necessary for the `update`, `remove` and some other functions that require a group name functions.
  *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If an input can be accepted multiple times, set this to `true` and add custom logic that uses the `read` function to read the input values upon a click on a custom button. Default is `false`.
  *     - **bordered** (number) [optional]: Whether the group should be bordered. Default is `false`.
- *     - **sticky** (number) [optional]: Whether it should stick to the top. Default is `false`.
+ *     - **location** (string) [optional]: The location of the group. Default is `mainLocation`. The following values are supported:
+ *         - `mainLocation`: The default location.
+ *         - `stickyLocation`: The group will stick to the top of the page.
+ *         - `dialogLocation`: The group will be shown within a dialog. It is recommended to start the group with a title. Only one dialog can be shown at a time. Removing a dialog element will close the dialog. A dialog element is automatically `remove`d after the user closes (noAccept == true only), cancels (noAccept == false only) or accepts (noAccept == false only) it. This will be awaited. Returns error response on cancel.
  *     - **insertAt** (number) [optional]: Where to insert. This allows negative indices. The default is `-1`.
  *     - **insertBefore** (string) [optional]: Name of the group to insert before.
  *     - **insertAfterInstead** (bool) [optional]: Modifies insertBefore to insert after that group instead. Default is `false`.
@@ -533,6 +542,7 @@ function _mapGroup(group) {
  *     - **breakBefore** (number) [optional]: Adds a break before with the value as its size. Must be between 0 and 8. Default is `0`.
  *     - **breakAfter** (number) [optional]: Adds a break after with the value as its size. Must be between 0 and 8. Default is `0`.
  *     - **gap** (number) [optional]: The gap between elements. Must be between `0` and `8`. Default is `4`.
+ *     - **noCloseOnOverlay** (bool) [optional]: This is exclusive to dialogs with `noAccept == true`. This requires implementing custom closing logic. Default is `false`.
  *
  * ## Return value when awaited
  * When this function is awaited, it returns an object that contains each input element (only input elements) from the group parameter with their name as a key. If no name is defined, their flattened index within the group is used instead, and added to the element as a name property.

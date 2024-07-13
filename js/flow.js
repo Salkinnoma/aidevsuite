@@ -23,6 +23,11 @@ class Flow {
         const locked = getHashQueryVariable('locked') ?? false;
         if (locked) mode = Flow.runMode;
 
+        if (Flow.isRunning) {
+            Flow.interruptRun();
+            console.log('pdiajodjoa');
+        }
+
         if (mode == Flow.runMode) Flow.run();
     }
 
@@ -30,7 +35,6 @@ class Flow {
         const iframe = document.getElementById("sandbox");
         Flow.iframe = iframe;
         console.log(iframe);
-        const allowedOrigin = window.location.origin;
 
         window.addEventListener('message', function setupWorker(event) {
             console.log('IFrame Message Received:', event);
@@ -137,19 +141,21 @@ class Flow {
         goToUrl(getUrlWithChangedHashParam('mode', null));
     }
 
-    static async generateScript() {
+    static async generateScript(rewrite = false) {
         if (Flow.generating) return;
         Flow.generating = true;
         Flow.generateScriptButton.setAttribute('disabled', '');
+        Flow.rewriteScriptButton.setAttribute('disabled', '');
         Flow.setStatus('Generating script...');
         Flow.setProgress(30);
 
-        const systemPrompt = `The user will ask you to write a script for a custom interactive tool that clearly communicates with the user. Your script will be evaluated in the eval part of onmessage on a worker. Below is the worker script that will eval your script. All code you write will be executed within an async funciton within eval. Write the whole script and only the script within a single code block (use \`\`\`code here\`\`\`), such that it can be easily parsed.\n\n` +
-            await Flow.getWorkerScript();
+        const systemPrompt = await Flow.getWorkerScript() + `\n\nThe user will ask you to write a script for a custom interactive tool that clearly communicates with the user. Your script will be evaluated in the eval part of onmessage on a worker. Above is the worker script that will eval your script. All code you write will be executed within an async function within eval. Write the whole script and only the script within a single code block (use \`\`\`code here\`\`\`), such that it can be easily parsed.`;
+        const secondSystemPrompt = Flow.getCode() + `Above is the existing code written by the user that needs to be changed and adjusted according to the user's wishes.`;
         const prompt = Flow.getPrompt();
         const systemMessage = ChatGptApi.toSystemMessage(systemPrompt);
+        const secondSystemMessage = ChatGptApi.toSystemMessage(secondSystemPrompt);
         const userMessage = ChatGptApi.toUserMessage(prompt);
-        const context = [systemMessage, userMessage];
+        const context = rewrite ? [systemMessage, secondSystemMessage, userMessage] : [systemMessage, userMessage];
 
         Flow.codeEditorContainerElement.classList.add('hide');
         Flow.streamTargetElement.classList.remove('hide');
@@ -171,6 +177,7 @@ class Flow {
         Flow.setProgress(100);
         Flow.generating = false;
         Flow.generateScriptButton.removeAttribute('disabled');
+        Flow.rewriteScriptButton.removeAttribute('disabled');
     }
 
     static showProgress() {
@@ -198,7 +205,9 @@ class Flow {
     }
 
     static interruptRun() {
+        console.log(Flow.dialogOutputContainer);
         Flow.destroyWorker();
+        Flow.dialogOutputContainer.classList.add('hide');
         Flow.isRunning = false;
     }
 
@@ -360,10 +369,16 @@ class Flow {
     ]);
 
 
+    // Paste item types
     static htmlPasteItemType = "html";
     static textPasteItemType = "text";
     static rtfPasteItemType = "rtf";
     static filesPasteItemType = "files";
+
+    // Group locations
+    static mainLocation = "main";
+    static stickyLocation = "sticky";
+    static dialogLocation = "dialog";
     
     // Event logic to communicate with worker
     static _postMessage(message) {
@@ -656,12 +671,13 @@ class Flow {
         settings.children.forEach(s => s.parent = settings);
         settings.accepted = false;
         settings.bordered = options.bordered ?? false;
-        settings.sticky = options.sticky ?? false;
+        settings.location = options.location ?? Flow.mainLocation;
         settings.gap = Math.min(8, Math.max(0, options.gap ?? 4));
         settings.breakBefore = Math.min(8, Math.max(0, options.breakBefore ?? 0));
         settings.breakAfter = Math.min(8, Math.max(0, options.breakAfter ?? 0));
         const inputs = Flow.extractInputElements(settings.children);
         settings.isInvalid = inputs.some(s => s.isInvalid);
+        settings.noCloseOnOverlay = options.noCloseOnOverlay ?? false;
         return settings;
     }
 
@@ -1297,10 +1313,29 @@ class Flow {
         return inputValues;
     }
 
+    static closeOutputDialog() {
+        Flow.dialogOutputElement.innerHTML = '';
+        Flow.dialogOutputContainer.classList.add('hide');
+    }
+
+    static onCloseDialog(groupSettings) {
+        if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.group);
+        Flow.postSuccessResponse(groupSettings.event);
+        Flow.closeOutputDialog();
+    }
+
+    static onCancelDialog(groupSettings) {
+        if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.group);
+        Flow.postErrorResponse(groupSettings.event);
+        Flow.closeOutputDialog();
+    }
+
     static async onAccept(groupSettings) {
+        if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.group);
+
         const inputValues = Flow.extractInputValues(groupSettings);
         groupSettings.accepted = true;
-        groupSettings.acceptButtonElement.remove();
+        if (groupSettings.location != Flow.dialogLocation) groupSettings.acceptButtonElement.remove();
 
         const inputs = Flow.extractInputElements(groupSettings);
         for (let settings of inputs) {
@@ -1311,6 +1346,10 @@ class Flow {
 
         groupSettings.accepted = true;
         Flow.postSuccessResponse(groupSettings.event, inputValues);
+        if (groupSettings.location == Flow.dialogLocation) {
+            Flow.closeOutputDialog();
+            return;
+        }
 
         for (let settings of inputs) {
             const element = fromHTML(`<div>`);
@@ -1390,10 +1429,6 @@ class Flow {
     static fromGroupSettings(settings) {
         const container = fromHTML(`<div class="w-100">`);
         settings.htmlElement = container;
-        if (settings.bordered) {
-            container.classList.add('bordered');
-            container.classList.add('largeElement');
-        }
 
         let element = container;
         if (settings.breakBefore != 0 || settings.breakAfter != 0) {
@@ -1404,6 +1439,11 @@ class Flow {
             container.appendChild(subContainer);
             if (settings.breakAfter) container.appendChild(name + 'b-' + settings.breakBefore);
             element = subContainer;
+        }
+
+        if (settings.bordered) {
+            element.classList.add('bordered');
+            element.classList.add('largeElement');
         }
 
         if (settings.gap != 0) {
@@ -1418,6 +1458,7 @@ class Flow {
         }
 
         const inputs = Flow.extractInputElements(settings);
+        
         if (inputs.length != 0) {
             const validationContainer = fromHTML(`<div class="listContainerHorizontal">`);
             if (!settings.isInvalid) validationContainer.classList.add('hide');
@@ -1430,17 +1471,39 @@ class Flow {
             validationContainer.appendChild(hb(1));
 
             element.appendChild(validationContainer);
-            const footer = fromHTML(`<div class="listContainerHorizontal">`);
-            footer.appendChild(fromHTML(`<div>`));
-            const acceptButton = fromHTML(`<button class="largeElement complexButton">`);
-            if (settings.isInvalid) acceptButton.setAttribute('disabled', '');
-            acceptButton.textContent = "Accept";
-            acceptButton.addEventListener('click', e => Flow.onAccept(settings));
-            footer.appendChild(acceptButton);
-            element.appendChild(footer);
-            settings.acceptButtonElement = acceptButton;
-            if (settings.noAccept) footer.classList.add('hide');
+
+            if (settings.location != Flow.dialogLocation) {
+                const footer = fromHTML(`<div class="listContainerHorizontal">`);
+                footer.appendChild(fromHTML(`<div>`));
+                const acceptButton = fromHTML(`<button class="largeElement complexButton">`);
+                if (settings.isInvalid) acceptButton.setAttribute('disabled', '');
+                acceptButton.textContent = "Accept";
+                acceptButton.addEventListener('click', e => Flow.onAccept(settings));
+                footer.appendChild(acceptButton);
+                element.appendChild(footer);
+                settings.acceptButtonElement = acceptButton;
+                if (settings.noAccept) footer.classList.add('hide');
+            }
+
         }
+
+        if (settings.location == Flow.dialogLocation) {
+            if (settings.noAccept) {
+                Flow.dialogOutputAcceptButton.removeAttribute('disabled');
+                Flow.dialogOutputFooter.classList.add('hide');
+                if (!settings.noCloseOnOverlay) Flow.dialogOutputOverlay.addEventListener('click', e => Flow.onCloseDialog(settings));
+            } else {
+                settings.acceptButtonElement = Flow.dialogOutputAcceptButton;
+                if (settings.isInvalid) Flow.dialogOutputAcceptButton.setAttribute('disabled', '');
+                else Flow.dialogOutputAcceptButton.removeAttribute('disabled');
+                Flow.dialogOutputCancelButton.addEventListener('click', e => Flow.onCancelDialog(settings));
+                Flow.dialogOutputAcceptButton.addEventListener('click', e => Flow.onAccept(settings));
+                Flow.dialogOutputOverlay.classList.remove('hide');
+                Flow.dialogOutputFooter.classList.remove('hide');
+            }
+
+            Flow.dialogOutputOverlay.classList.remove('hide');
+        } 
 
         return element;
     }
@@ -1471,49 +1534,61 @@ class Flow {
             Flow.settingsByGroupNameAndName.get(s.group.name).delete(s.name);
         });
     
-        // Find the count of sticky and non-sticky elements up to the start index
+        // Find the count of elements in different locations up to the start index
+        let mainCountBeforeStart = 0;
         let stickyCountBeforeStart = 0;
-        let normalCountBeforeStart = 0;
-    
+        let dialogCountBeforeStart = 0;
+
         for (let i = 0; i < start; i++) {
-            if (Flow.output[i].sticky) {
+            const location = Flow.output[i].location;
+            if (location === Flow.stickyLocation) {
                 stickyCountBeforeStart++;
+            } else if (location === Flow.dialogLocation) {
+                dialogCountBeforeStart++;
             } else {
-                normalCountBeforeStart++;
+                mainCountBeforeStart++;
             }
         }
-    
+
         // Insert new elements into their respective parent elements
+        const mainParent = Flow.outputElement;
         const stickyParent = Flow.stickyOutputElement;
-        const normalParent = Flow.outputElement;
-    
+        const dialogParent = Flow.dialogOutputElement;
+
+        let mainInsertIndex = mainCountBeforeStart;
         let stickyInsertIndex = stickyCountBeforeStart;
-        let normalInsertIndex = normalCountBeforeStart;
-    
+        let dialogInsertIndex = dialogCountBeforeStart;
+
         for (let i = 0; i < elements.length; i++) {
             const element = elements[i];
             const groupSettings = insertGroupSettings[i];
-    
-            if (groupSettings.sticky) {
-                // If sticky, insert into the stickyParent
+            const location = groupSettings.location;
+
+            if (location === Flow.stickyLocation) {
+                // Insert into the stickyParent
                 if (stickyInsertIndex < stickyParent.children.length) {
                     stickyParent.insertBefore(element, stickyParent.children[stickyInsertIndex]);
                 } else {
                     stickyParent.appendChild(element);
                 }
                 stickyInsertIndex++;
+            } else if (location === Flow.dialogLocation) {
+                // Insert into the dialogParent
+                dialogParent.replaceChildren(element);
+                Flow.dialogOutputContainer.classList.remove('hide');
+                dialogInsertIndex++;
             } else {
-                // If not sticky, insert into the normalParent
-                if (normalInsertIndex < normalParent.children.length) {
-                    normalParent.insertBefore(element, normalParent.children[normalInsertIndex]);
+                // Insert into the mainParent
+                if (mainInsertIndex < mainParent.children.length) {
+                    mainParent.insertBefore(element, mainParent.children[mainInsertIndex]);
                 } else {
-                    normalParent.appendChild(element);
+                    mainParent.appendChild(element);
                 }
-                normalInsertIndex++;
+                mainInsertIndex++;
             }
         }
-    
-        if (Flow.output.length == 0) Flow.outputElement.textContent = Flow.noOutputMessage;
+
+        if (Flow.output.length == 0) Flow.mainLocation.textContent = Flow.noOutputMessage;
     }
 
     static async onShowRequest(event) {
@@ -1683,20 +1758,23 @@ class Flow {
         Flow.postSuccessResponse(e);
     }
     
+    static remove(groupName, elementName = null) {
+        if (elementName == null) {
+            const start = Flow.output.findIndex(s => s.name == groupName);
+            Flow.spliceOutput(start, 1);
+        } else {
+            const settings = Flow.settingsByGroupNameAndName.get(groupName).get(elementName);
+            Flow.settingsByGroupNameAndName.get(groupName).delete(elementName);
+            const start = settings.parent.children.findIndex(s => s.name == elementName);
+            settings.parent.children.splice(start, 1);
+            settings.htmlElement.remove();
+        }
+    }
 
     static async onRemove(event) {
         const e = event;
         const content = e.data.content;
-        if (content.elementName == null) {
-            const start = Flow.output.findIndex(s => s.name == content.groupName);
-            Flow.spliceOutput(start, 1);
-        } else {
-            const settings = Flow.settingsByGroupNameAndName.get(content.groupName).get(content.elementName);
-            Flow.settingsByGroupNameAndName.get(content.groupName).delete(content.elementName);
-            const start = settings.parent.children.findIndex(s => s.name == content.elementName);
-            settings.parent.children.splice(start, 1);
-            settings.htmlElement.remove();
-        }
+        Flow.remove(content.groupName, content.elementName);
         Flow.postSuccessResponse(e);
     }
 
@@ -2134,9 +2212,37 @@ class Flow {
         Flow.starDialog = dialogElement;
     }
 
+    static setupOutputDialog() {
+        const dialogsContainer = document.getElementById('dialogs');
+        const dialogElement = fromHTML(`<div class="dialog hide">`);
+        Flow.dialogOutputContainer = dialogElement;
+        const contentElement = fromHTML(`<div class="dialogContent">`);
+        const innerContentElement = fromHTML(`<div class="dialogInnerContent largeElement bordered grounded">`);
+        const dialogOutputElement = fromHTML(`<div class="w-100 divList gap-4">`);
+        Flow.dialogOutputElement = dialogOutputElement;
+        innerContentElement.appendChild(dialogOutputElement);
+        innerContentElement.appendChild(hb(4));
+        const dialogFooter = fromHTML(`<div class="listHorizontal">`);
+        Flow.dialogOutputFooter = dialogFooter;
+        const cancelButton = fromHTML(`<button class="w-100 largeElement complexButton flexFill">Cancel`);
+        Flow.dialogOutputCancelButton = cancelButton;
+        dialogFooter.appendChild(cancelButton);
+        const acceptButton = fromHTML(`<button class="w-100 largeElement complexButton flexFill" disabled>Accept`);
+        Flow.dialogOutputAcceptButton = acceptButton;
+        dialogFooter.appendChild(acceptButton);
+        innerContentElement.appendChild(dialogFooter);
+        contentElement.appendChild(innerContentElement);
+        dialogElement.appendChild(contentElement);
+        const overlayElement = fromHTML(`<div class="dialogOverlay">`);
+        Flow.dialogOutputOverlay = overlayElement;
+        dialogElement.appendChild(overlayElement);
+        dialogsContainer.appendChild(dialogElement);
+    }
+
     static setupDialogs() {
         Flow.setupImportDialog();
         Flow.setupStarDialog();
+        Flow.setupOutputDialog();
     }
 }
 
@@ -2245,6 +2351,22 @@ function getFlowPage() {
         const footer = fromHTML(`<div class="listContainerHorizontal contenteditableContainerFooter">`);
         footer.appendChild(fromHTML(`<div>`));
         const rightFooterList = fromHTML(`<div class="listHorizontal">`);
+
+        // Rewrite button
+        const rewriteButton = fromHTML(`<button class="largeElement complexButton">`);
+        Flow.rewriteScriptButton = rewriteButton;
+        const rewriteButtonList = fromHTML(`<div class="listHorizontal">`);
+        const rewriteIcon = icons.retry();
+        rewriteIcon.classList.add('smallIcon');
+        rewriteButtonList.appendChild(rewriteIcon);
+        const rewriteButtonTextElement = fromHTML(`<div>`);
+        rewriteButtonTextElement.textContent = "Rewrite Script";
+        rewriteButtonList.appendChild(rewriteButtonTextElement);
+        rewriteButton.appendChild(rewriteButtonList);
+        rewriteButton.addEventListener('click', e => Flow.generateScript(true));
+        rightFooterList.appendChild(rewriteButton);
+
+        // Generate button
         const generateButton = fromHTML(`<button class="largeElement complexButton">`);
         Flow.generateScriptButton = generateButton;
         const generateButtonList = fromHTML(`<div class="listHorizontal">`);
@@ -2257,6 +2379,8 @@ function getFlowPage() {
         generateButton.appendChild(generateButtonList);
         generateButton.addEventListener('click', e => Flow.generateScript());
         rightFooterList.appendChild(generateButton);
+
+        // Settings button
         const settingsButton = fromHTML(`<button class="largeElement complexButton">`);
         settingsButton.setAttribute('tooltip', 'Open chatbot settings');
         const settingsIcon = icons.settings();
@@ -2264,6 +2388,7 @@ function getFlowPage() {
         settingsButton.appendChild(settingsIcon);
         settingsButton.addEventListener('click', e => Settings.open(Settings.chatbotPage));
         rightFooterList.appendChild(settingsButton);
+
         footer.appendChild(rightFooterList);
         promptEditorContainer.appendChild(footer);
         elements.push(promptEditorContainer);
