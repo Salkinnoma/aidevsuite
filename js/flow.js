@@ -2554,7 +2554,7 @@ function getFlowPage() {
         urlEditorContainer.appendChild(urlEditor);
         Flow.urlEditorContainerElement = urlEditorContainer;
         elements.push(urlEditorContainer);
-        if (name != 'extern') elements.push(hb(2));
+        if (name == 'extern') elements.push(hb(2));
         const externTopList = fromHTML(`<div class="listContainerHorizontal">`);
         externTopList.appendChild(fromHTML(`<div>`));
         const rightExternTopList = fromHTML(`<div class="listHorizontal">`);
@@ -2600,7 +2600,7 @@ function getFlowPage() {
         // Extern target
         const externCode = (Flow.loadedExternPage?.url == newUrl && newUrl != null) ? Flow.loadedExternPage.code : '';
         const externContainerElement = CodeHelpers.createCodeElement(externCode, "javascript");
-        if (name != 'extern' || Flow.loadedExternPage?.url != newUrl) externContainerElement.classList.add('hide');
+        if (name != 'extern' || Flow.loadedExternPage?.url != newUrl || newUrl == null) externContainerElement.classList.add('hide');
         Flow.externContainerElement = externContainerElement;
         const externTargetElement = externContainerElement.querySelector('code');
         Flow.externTargetElement = externTargetElement;
