@@ -98,10 +98,18 @@ function loadLinkedPages() {
     const linkedPagesJSON = localStorage.getItem('linkedPages');
     if (linkedPagesJSON) {
         linkedPages = new Map(Object.entries(JSON.parse(linkedPagesJSON)));
+    } else linkedPages = new Map();
 
-        return linkedPages;
+    const chatInjected = localStorage.getItem("chat_injected");
+    if (!chatInjected) {
+        const chatLink = "data/Chat.json";
+        fetchExternalPage(chatLink).then(p => {
+            addLinkedPage(p.name, chatLink);
+            localStorage.setItem('chat_injected', true);
+        });
     }
-    return linkedPages = new Map();
+
+    return linkedPages;
 }
 
 function saveLinkedPages() {
