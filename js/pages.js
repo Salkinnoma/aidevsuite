@@ -234,7 +234,7 @@ function getHomePage() {
         pageElement.textContent = page.name;
         linkedGrid.appendChild(pageElement);
     }
-    if (linkedValues.length == 0) container.appendChild(fromHTML(`<div>No scripts linked yet.`));
+    if (linkedPages.size == 0) container.appendChild(fromHTML(`<div>No scripts linked yet.`));
     else container.appendChild(linkedGrid);
     container.appendChild(hb(4));
 
