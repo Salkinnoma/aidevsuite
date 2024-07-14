@@ -574,8 +574,15 @@ class Flow {
             const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage'));
             scriptStorage[id] ??= {};
             scriptStorage[id][content.set.key] = content.set.value;
-            localStorage.setItem('scriptStorage', JSON.stringify(scriptStorage));
-            Flow.postSuccessResponse(e);
+            const jsonStorage = JSON.stringify(scriptStorage);
+            const targetSize = getStringByteSize(JSON.stringify(scriptStorage[id]));
+            const totalSize = getStringByteSize(jsonStorage);
+            if (totalSize > megabyte * 3 || targetSize > kilobyte * 50) {
+                Flow.postErrorResponse(e, new Error("Not enough storage."));
+            } else {
+                localStorage.setItem('scriptStorage', jsonStorage);
+                Flow.postSuccessResponse(e);
+            }
         } else if (content.get != null) {
             const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage'));
             scriptStorage[id] ??= {};
@@ -2591,7 +2598,7 @@ function getFlowPage() {
         elements.push(hb(7));
 
         // Extern target
-        const externCode = Flow.loadedExternPage?.url == newUrl ? Flow.loadedExternPage.code : '';
+        const externCode = (Flow.loadedExternPage?.url == newUrl && newUrl != null) ? Flow.loadedExternPage.code : '';
         const externContainerElement = CodeHelpers.createCodeElement(externCode, "javascript");
         if (name != 'extern' || Flow.loadedExternPage?.url != newUrl) externContainerElement.classList.add('hide');
         Flow.externContainerElement = externContainerElement;
