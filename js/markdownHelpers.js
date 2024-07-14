@@ -26,7 +26,6 @@ class MarkdownHelpers {
         level: 'inline',
         start(src) { return src.match(/==/)?.index; },
         tokenizer(src, tokens) {
-            console.log(MarkdownHelpers.highlightExtensionEnabled);
             if (!MarkdownHelpers.highlightExtensionEnabled) return;
             const rule = /^==([^=]+)==/;  // Regex to match the custom highlight syntax
             const match = rule.exec(src);

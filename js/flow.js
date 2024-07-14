@@ -12,9 +12,8 @@ class Flow {
     static status = "Running...";
     static noOutputMessage = "No output yet...";
     static output = [];
-    static groupByName = new Map();
-    static settingsByGroupNameAndName = new Map();
-    static groupByElement = new Map();
+    static elementById = new Map();
+    static groupById = new Map();
     static clickEventById = new Map();
 
     static onPageLoaded() {
@@ -269,7 +268,9 @@ class Flow {
         Flow.setStatus("Running...");
         console.log(Flow.status);
         Flow.output = [];
-        Flow.groupByElement.clear();
+        Flow.groupById.clear();
+        Flow.elementById.clear();
+        Flow.clickEventById.clear();
 
         await Flow.createWorker();
         let error = false;
@@ -605,7 +606,7 @@ class Flow {
 
         const inputValues = Flow.extractInputValues(settings.group);
         const inputs = Flow.extractInputElements(settings.group);
-        const targetInputValue = inputValues.find(v => v.name == settings.name);
+        const targetInputValue = inputValues.find(v => v.id == settings.id);
         const response = await Flow.requireResponse(
             delayed ? Flow.delayedValidateInputEventType : Flow.validateInputEventType,
             {group: inputValues, element: targetInputValue},
@@ -652,13 +653,12 @@ class Flow {
             settings.children = settings.children.concat(settings.rightChildren);
             settings.rightChildren.forEach(s => s.parent = settings);
         }
-        settings.name = element.name ?? element.id;
         settings.hide = options.hide ?? false;
         settings.disabled = options.disabled ?? false;
         settings.bordered = options.bordered ?? false;
         settings.breakBefore = Math.min(8, Math.max(0, options.breakBefore ?? 0));
         settings.breakAfter = Math.min(8, Math.max(0, options.breakAfter ?? 0));
-        Flow.settingsByGroupNameAndName.get(groupSettings.name).set(settings.name, settings);
+        Flow.elementById.set(settings.id, settings);
 
         if (Flow.textTypes.has(type)) {
             settings.text = element.text;
@@ -778,20 +778,15 @@ class Flow {
 
     static extractSettingsFromGroup(group) {
         const options = group.options;
+        const element = group.element;
         const settings = {};
-        settings.name = group.options?.name ?? generateUniqueId();
+        settings.id = element.id;
+        Flow.groupById.set(settings.id, settings);
+        settings.element = Flow.extractSettingsFromElement(element, settings);
         settings.noAccept = options.noAccept ?? false;
-        Flow.groupByName.set(settings.name, settings);
-        Flow.settingsByGroupNameAndName.set(settings.name, new Map());
-        settings.children = group.children.map(e => Flow.extractSettingsFromElement(e, settings));
-        settings.children.forEach(s => s.parent = settings);
         settings.accepted = false;
-        settings.bordered = options.bordered ?? false;
         settings.location = options.location ?? Flow.mainLocation;
-        settings.gap = Math.min(8, Math.max(0, options.gap ?? 4));
-        settings.breakBefore = Math.min(8, Math.max(0, options.breakBefore ?? 0));
-        settings.breakAfter = Math.min(8, Math.max(0, options.breakAfter ?? 0));
-        const inputs = Flow.extractInputElements(settings.children);
+        const inputs = Flow.extractInputElements(settings);
         settings.isInvalid = inputs.some(s => s.isInvalid);
         settings.noCloseOnOverlay = options.noCloseOnOverlay ?? false;
         return settings;
@@ -950,11 +945,11 @@ class Flow {
         const container = fromHTML(`<div>`);
         settings.htmlElement = container;
         if (settings.hide) container.classList.add('hide');
-        const containered = Flow.containerTypes.has(settings.parent.type);
+        const containered = Flow.containerTypes.has(settings.parent?.type);
         let decorated = settings.leftChildren != null || settings.rightChildren != null;
         let element = container;
         if (settings.breakBefore != 0 || settings.breakAfter != 0) {
-            const horizontal = settings.parent.type == Flow.listBarType || settings.parent.type == Flow.buttonType;
+            const horizontal = settings.parent?.type == Flow.listBarType || settings.parent?.type == Flow.buttonType;
             const name = horizontal ? 'h' : 'b';
             const subContainer = fromHTML(`<div>`);
             if (settings.breakBefore) container.appendChild(name + 'b-' + settings.breakBefore);
@@ -1377,7 +1372,7 @@ class Flow {
 
     static extractInputElements(groupSettings) {
         const inputs = [];
-        let unprocessed = [groupSettings];
+        let unprocessed = [groupSettings.element];
         while (unprocessed.length != 0) {
             let newUnprocessed = [];
             for (let settings of unprocessed) {
@@ -1393,7 +1388,7 @@ class Flow {
         const inputs = Flow.extractInputElements(groupSettings);
         const inputValues = [];
         for (let settings of inputs) {
-            const value = {name: settings.name};
+            const value = {id: settings.id};
             const type = settings.type;
             
             if (type == Flow.textInputType) {
@@ -1434,13 +1429,13 @@ class Flow {
     }
 
     static onCloseDialog(groupSettings) {
-        if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.group);
+        if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.id);
         Flow.postSuccessResponse(groupSettings.event);
         Flow.closeOutputDialog();
     }
 
     static onCancelDialog(groupSettings) {
-        if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.group);
+        if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.id);
         Flow.postErrorResponse(groupSettings.event, "dialog_canceled");
         Flow.closeOutputDialog();
     }
@@ -1448,7 +1443,7 @@ class Flow {
     static async onAccept(groupSettings) {
         if (groupSettings.accepted) return;
 
-        if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.group);
+        if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.id);
 
         const inputValues = Flow.extractInputValues(groupSettings);
         groupSettings.accepted = true;
@@ -1548,31 +1543,9 @@ class Flow {
         settings.htmlElement = container;
 
         let element = container;
-        if (settings.breakBefore != 0 || settings.breakAfter != 0) {
-            const horizontal = settings.parent.type == Flow.listBarType || settings.parent.type == Flow.buttonType;
-            const name = horizontal ? 'h' : 'b';
-            const subContainer = fromHTML(`<div class="w-100">`);
-            if (settings.breakBefore) container.appendChild(name + 'b-' + settings.breakBefore);
-            container.appendChild(subContainer);
-            if (settings.breakAfter) container.appendChild(name + 'b-' + settings.breakBefore);
-            element = subContainer;
-        }
 
-        if (settings.bordered) {
-            element.classList.add('bordered');
-            element.classList.add('largeElement');
-        }
-
-        if (settings.gap != 0) {
-            element.classList.add('divList');
-            element.classList.add('w-100');
-            element.classList.add('gap-' + settings.gap);
-        }
-
-        for (const child of settings.children) {
-            const childElement = Flow.fromElementSettings(child);
-            element.appendChild(childElement);
-        }
+        const childElement = Flow.fromElementSettings(settings.element);
+        element.appendChild(childElement);
 
         const inputs = Flow.extractInputElements(settings);
         
@@ -1647,8 +1620,8 @@ class Flow {
         // Remove deleted elements from their respective parent elements
         deleted.forEach(s => {
             s.htmlElement.remove();
-            Flow.groupByName.delete(s.name);
-            Flow.settingsByGroupNameAndName.get(s.group.name).delete(s.name);
+            Flow.groupById.delete(s.id);
+            Flow.elementById.delete(s.id);
         });
     
         // Find the count of elements in different locations up to the start index
@@ -1721,7 +1694,7 @@ class Flow {
         options.deleteBefore ??= 0;
         let insertAt = options.insertAt;
         if (options.insertBefore != null) {
-            insertAt = Flow.output.findIndex(s => s.name == options.insertBefore);
+            insertAt = Flow.output.findIndex(s => s.id == options.insertBefore);
             if (options.insertAfterInstead) insertAt += 1;
         }
 
@@ -1742,10 +1715,14 @@ class Flow {
     static async onRead(event) {
         const e = event;
         const content = e.content;
-        console.log(content);
-        const group = Flow.groupByName.get(content.groupName);
-        let values = Flow.extractInputValues(group);
-        if (content.elementName != null) values = values.find(v => v.name == content.elementName);
+        let values;
+        if (content.all) {
+            const groups = content.id == null ? Flow.output : [Flow.groupById.get(content.id)];
+            values = groups.map(group => Flow.extractInputValues(group)).flat();
+        } else {
+            const group = Flow.elementById.get(content.id).group;
+            values = Flow.extractInputValues(group).find(v => v.id == content.id)
+        }
         
         Flow.postSuccessResponse(e, values);
     }
@@ -1755,9 +1732,10 @@ class Flow {
         const content = e.content;
         const properties = content.properties;
     
-        const settings = Flow.settingsByGroupNameAndName.get(content.groupName).get(content.elementName);
+        const settings = Flow.elementById.get(content.id);
+        let rerenderMarkdown = false;
         if (Flow.inputTypes.has(settings.type) && settings.group.accepted) return;
-    console.log(event);
+
         // Update settings and corresponding elements
         if (properties.hide !== undefined) {
             settings.hide = content.hide;
@@ -1836,23 +1814,15 @@ class Flow {
             settings.markdown = properties.markdown;
             if (settings.type === Flow.markdownType) {
                 settings.rawTextElement.textContent = settings.markdown;
-                renderMarkdown(settings.markdownElement, settings.markdown, {
-                    delimiters: settings.katexDelimiters,
-                    noHighlight: settings.noHighlight,
-                    sanitize: true,
-                    katex: settings.katex
-                });
+                rerenderMarkdown = true;
             } else if (settings.type === Flow.markdownInputType) {
                 settings.codeEditor.value = settings.markdown;
-                renderMarkdown(settings.markdownElement, settings.markdown, {
-                    delimiters: settings.katexDelimiters,
-                    noHighlight: settings.noHighlight,
-                    sanitize: true,
-                    katex: settings.katex
-                });
+                rerenderMarkdown = true;
             }
-         
-
+        }
+        if (properties.noHighlight !== undefined) {
+            settings.noHighlight = properties.noHighlight;
+            rerenderMarkdown = true;
         }
         if (properties.files !== undefined && settings.type === Flow.fileInputType) {
             settings.filesDisplayElement.innerHTML = '';
@@ -1874,18 +1844,27 @@ class Flow {
             }
         }
 
+        if (rerenderMarkdown) {
+            renderMarkdown(settings.markdownElement, settings.markdown, {
+                delimiters: settings.katexDelimiters,
+                noHighlight: settings.noHighlight,
+                sanitize: true,
+                katex: settings.katex
+            });
+        }
+
     
         Flow.postSuccessResponse(e);
     }
     
-    static remove(groupName, elementName = null) {
-        if (elementName == null) {
-            const start = Flow.output.findIndex(s => s.name == groupName);
+    static remove(id) {
+        if (Flow.groupById.has(id)) {
+            const start = Flow.output.findIndex(s => s.id == id);
             Flow.spliceOutput(start, 1);
         } else {
-            const settings = Flow.settingsByGroupNameAndName.get(groupName).get(elementName);
-            Flow.settingsByGroupNameAndName.get(groupName).delete(elementName);
-            const start = settings.parent.children.findIndex(s => s.name == elementName);
+            const settings = Flow.elementById.get(id);
+            Flow.elementById.delete(id);
+            const start = settings.parent.children.findIndex(s => s.id == id); // Has definitely a parent since it can no longer be a top level element.
             settings.parent.children.splice(start, 1);
             settings.htmlElement.remove();
         }
@@ -1894,17 +1873,17 @@ class Flow {
     static async onRemove(event) {
         const e = event;
         const content = e.content;
-        Flow.remove(content.groupName, content.elementName);
+        Flow.remove(content.id);
         Flow.postSuccessResponse(e);
     }
 
     static async onAcceptRequest(event) {
         const e = event;
         const content = e.content;
-        if (content.groupName == null) {
+        if (content.id == null) {
             Flow.output.forEach(s => Flow.onAccept(s));
         } else {
-            const group = Flow.groupByName.get(content.groupName);
+            const group = Flow.groupById.get(content.id);
             Flow.onAccept(group);
         }
 
@@ -1928,15 +1907,12 @@ class Flow {
         }
         const options = content.options ?? {};
         const chatOptions = {model: options.model, seed: options.seed};
-        let settings;
-        if (!Array.isArray(options.element)) options.element = [options.element, options.element];
-        else if (options.element?.length == 1) options.element.push(options.element[0]);
-        if (options.element?.length == 2) settings = Flow.settingsByGroupNameAndName.get(options.element[0]).get(options.element[1]);
+        const settings = Flow.elementById.get(options.id);
 
         let result = '';
         try {
-            if (options.hasOnUpdate || options.element?.length == 2) {
-                if (options.element?.length == 2 && Flow.inputTypes.has(settings.type)) {
+            if (options.hasOnUpdate || settings != null) {
+                if (settings != null && Flow.inputTypes.has(settings.type)) {
                     if (settings.type == Flow.imageInputType) {
                         settings.captionCodeEditor.classList.add('hide');
                     } else if (Flow.inputTypes.has(settings.type)) {
@@ -1952,7 +1928,7 @@ class Flow {
                         const transformed = await Flow.requireResponse(Flow.chatStreamEventType, text, null, e);
                         if (transformed != null) text = transformed;
                     }
-                    if (options.element?.length == 2) {
+                    if (settings != null) {
                         // Update the string value of the element based on its type
                         if (settings.type === Flow.paragraphType) {
                             settings.text = text;
@@ -1997,11 +1973,11 @@ class Flow {
                             console.warn(`Unsupported type for streaming updates: ${settings.type}`);
                         }
 
-                        if (options.element?.length == 2 && Flow.inputTypes.has(settings.type)) settings.streamTarget.textContent = text;
+                        if (settings != null && Flow.inputTypes.has(settings.type)) settings.streamTarget.textContent = text;
                     }
                 }, chatOptions);
 
-                if (options.element?.length == 2 && Flow.inputTypes.has(settings.type)) {
+                if (settings != null && Flow.inputTypes.has(settings.type)) {
                     settings.streamTarget.classList.add('hide');
 
                     const targetElement = Flow.imageInputType ? settings.captionCodeEditor : settings.codeEditor;
@@ -2010,7 +1986,7 @@ class Flow {
                     InputHelpers.replaceTextWithUndo(targetElement, result);
                 }
             } else {
-                // Don't stream
+                // Don't stream if no id and no onUpdate
                 result = await ChatGptApi.chat(context, chatOptions);
             }
 
@@ -2664,6 +2640,8 @@ function getFlowPage() {
         footer.appendChild(rightFooterList);
         promptEditorContainer.appendChild(footer);
         elements.push(promptEditorContainer);
+
+        if (name == 'extern' && Flow.loadedExternPage?.url != newUrl && newUrl) Flow.loadScript();
     } else {
         // Output container
         const outputContainer = fromHTML(`<div class="divList gap-4">`);

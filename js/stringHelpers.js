@@ -111,3 +111,7 @@ function removeLastChar(str){
 function isString(str, orNull = false) {
     return (orNull && str == null) || typeof str === 'string' || str instanceof String;
 }
+
+function getStringByteSize(string) {
+    string.length * 2;
+}

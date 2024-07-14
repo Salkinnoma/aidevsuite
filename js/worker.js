@@ -43,8 +43,8 @@ const materialIconProvider = "materialIconProvider";
 const heroIconProvider = "heroIconProvider";
 
 // Container element types
-const barType = "barType";
-const verticalType = "verticalType";
+const verticalType = "verticalType"; // Use this to group multiple elements without any effect on their appearance.
+const barType = "barType"; // Use this to group multiple elements horizontally.
 const buttonType = "buttonType";
 
 // Bar sub types
@@ -95,8 +95,8 @@ const allTypes = new Set([
 ]);
 
 const containerTypes = new Set([
-    barType,
     verticalType,
+    barType,
     buttonType,
 ]);
 
@@ -246,7 +246,7 @@ async function load(url) {
 
 /**
  * Create elements using various create functions. The `options` parameter of any elements can additionally take the following properties:
- * - **name** (string) [optional]: This is necessary for the `update`, `remove` and some other functions that require an element name functions. After calling `showGroup` or `show`, this can be accessed via element.name.
+ * - **id** (string) [optional]: Allows overwriting the randomly generated id. Use very carefully.
  * - **bordered** (bool) [optional]: Whether to add a border around them.
  * - **breakBefore** (number) [optional]: Adds a break before with the value as its size. Must be between 0 and 8. Default is `0`.
  * - **breakAfter** (number) [optional]: Adds a break after with the value as its size. Must be between 0 and 8. Default is `0`.
@@ -262,6 +262,7 @@ async function load(url) {
  */
 function createBreak(size, options = null) {
     const content = {
+        id: options?.id ?? generateUniqueId(),
         type: breakType,
         size,
         options,
@@ -276,6 +277,7 @@ function createBreak(size, options = null) {
  */
 function createRuler(options = null) {
     const content = {
+        id: options?.id ?? generateUniqueId(),
         type: rulerType,
         options,
     };
@@ -285,6 +287,7 @@ function createRuler(options = null) {
 // Create empty placeholder elements for use in navBarLists, as they use `justify-content: space-between;`
 function createEmpty(options = null) {
     const content = {
+        id: options?.id ?? generateUniqueId(),
         type: emptyType,
         options,
     };
@@ -301,6 +304,7 @@ function createEmpty(options = null) {
  */
 function createText(type, text, options = null) {
     const content = {
+        id: options?.id ?? generateUniqueId(),
         type,
         text,
         options,
@@ -316,6 +320,7 @@ function createText(type, text, options = null) {
  */
 function createCode(code, options = null) {
     const content = {
+        id: options?.id ?? generateUniqueId(),
         type: codeType,
         code,
         options,
@@ -341,6 +346,7 @@ function createCode(code, options = null) {
  */
 function createMarkdown(markdown, options = null) {
     const content = {
+        id: options?.id ?? generateUniqueId(),
         type: markdownType,
         markdown,
         options,
@@ -356,6 +362,7 @@ function createMarkdown(markdown, options = null) {
  */
 function createImage(url, options = null) {
     const content = {
+        id: options?.id ?? generateUniqueId(),
         type: imageType,
         url,
         options,
@@ -375,6 +382,7 @@ function createImage(url, options = null) {
  */
 function createIcon(ds, iconProvider, options = null) {
     const content = {
+        id: options?.id ?? generateUniqueId(),
         type: iconType,
         ds,
         iconProvider,
@@ -385,9 +393,7 @@ function createIcon(ds, iconProvider, options = null) {
 
 /**
  * ## Parameters
- * - **type** (string): Specifies the type of the container. Supported values are:
- *     - `barType`
- *     - `verticalType`
+ * - **type** (string): Specifies the type of the container. All `containerTypes` are supported. Use `verticalType` for simple grouping of elements without any effect on their appearance.
  * - **elements** (object or array): A single element or a list of elements displayed within the container. Please do not put buttons or interactables within buttons.
  * - **options** (object): An object that contains various options specific to the `type` of input. The options available depend on the input type.
  * 
@@ -397,17 +403,17 @@ function createIcon(ds, iconProvider, options = null) {
  * - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
  * - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
  * 
+ * ### `verticalType`
+ * - **centered** (bool) [optional]: Whether the items should be centered. Default is `false`.
+ * 
  * ### `barType`
  * - **barSubType** (string) [optional]: The type of the bar or list. Default is `navBarType`. Supported values are:
  *     - `navBarType` // Uses `justify-content: space-between;`, works well with `emptyType` elements. E.g. a navBar with an emptyElement and a button will cause the button to float right.
  *     - `listBarType` // Normal wrapping list
  *     - `fillBarType` // Uses `flex` to try to share the horzontal space but also fill it
  * 
- * ### `verticalType`
- * - **centered** (bool) [optional]: Whether the items should be centered. Default is `false`.
- * 
  * ### `buttonType`
- * - **buttonSubType** (string): Specifies the type of the button. Default is `complexButtonType`. Supported values are:
+ * - **buttonSubType** (string) [optional]: Specifies the type of the button. Default is `complexButtonType`. Supported values are:
  *     - `simpleButtonType` // *Only* use this for small buttons that should blend in, such as an X to close a dialog.
  *     - `complexButtonType` // Use this for buttons that should be strongly visible, such as a Save or Cancel button.
  * - **onClick** (function): A callback function that is called whenever the button is clicked. It has neither parameters nor a return value.
@@ -417,6 +423,7 @@ function createIcon(ds, iconProvider, options = null) {
 function createContainer(type, elements, options = null) {
     options ??= {};
     const content = {
+        id: options?.id ?? generateUniqueId(),
         type,
         elements: Array.isArray(elements) ? elements : [elements],
         options,
@@ -424,24 +431,53 @@ function createContainer(type, elements, options = null) {
     return content;
 }
 
-function createFloatRightWrapper(element, options = null) {
-    options ??= {};
-    const content = {
-        type: barType,
-        elements: [createEmpty(), element],
-        options,
-    };
-    return content;
+/**
+ * Use this for grouping elements without affecting their appearance.
+ */
+function createGroup(elements, options = null) {
+    return createContainer(verticalType, elements, options);
 }
 
-function createFloatCenterWrapper(element, options = null) {
+function createCenteredGroup(elements, options = null) {
     options ??= {};
-    const content = {
-        type: barType,
-        elements: [createEmpty(), element, createEmpty(),],
-        options,
-    };
-    return content;
+    options.centered = true;
+    return createContainer(verticalType, elements, options);
+}
+
+function createNavBar(elements, options = null) {
+    return createContainer(navBarType, elements, options);
+}
+
+function createHorizontalList(elements, options = null) {
+    options ??= {};
+    options.barSubType = listBarType;
+    return createContainer(barType, elements, options);
+}
+
+function createFilledBar(elements, options = null) {
+    options ??= {};
+    options.barSubType = fillBarType;
+    return createContainer(barType, elements, options);
+}
+
+/**
+ * Use this to cause elements to float to the right.
+ */
+function createFloatRightWrapper(element, options = null) {
+    return createContainer(barType, [createEmpty(), element], options);
+}
+
+function createButton(elements, onClick, options = null) {
+    options ??= {};
+    options.onClick = onClick;
+    return createContainer(buttonType, elements, options);
+}
+
+function createSimpleButton(elements, onClick, options = null) {
+    options ??= {};
+    options.buttonSubType = simpleButtonType;
+    options.onClick = onClick;
+    return createContainer(buttonType, elements, options);
 }
 
 /**
@@ -452,7 +488,6 @@ function createFloatCenterWrapper(element, options = null) {
  * ## Options Configuration by Input Type
  *
  * ### All Types
- * - **name** (string) [optional]: Recommended for use as part of the `showGroup` function.
  * - **disabled** (bool) [optional]: Whether user input is disabled. Default is `false`.
  *
  * ### All Input Types
@@ -525,10 +560,11 @@ function createFloatCenterWrapper(element, options = null) {
  * - **replaceDescription** (string) [optional]: Description text when something has been pasted. Default is `Successfully pasted. Paste (STRG + V) into here to change its content.`.
  * 
  * ## Returns
- * A content object for the `showGroup` and `show` functions.
+ * A content object for the `show` function.
  * */
 function createInput(type, options = null) {
     const content = {
+        id: options?.id ?? generateUniqueId(),
         type: type,
         options: options,
     };
@@ -537,9 +573,9 @@ function createInput(type, options = null) {
 }
 
 
-function _extractElements(group) {
+function _extractElements(element) {
     const elements = [];
-    let unprocessedElements = group;
+    let unprocessedElements = [element];
     while (unprocessedElements.length !== 0) {
         let newUnprocessedElements = [];
         for (let element of unprocessedElements) {
@@ -553,104 +589,36 @@ function _extractElements(group) {
     return elements;
 }
 
-function _mapGroup(group) {
+function _mapElements(elements) {
     const mapped = {};
-    for (let element of group) {
-        mapped[element.name] = element;
+    for (let element of elements) {
+        mapped[element.id] = element;
     }
     return mapped;
 }
 
 /**
- * - **group** (array): The group parameter accepts an array of elements created via any of the create functions. For inputs, it is recommended to define a name, to allow easy access of the return values.
+ * The element parameter should be created via any of the create functions.
+ * For showing multiple elements at once, use a container element.
+ * Important: The returned objects are deep copies. They are not updated on input. The updated values must be fetched either via the `onValidate` callback or the `read` function.
+ * 
+ * ## Parameters
+ * - **element** (object): The `element` parameter accepts an element created via any of the create functions.
  * - **options** (object) [optional]: An object that can have the following properties:
- *     - **name** (string) [optional]: This is necessary for the `update`, `remove` and some other functions that require a group name functions.
  *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If you add your own custom button to accept input, you must set this to true! If an input can be accepted multiple times, set this to `true` and add custom logic that uses the `read` function to read the input values upon a click on a custom button. Default is `false`.
- *     - **bordered** (number) [optional]: Whether the group should be bordered. Default is `false`.
  *     - **location** (string) [optional]: The location of the group. Default is `mainLocation`. The following values are supported:
  *         - `mainLocation`: The default location.
  *         - `stickyLocation`: The group will stick to the top of the page.
  *         - `dialogLocation`: The group will be shown within a dialog. It is recommended to start the group with a title. Only one dialog can be shown at a time. Removing a dialog element will close the dialog. A dialog element is automatically `remove`d after the user closes (noAccept == true only), cancels (noAccept == false only) or accepts (noAccept == false only) it. This will be awaited. Returns error response on cancel.
  *     - **insertAt** (number) [optional]: Where to insert. This allows negative indices. The default is `-1`.
- *     - **insertBefore** (string) [optional]: Name of the group to insert before.
+ *     - **insertBefore** (string) [optional]: `id` of the group to insert before.
  *     - **insertAfterInstead** (bool) [optional]: Modifies insertBefore to insert after that group instead. Default is `false`.
  *     - **deleteAfter** (number) [optional]: How many to delete after this. The default is `0`.
  *     - **deleteBefore** (number) [optional]: How many to delete before this. The default is `0`.
- *     - **breakBefore** (number) [optional]: Adds a break before with the value as its size. Must be between 0 and 8. Default is `0`.
- *     - **breakAfter** (number) [optional]: Adds a break after with the value as its size. Must be between 0 and 8. Default is `0`.
- *     - **gap** (number) [optional]: The gap between elements. Must be between `0` and `8`. Default is `4`.
  *     - **noCloseOnOverlay** (bool) [optional]: This is exclusive to dialogs with `noAccept == true`. This requires implementing custom closing logic. Default is `false`.
  *
  * ## Return value when awaited
- * When this function is awaited, it returns an object that contains each input element (only input elements) from the group parameter with their name as a key. If no name is defined, their flattened index within the group is used instead, and added to the element as a name property.
- * Each returned input element contains data as described by the `show` function.
- * */
-async function showGroup(group, options) {
-    const onValidateMap = new Map();
-    const onDelayedValidateMap = new Map();
-    const onClickMap = new Map();
-    const elements = _extractElements(group);
-
-
-    for (let [index, element] of elements.entries()) {
-        element.id = generateUniqueId();
-        element.options ??= {};
-
-        element.name = element.options.name ?? index;
-
-        if (element.options?.onValidate != null) {
-            const onValidate = element.options.onValidate;
-            delete element.options.onValidate;
-            element.hasValidation = true;
-            onValidateMap.set(element.name, onValidate);
-        }
-
-        if (element.options?.onDelayedValidate != null) {
-            const onDelayedValidate = element.options.onDelayedValidate;
-            delete element.options.onDelayedValidate;
-            element.hasDelayedValidation = true;
-            onDelayedValidateMap.set(element.name, onDelayedValidate);
-        }
-
-        if (element.options?.onClick != null) {
-            const onClick = element.options?.onClick;
-            delete element.options.onClick;
-            onClickMap.set(element.name, onClick);
-        }
-    }
-
-    const buttons = elements.filter(e => e.type == buttonType);
-    for (let element of buttons) {
-        requireResponse(clickEventType, element.id, _ => onClickMap.get(element.name)()); // Don't await
-    }
-
-    const response = await requireResponse(showEventType, {children: group, options}, async (content, event) => {
-        let map = null;
-        if (event.type == validateInputEventType) {
-            map = onValidateMap;
-        } else if (event.type == delayedValidateInputEventType) {
-            map = onDelayedValidateMap;
-        }
-        return await map.get(content.element.name)(_mapGroup(content.group), content.element);
-    });
-
-    return _mapGroup(response ?? []);
-}
-
-/**
- * The element parameter should be created via any of the create functions.
- * For showing multiple elements at once, use the `showGroup` function.
- * Important: The returned objects are deep copies. They are not updated on input. The updated values must be fetched either via the `onValidate` callback or the `read` function.
- * 
- * ## Parameters
- * The parameters are the same as for the `showGroup` function. Take special note of the `name`, `noAccept` and delete options. By default the `name` will be the same as the element `name`.
- *
- * ## Return value when awaited
- * When this function is awaited:
- * - If and only if the element is an input, it returns an object with following properties:
- *
- * ### All Types
- * - **name** (string): The name assigned to the element.
+ *  When this function is awaited, and `noAccept` is not set, it returns an object that contains each input element (only input elements), including all nested input elements, from the element parameter with their id as a key. If there is only a single input element, then the element is returned directly instead of as part of an object. If there is no input element, null is returned. Each returned element has the following properties.
  * 
  * ### For `textInputType`
  * - **text** (string): The text value of the input.
@@ -702,61 +670,100 @@ async function showGroup(group, options) {
  * */
 async function show(element, options = null) {
     options ??= {};
-    options.name ??= element.options?.name;
-    let result = await showGroup([element], options);
-    return result[element.name];
+    const onValidateMap = new Map();
+    const onDelayedValidateMap = new Map();
+    const onClickMap = new Map();
+    const elements = _extractElements(element);
+    const inputs = elements.filter(e => inputTypes.has(e.type));
+
+
+    for (let [index, element] of elements.entries()) {
+        element.options ??= {};
+
+        if (element.options?.onValidate != null) {
+            const onValidate = element.options.onValidate;
+            delete element.options.onValidate;
+            element.hasValidation = true;
+            onValidateMap.set(element.id, onValidate);
+        }
+
+        if (element.options?.onDelayedValidate != null) {
+            const onDelayedValidate = element.options.onDelayedValidate;
+            delete element.options.onDelayedValidate;
+            element.hasDelayedValidation = true;
+            onDelayedValidateMap.set(element.id, onDelayedValidate);
+        }
+
+        if (element.options?.onClick != null) {
+            const onClick = element.options?.onClick;
+            delete element.options.onClick;
+            onClickMap.set(element.id, onClick);
+        }
+    }
+
+    const buttons = elements.filter(e => e.type == buttonType);
+    for (let element of buttons) {
+        requireResponse(clickEventType, element.id, _ => onClickMap.get(element.id)()); // Don't await
+    }
+
+    const response = await requireResponse(showEventType, {element, options}, async (content, event) => {
+        let map = null;
+        if (event.type == validateInputEventType) {
+            map = onValidateMap;
+        } else if (event.type == delayedValidateInputEventType) {
+            map = onDelayedValidateMap;
+        }
+        return await map.get(content.element.id)(_mapElements(content.elements), content.element);
+    });
+
+    if (options.noAccept) return null;
+    else return inputs.length == 1 ? response[0] : (inputs.length == 0 ? null : _mapElements(response));
 }
 
 /**
  * If the element is an input element, it returns the current values of the input as described by the `show` function.
- * 
- * If `elementName` is null, it will be set to `groupName`.
  */
-async function read(groupName, elementName = null) {
-    elementName ??= groupName;
-    return await requireResponse(readEventType, {groupName, elementName});
+async function read(id) {
+    return await requireResponse(readEventType, {id});
 }
 
 /**
- * Returns the current values of all inputs of the group as described by the `show` function.
+ * Returns the current values of all nested inputs of the element (and itself if it is an input) as described by the `show` function. If `id` is null, it returns all elements regardless of their parent.
  */
-async function readGroup(groupName) {
-    return await requireResponse(readEventType, {groupName, elementName: null});
+async function readAll(id = null) {
+    return await requireResponse(readEventType, {id, all: true});
 }
 
 /**
- * - **groupName** (string): The name of the group to update.
- * - **elementName** (string): The name of the element to update. If null, it will be set to `groupName`. You cannot update accepted inputs (after awaiting return value).
+ * - **id** (string): The id of the element to update. You cannot update accepted inputs (after awaiting return value).
  * - **properties** (object): An object that contains the properties to update. The following properties are available:
  *     - All properties passed into any of the create functions, except `type`, `options`, any child element properties and any of the callback functions.
  *     - All properties of the `options` property, except `defaultValue` and any of the callback functions.
  *     - All return value properties from inputs.
  */
-async function update(groupName, elementName, properties) {
-    elementName ??= groupName;
-    await requireResponse(updateEventType, {groupName, elementName, properties});
+async function update(id, properties) {
+    await requireResponse(updateEventType, {id, properties});
 }
 
 /**
- * - **groupName** (string) [optional]: The name of the group to delete. If null, all groups are deleted instead.
- * - **elementName** (string) [optional]: The name of the element to delete. If null, the entire group is deleted instead.
+ * - **id** (string) [optional]: The id of the element to delete. All nested elements are also deleted.
  */
-async function remove(groupName = null, elementName = null) {
-    await requireResponse(removeEventType, {groupName, elementName});
+async function remove(id) {
+    await requireResponse(removeEventType, {id});
 }
 
 /**
- * - **groupName** (string) [optional]: The name of the group to accept input from. This is only useful if `noAccept == true`. If null, all inputs across all groups will be accepted instead.
+ * - **id** (string) [optional]: The id of the top level element to accept input from. This is only useful if `noAccept == true`. If null, all inputs across all top level elements will be accepted instead.
  */
-async function accept(groupName = null) {
-    await requireResponse(acceptEventType, {groupName});
+async function accept(id = null) {
+    await requireResponse(acceptEventType, {id});
 }
 
 /**
  * This allows communicating with a chatbot. A chatbot always responds with markdown.
  * - **context** (array): A list of message objects.
  * - **options** (object): An object that can have the following properties:
- *     - **element** (string or array of 2 strings) [optional]: Allows streaming to an element. If it is a string, it must represent both the group name and the element name. If it is an array, the first string must be the `name` of the group, the second must be the `name` of the element. If streaming to an input, it will be disabled for user input while streaming. This only works on elements with a string value, such as text, caption, code etc..
+ *     - **id** (string) [optional]: Allows streaming to an element. If streaming to an input, it will be disabled for user input while streaming. This only works on elements with a string value, such as text, caption, code etc..
  *     - **onUpdate** (function) [optional]: Allows streaming to a callback function. The function can optionally return a string to update the value to e.g. extract code blocks. The function takes in the following parameters:
  *         - **response** (string): The newly streamed tokens concatenated with the previous response text.
  *     - **model** (string) [optional]: The model to be used. Default is `ChatHelpers.gpt4OmniIdentifier`.
@@ -1080,29 +1087,28 @@ function extractCode(markdown, codeBlocksOnly = true) {
 
 class Samples {
     static async runSimpleChatBot() { // Simple chatbot implementation. You can use this as reference or even directly call it in your code!
-        const promptInputName = "promptInputName"; // Define name of prompt input for easy reference
+        await setStatus("Ready to chat"); // Set status as flavor
+        // Show input box for the user to enter their prompt
+        const promptInput = createInput(textInputType, { // Add text input to allow user to input their prompt
+            placeholder: "Enter your prompt here...", // Add placeholder to better communicate with the user
+        });
+        await show(promptInput, {noAccept: true}); // Show the input without an accept button, so we can reuse it.
+
         const context = []; // Define context to pass to chatbot
-    
         async function run() { // Define run function to be called on chat button click
-            const prompt = (await read(promptInputName)).text; // Read text value of prompt input
+            const prompt = (await read(promptInput.id)).text; // Read text value of prompt input
             context.push(toUserMessage(prompt)); // Add user prompt to chat context
     
             const userMessageElement = createText(paragraphType, `User:\n${prompt}`, {bordered: true}); // Add border to user message to make it easier for the user to see in the sea of messages
-            const assistantMessageElement = createMarkdown("", {name: context.length}); // Show assistant message in markdown to make it more appealing
-            await showGroup([userMessageElement, assistantMessageElement], {insertBefore: promptInputName, name: context.length}); // Insert with name equal to context length for later reference, and before prompt input, as that should stay at the bottom.
+            await show(userMessageElement, {insertBefore: promptInput.id}); // Insert before prompt input, as that should stay at the bottom.
+            const assistantMessageElement = createMarkdown(""); // Show assistant message in markdown to make it more appealing
+            await show(assistantMessageElement, {insertBefore: promptInput.id}); // Insert before prompt input, as that should stay at the bottom.
     
-            const result = await chat(context, {element: counter}); // We chat and stream to the element with name equal to context length
+            const result = await chat(context, {id: assistantMessageElement.id}); // Chat and stream to the last assistant message element.
             context.push(toAssistantMessage(result)); // Save assistant response to chat context
         }
     
-        await setStatus("Ready to chat"); // Set status as flavor
-         // Show input box for the user to enter their prompt
-        const inputElement = createInput(textInputType, { // Add text input to allow user to input their prompt
-            name: promptInputName, // Add name for later reference
-            placeholder: "Enter your prompt here...", // Add placeholder to better communicate with the user
-        });
-        await show(inputElement, {noAccept: true}); // Show the input without an accept button, so we can reuse it.
-        const button = createContainer(buttonType, createText(paragraphType, "Chat"), {onClick:run}); // Button that calls run() on click
+        const button = createButton(createText(paragraphType, "Chat"), run); // Button that calls run() on click
         const wrapper = createFloatRightWrapper(button); // Make chat button float to the right
         await show(wrapper); // Show the button
         // Continues to run in the background until the script finishes running. To stop the script from finishing, await `forever` at the end of your script.
