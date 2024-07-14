@@ -41,7 +41,7 @@ function buildUrlWithNewHashParams(hashSearchParams){
 
 function getUrlWithChangedHashParam(name, value){
     const hashParams = this.getHashParams();
-    if (value == null) {
+    if (value == null || value == "") {
         hashParams.delete(name);
     } else {
         hashParams.set(name, value);

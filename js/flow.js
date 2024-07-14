@@ -102,7 +102,7 @@ class Flow {
             };
             return item;
         } else if (name == 'extern') {
-            return Flow.loadedExternPage ?? {code: ''};
+            return (Flow.loadedExternPage?.url == getHashQueryVariable('url') && Flow.loadedExternPage?.url != null) ? Flow.loadedExternPage : {code: ''};
         } else {
             return localPages.get(name);
         }
@@ -276,7 +276,7 @@ class Flow {
         try {
             let code = Flow.getCode();
             let url = getHashQueryVariable('url');
-            if (getPathFromHash() == 'extern' && !Flow.loadedExternPage && url) {
+            if (getPathFromHash() == 'extern' && Flow.loadedExternPage?.url != getHashQueryVariable('url')) {
                 Flow.setStatus("Fetching...");
                 const page = await fetchExternalPage(url);
                 page.url = url;
