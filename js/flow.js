@@ -89,6 +89,8 @@ class Flow {
 
     static updateUrl(url) {
         localStorage.setItem('externUrl', url);
+        const newUrl = getUrlWithChangedHashParam('url', url);
+        history.replaceState(null, "", newUrl);
     }
 
     static getPage() {
@@ -2541,7 +2543,7 @@ function getFlowPage() {
     elements.push(hb(7));
 
     if (mode == Flow.editMode) {
-        // Extern url bar
+        // Extern url editor
         const urlEditorContainer = fromHTML(`<div class="contenteditableContainer">`);
         if (name != 'extern') urlEditorContainer.classList.add('hide');
         const urlEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter url here...">`);
