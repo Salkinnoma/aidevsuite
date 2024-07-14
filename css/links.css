@@ -21,3 +21,7 @@ a:hover, a:focus {
 .textLink:hover, .textLink:focus {
     opacity: 0.8;
 }
+
+a:disabled, a[disabled], .textLink:disabled, .textLink[disabled] {
+    cursor: default;
+}

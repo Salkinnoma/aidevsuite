@@ -47,8 +47,7 @@ class ContentEditableHelpers {
             if (isFirefox) {
                 ContentEditableHelpers.convertToPlainText(element);
             } else {
-                console.log(element, element.getAttribute('contenteditable'));
-               element.setAttribute('contenteditable', 'plaintext-only');
+                element.setAttribute('contenteditable', 'plaintext-only');
             }
         }
     }

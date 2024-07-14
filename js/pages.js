@@ -1,21 +1,31 @@
-const securityId = "aidevsuite";
+const securityId = "aidevsuite_a1b2c3";
 
 const defaultPages = new Set([
+    '',
     'home',
     'flow',
+    'extern',
     'help',
 ]);
 
 let localPages = new Map();
+let linkedPages = new Map();
+
+const samples = ['Fetch', 'Chat'];
 
 const pageLoadedEvent = new CustomEvent("pageloaded");
 function loadLocalPages() {
     const localPagesJSON = localStorage.getItem('pages');
     if (localPagesJSON) {
         localPages = new Map(Object.entries(JSON.parse(localPagesJSON)));
+        for (let page of localPages.values()) {
+            page.id ??= generateUniqueId();
+            page.securityId = securityId;
+        }
+
         return localPages;
     }
-    return new Map();
+    return localPages = new Map();
 }
 
 function saveLocalPages() {
@@ -23,30 +33,60 @@ function saveLocalPages() {
     for (let entry of localPages.entries()) localPagesObj[entry[0]] = entry[1];
     localStorage.setItem('pages', JSON.stringify(localPagesObj));
 
-    updateLocalPagesSidebar();
+    updatePagesSidebar();
 }
 
-function addLocalPage(name, link, code) {
+function addLocalPage(name, link, code, prompt = null) {
+    if (defaultPages.has(link)) return;
+
     if (link.trim() == '') {
         Flow.updateDefaultCode(code);
         return;
     }
 
-    localPages.set(link, {name, link, code, securityId});
+    // Just to be extra sure check for collisions
+    const ids = new Set();
+    localPages.values().forEach(p => ids.add(p.id));
+    let id;
+    do {
+        id = generateUniqueId();
+    } while (ids.has(id));
+
+    localPages.set(link, {name, link, code, prompt, securityId, id});
     saveLocalPages();
 }
 
 function updateLocalPage(page) {
+    if (defaultPages.has(page.link)) return;
+
     localPages.set(page.link, page);
     saveLocalPages();
 }
 
-function deleteLocalPage(link) {
-    localPages.delete(link);
+function deleteLocalPage(page) {
+    if (defaultPages.has(page.link)) return;
+
+    localPages.delete(page.link);
+
+    const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage'));
+    delete scriptStorage[id];
+    localStorage.setItem('scriptStorage', JSON.stringify(scriptStorage));
+
+    saveLocalPages();
+}
+
+function moveLocalPage(page, newLink) {
+    addLocalPage(page.name, newLink, page.code, page.prompt);
+    deleteLocalPage(page);
     saveLocalPages();
 }
 
 async function fetchExternalPage(url) {
+    if (url.startsWith('#')) {
+        const page = localPages.get(removeFirstChar(url));
+        return {code: page.code};
+    }
+
     const response = await fetch(url);
     const data = await response.json();
     if (data.securityId !== securityId) throw new Error('Security check failed.');
@@ -54,33 +94,71 @@ async function fetchExternalPage(url) {
     return data;
 }
 
-function suggestNameForPageLink(link) {
-    return escapeFileNameMinimal(link);
+function loadLinkedPages() {
+    const linkedPagesJSON = localStorage.getItem('linkedPages');
+    if (linkedPagesJSON) {
+        linkedPages = new Map(Object.entries(JSON.parse(linkedPagesJSON)));
+
+        return linkedPages;
+    }
+    return linkedPages = new Map();
 }
 
+function saveLinkedPages() {
+    const linkedPagesObj = {};
+    for (let entry of linkedPages.entries()) linkedPagesObj[entry[0]] = entry[1];
+    localStorage.setItem('linkedPages', JSON.stringify(linkedPagesObj));
 
-function moveLocalPage(page, newLink) {
-    addLocalPage(page.name, newLink, page.code, page.prompt);
-    deleteLocalPage(page.link);
-    saveLocalPages();
+    updatePagesSidebar();
+}
+
+function addLinkedPage(name, url) {
+    linkedPages.set(url, {name, link: url});
+    saveLinkedPages();
+}
+
+function updateLinkedPage(page) {
+    linkedPages.set(page.link, page);
+    saveLinkedPages();
+}
+
+function deleteLinkedPage(link) {
+    linkedPages.delete(link);
+    saveLinkedPages();
+}
+
+function suggestNameForPageLink(link) {
+    return escapeFileNameMinimal(link);
 }
 
 function getValidHashUrls(){
     return [...defaultPages, ...localPages.keys()];
 }
 
-function updateLocalPagesSidebar() {
-    const localPagesList = document.getElementById('localPagesList')
+function updatePagesSidebar() {
+    const link = getPathFromHash();
+    const url = getHashQueryVariable('url');
+
+    // Local pages
+    const localPagesList = document.getElementById('localPagesList');
     localPagesList.innerHTML = '';
-    localPages.values().forEach(p => localPagesList.appendChild(fromHTML(`<a class="element sidebarElement hoverable" href="#${p.link}">${p.name}</a>`)));
+    localPages.values().forEach(p => localPagesList.appendChild(fromHTML(`<a class="element sidebarElement hoverable" href="#${escapeHTML(p.link)}" ${p.link == link ? 'title="You are here. F5 to reload." disabled' : ''}>${escapeHTML(p.name)}</a>`)));
     if (localPages.size == 0) localPagesList.classList.add('hide');
     else localPagesList.classList.remove('hide');
+
+    // Linked pages
+    const linkedPagesList = document.getElementById('linkedPagesList');
+    linkedPagesList.innerHTML = '';
+    linkedPages.values().forEach(p => linkedPagesList.appendChild(fromHTML(`<a class="element sidebarElement hoverable" href="#extern?url=${escapeHTML(p.link)}" ${p.link == url ? 'title="You are here. F5 to reload." disabled' : ''}>${escapeHTML(p.name)}</a>`)));
+    if (linkedPages.size == 0) linkedPagesList.classList.add('hide');
+    else linkedPagesList.classList.remove('hide');
 }
 
 // Function to handle hash changes
 function loadPage() {
     const hash = getHashUrl();
     loadLocalPages();
+    loadLinkedPages();
 
     const page = document.getElementById('pages');
 
@@ -91,12 +169,12 @@ function loadPage() {
     if (hash == '' || hash == '#' || hash == '#home') {
         removeHash();
         newPage = getHomePage();
-    } else if (link == 'flow') {
+    } else if (localPages.has(link) ||
+        link == 'flow' ||
+        link == 'extern') {
         newPage = getFlowPage();
     } else if (link == 'help') {
         newPage = getHelpPage();
-    } else if (localPages.has(link)) {
-        newPage = getFlowPage(localPages.get(link).code);
     } else {
         openPage();
         return;
@@ -105,7 +183,7 @@ function loadPage() {
     if (!Array.isArray(newPage)) newPage = [newPage];
     page.replaceChildren(...newPage);
 
-    updateLocalPagesSidebar();
+    updatePagesSidebar();
     updateSidebar();
 
     window.dispatchEvent(pageLoadedEvent);
@@ -116,6 +194,20 @@ function openPage(page = null) {
 }
 
 function getHomePage() {
+    const container = fromHTML(`<div>`);
+
+    // Local pages title bar
+    const titleBar = fromHTML(`<div class="listContainerHorizontal">`);
+    const title = fromHTML(`<h1>Local Scripts`);
+    titleBar.appendChild(title);
+    const rightTitleList = fromHTML(`<div class="listHorizontal">`);
+    const createButton = fromHTML(`<button class="complexButton largeElement">Start Creating`);
+    createButton.addEventListener('click', e => openPage('flow'));
+    rightTitleList.appendChild(createButton);
+    titleBar.appendChild(rightTitleList);
+    container.appendChild(titleBar);
+
+    // Local pages grid
     const grid = fromHTML(`<div class="listHorizontal">`);
     const pages = localPages.values();
     for (let page of pages) {
@@ -124,7 +216,48 @@ function getHomePage() {
         pageElement.textContent = page.name;
         grid.appendChild(pageElement);
     }
-    return grid;
+    container.appendChild(grid);
+    container.appendChild(hb(4));
+
+    // Linked pages title bar
+    const linkedTitleBar = fromHTML(`<div class="listContainerHorizontal">`);
+    const linkedTitle = fromHTML(`<h1>Linked Scripts`);
+    linkedTitleBar.appendChild(linkedTitle);
+    container.appendChild(linkedTitleBar);
+
+    // Linked pages grid
+    const linkedGrid = fromHTML(`<div class="listHorizontal">`);
+    const linkedValues = linkedPages.values();
+    for (let page of linkedValues) {
+        const pageElement = fromHTML(`<a class="giantElement raised xl-font">`);
+        pageElement.setAttribute('href', '#extern?url=' + page.link);
+        pageElement.textContent = page.name;
+        linkedGrid.appendChild(pageElement);
+    }
+    if (linkedValues.length == 0) container.appendChild(fromHTML(`<div>No scripts linked yet.`));
+    else container.appendChild(linkedGrid);
+    container.appendChild(hb(4));
+
+    // Samples pages title bar
+    const samplesTitleBar = fromHTML(`<div class="listContainerHorizontal">`);
+    const samplesTitle = fromHTML(`<h1>Sample Scripts`);
+    samplesTitleBar.appendChild(samplesTitle);
+    container.appendChild(samplesTitleBar);
+
+    // Sample pages grid
+    const samplesGrid = fromHTML(`<div class="listHorizontal">`);
+    for (let sample of samples) {
+        const link = 'data/' + sample + '.json';
+        fetchExternalPage(link).then(page => {
+            const pageElement = fromHTML(`<a class="giantElement raised xl-font">`);
+            pageElement.setAttribute('href', '#extern?url=' + link);
+            pageElement.textContent = page.name;
+            samplesGrid.appendChild(pageElement);
+        });
+    }
+    container.appendChild(samplesGrid);
+    
+    return container;
 }
 
 function getHelpPage() {

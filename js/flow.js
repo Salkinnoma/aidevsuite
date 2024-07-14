@@ -5,6 +5,8 @@ class Flow {
     static runMode = 'run';
     static editMode = 'edit';
     static isRunning = false;
+    static loadedExternPage = null;
+    static onIframeEvent = new Map();
     static progress = 0;
     static maxProgress = 1;
     static status = "Running...";
@@ -17,7 +19,7 @@ class Flow {
 
     static onPageLoaded() {
         const name = getPathFromHash();
-        if (name !== 'flow' && !localPages.has(name)) return;
+        if (name !== 'flow' && name !== 'extern' && !localPages.has(name)) return;
 
         let mode = getHashQueryVariable('mode') ?? Flow.editMode;
         const locked = getHashQueryVariable('locked') ?? false;
@@ -25,7 +27,6 @@ class Flow {
 
         if (Flow.isRunning) {
             Flow.interruptRun();
-            console.log('pdiajodjoa');
         }
 
         if (mode == Flow.runMode) Flow.run();
@@ -37,17 +38,36 @@ class Flow {
         console.log(iframe);
 
         window.addEventListener('message', function setupWorker(event) {
-            console.log('IFrame Message Received:', event);
-            if (event.data?.workerData) {
-                Flow.onWorkerMessage({data: event.data?.workerData});
+            if (event.data.source == 'origin') return;
+            const data = event.data.message;
+
+            if (event.data.source == 'worker') {
+                Flow.onWorkerMessage(data);
+            } else if (event.data.source == 'iframe') {
+                if (!event.data.response) console.log('IFrame Message Received:', data ?? event);
+                Flow.onIframeEvent.get(event.data.id)?.(event.data);
             }
         });
     }
 
-    static postIframeMessage(message) {
+    static postIframeRequest(content, id = null) {
         //const allowedOrigin = window.location.origin; // Doesn't work because iframe is sandboxed with different origin (null)
-        console.log('Init iframe message', message);
-        Flow.iframe.contentWindow.postMessage(message, '*');
+        //console.log('IFrame Message Posted:', content);
+        Flow.iframe.contentWindow.postMessage({message: content, id, source: 'origin'}, '*');
+    }
+
+    static requireIframeResponse(content){
+        return new Promise((resolve, reject) => {
+            const id = generateUniqueId();
+    
+            Flow.onIframeEvent.set(id, (event) => {
+                Flow.onIframeEvent.delete(id);
+                resolve(event.message);
+            });
+    
+    
+            Flow.postIframeRequest(content, id);
+        });
     }
 
     static updateDefaultCode(code) {
@@ -58,11 +78,17 @@ class Flow {
         const name = getPathFromHash();
         if (name == 'flow') {
             Flow.updateDefaultCode(code);
+        } else if (name == 'extern') {
+            return;
         } else {
             const page = localPages.get(name);
             page.code = code;
             updateLocalPage(page);
         }
+    }
+
+    static updateUrl(url) {
+        localStorage.setItem('externUrl', url);
     }
 
     static getPage() {
@@ -73,17 +99,38 @@ class Flow {
                 code: localStorage.getItem('lastCode'),
             };
             return item;
+        } else if (name == 'extern') {
+            return Flow.loadedExternPage ?? {code: ''};
         } else {
             return localPages.get(name);
         }
     }
 
     static getCode() {
-        const name = getPathFromHash();
-        if (name == 'flow') {
-            return localStorage.getItem('lastCode');
-        } else {
-            return localPages.get(name).code;
+        return Flow.getPage().code;
+    }
+
+    static async loadScript() {
+        Flow.loadedExternPage = null;
+        const url = Flow.urlEditorElement.textContent;
+        Flow.setStatus('Loading external script...');
+        
+        Flow.externContainerElement.classList.remove('hide');
+        Flow.externTargetElement.setAttribute('placeholder', 'Loading...');
+        Flow.externTargetElement.textContent = '';
+        try {
+            const page = await fetchExternalPage(url);
+            page.url = url;
+            Flow.loadedExternPage = page;
+            Flow.externTargetElement.textContent = page.code;
+            Flow.externTargetElement.setAttribute('placeholder', 'Loaded script seems to be empty...');
+            Flow.setStatus('Finished loading external script.');
+
+            highlightCode(Flow.externTargetElement);
+        } catch (e) {
+            console.log(e);
+            Flow.externTargetElement.setAttribute('placeholder', 'Failed loading external script.');
+            Flow.setStatus('Error: Failed loading external script: ' + e.message, true);
         }
     }
     
@@ -97,6 +144,8 @@ class Flow {
         const name = getPathFromHash();
         if (name == 'flow') {
             localStorage.setItem('lastPrompt', prompt);
+        } else if (name == 'extern') {
+            return;
         } else {
             const page = localPages.get(name);
             page.prompt = prompt;
@@ -105,12 +154,7 @@ class Flow {
     }
 
     static getPrompt() {
-        const name = getPathFromHash();
-        if (name == 'flow') {
-            return localStorage.getItem('lastPrompt');
-        } else {
-            return localPages.get(name).prompt;
-        }
+        return Flow.getPage().prompt;
     }
     
     static onPromptInput(event) {
@@ -149,7 +193,11 @@ class Flow {
         Flow.setStatus('Generating script...');
         Flow.setProgress(30);
 
-        const systemPrompt = await Flow.getWorkerScript() + `\n\nThe user will ask you to write a script for a custom interactive tool that clearly communicates with the user. Your script will be evaluated in the eval part of onmessage on a worker. Above is the worker script that will eval your script. All code you write will be executed within an async function within eval. Write the whole script and only the script within a single code block (use \`\`\`code here\`\`\`), such that it can be easily parsed.`;
+        const page = Flow.getPage();
+        const hasStorage = page.id != null;
+        const storageAddendum = hasStorage ? '' : ' The storage is disabled for this script.';
+
+        const systemPrompt = await Flow.getWorkerScript() + `\n\nThe user will ask you to write a script for a custom interactive tool that clearly communicates with the user.${storageAddendum} Your script will be evaluated in the eval part of onmessage on a worker. Above is the worker script that will eval your script. All code you write will be executed within an async function within eval. Write the whole script and only the script within a single code block (use \`\`\`code here\`\`\`), such that it can be easily parsed.`;
         const secondSystemPrompt = Flow.getCode() + `Above is the existing code written by the user that needs to be changed and adjusted according to the user's wishes.`;
         const prompt = Flow.getPrompt();
         const systemMessage = ChatGptApi.toSystemMessage(systemPrompt);
@@ -158,7 +206,7 @@ class Flow {
         const context = rewrite ? [systemMessage, secondSystemMessage, userMessage] : [systemMessage, userMessage];
 
         Flow.codeEditorContainerElement.classList.add('hide');
-        Flow.streamTargetElement.classList.remove('hide');
+        Flow.streamContainerElement.classList.remove('hide');
 
         const result = await ChatGptApi.streamChat(context, t => {
             const code = ParsingHelpers.extractCode(t);
@@ -167,7 +215,7 @@ class Flow {
         const code = ParsingHelpers.extractCode(result);
 
         Flow.codeEditorContainerElement.classList.remove('hide');
-        Flow.streamTargetElement.classList.add('hide');
+        Flow.streamContainerElement.classList.add('hide');
 
         InputHelpers.replaceTextWithUndo(Flow.codeEditorElement, code);
 
@@ -199,9 +247,11 @@ class Flow {
         Flow.progressBar.value = Flow.progress;
     }
 
-    static setStatus(message) {
+    static setStatus(message, error = false) {
         Flow.status = message;
         Flow.statusElement.textContent = Flow.status;
+        if (error) Flow.statusElement.classList.add('danger-text');
+        else Flow.statusElement.classList.remove('danger-text');
     }
 
     static interruptRun() {
@@ -222,27 +272,36 @@ class Flow {
         await Flow.createWorker();
         let error = false;
         try {
-            let result = await Flow.evalOnWorker(Flow.getCode());
+            let code = Flow.getCode();
+            let url = getHashQueryVariable('url');
+            if (getPathFromHash() == 'extern' && !Flow.loadedExternPage && url) {
+                Flow.setStatus("Fetching...");
+                const page = await fetchExternalPage(url);
+                page.url = url;
+                Flow.loadedExternPage = page;
+                code = page.code;
+                Flow.setStatus("Running...");
+            }
+            await Flow.evalOnWorker(code);
         } catch (e) {
             error = e;
-            console.log(error);
         }
-        Flow.destroyWorker();
+        await Flow.destroyWorker();
         Flow.hideProgress();
 
-        if (error) Flow.setStatus("Script Error: " + error);
+        if (error) Flow.setStatus("Script Error: " + error, true);
         else Flow.setStatus("Finished");
         console.log(Flow.status);
 
         Flow.isRunning = false;
     }
     
-    static destroyWorker() {
-        Flow.postIframeMessage({ command: 'terminateWorker' });
+    static async destroyWorker() {
+        await Flow.requireIframeResponse({ command: 'terminateWorker' });
     }
 
     static async createWorker() {
-        Flow.postIframeMessage({loadWorker: await Flow.getWorkerScript()});
+        await Flow.requireIframeResponse({ loadWorker: await Flow.getWorkerScript() });
     }
 
     static async getWorkerScript() {
@@ -260,10 +319,12 @@ class Flow {
     // Event types
     static logEventType = "logEventType";
     static evalEventType = "evalEventType";
+    static loadEventType = "loadEventType";
     static showEventType = "showEventType";
     static readEventType = "readEventType";
     static updateEventType = "updateEventType";
     static removeEventType = "removeEventType";
+    static acceptEventType = "acceptEventType";
     static validateInputEventType = "validateInputEventType";
     static delayedValidateInputEventType = "delayedValidateInputEventType";
     static clickEventType = "clickEventType";
@@ -273,6 +334,7 @@ class Flow {
     static dataURLDownloadEventType = "dataURLDownloadEventType";
     static setProgressEventType = "setProgressEventType";
     static setStatusEventType = "setStatusEventType";
+    static storageEventType = "storageEventType";
 
     // Element types
     static breakType = "breakType";
@@ -382,19 +444,19 @@ class Flow {
     
     // Event logic to communicate with worker
     static _postMessage(message) {
-        Flow.postIframeMessage({ workerCommand: message });
+        Flow.postIframeRequest({ workerCommand: message });
     }
 
     static postRequest(type, content, id = null, pingId = null, pingSourceEvent = null) {
-        Flow._postMessage({id, pingId, pingSourceId: pingSourceEvent?.data.pingId, type, content});
+        Flow._postMessage({id, pingId, pingSourceId: pingSourceEvent?.pingId, type, content});
     }
 
     static postSuccessResponse(requestEvent, content = null, message = null) {
-        Flow._postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: Flow.successStatus, content, message });
+        Flow._postMessage({ id:requestEvent.id, type: requestEvent.type, response: true, status: Flow.successStatus, content, message });
     }
 
     static postErrorResponse(requestEvent, message, content = null) {
-        Flow._postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: Flow.errorStatus, content, message });
+        Flow._postMessage({ id:requestEvent.id, type: requestEvent.type, response: true, status: Flow.errorStatus, content, message });
     }
 
     static requireResponse(type, content, onPing = null, pingSourceEvent = null){
@@ -405,7 +467,7 @@ class Flow {
                 pingId = generateUniqueId();
                 Flow.onPingEvent.set(pingId, async (event) => {
                     try {
-                        const result = await onPing(event.data.content, event);
+                        const result = await onPing(event.content, event);
                         Flow.postSuccessResponse(event, result);
                     } catch (e) {
                         Flow.postErrorResponse(event, "Executing request produced an error.");
@@ -416,9 +478,8 @@ class Flow {
             Flow.onEvent.set(id, (event) => {
                 Flow.onEvent.delete(id);
                 if (pingId != null) Flow.onPingEvent.delete(pingId);
-
-                if (event.data.status === Flow.errorStatus) reject(event.data.stack);
-                else resolve(event.data.content);
+                if (event.status === Flow.errorStatus) reject(event.message);
+                else resolve(event.content);
             });
     
     
@@ -428,35 +489,42 @@ class Flow {
     
     static onWorkerMessage(event) {
         const e = event;
-        if (e.data.type !== Flow.logEventType) console.log("Worker Message Received:", e.data);
+        const type = e.type;
+        if (type !== Flow.logEventType) console.log("Worker Message Received:", event);
 
         try {
-            if (Flow.onEvent.has(e.data.id)) {
-                Flow.onEvent.get(e.data.id)(e);
-            } else if (Flow.onPingEvent.has(e.data.pingSourceId)) {
-                Flow.onPingEvent.get(e.data.pingSourceId)(e);
-            } else if (e.data.type === Flow.logEventType) {
+            if (Flow.onEvent.has(e.id)) {
+                Flow.onEvent.get(e.id)(e);
+            } else if (Flow.onPingEvent.has(e.pingSourceId)) {
+                Flow.onPingEvent.get(e.pingSourceId)(e);
+            } else if (type === Flow.logEventType) {
                 Flow.onLogRequest(e);
-            } else if (e.data.type === Flow.showEventType) {
+            } else if (type === Flow.loadEventType) {
+                Flow.onLoadRequest(e);
+            } else if (type === Flow.showEventType) {
                 Flow.onShowRequest(e);
-            } else if (e.data.type === Flow.readEventType) {
+            } else if (type === Flow.readEventType) {
                 Flow.onRead(e);
-            } else if (e.data.type === Flow.updateEventType) {
+            } else if (type === Flow.updateEventType) {
                 Flow.onUpdate(e);
-            }  else if (e.data.type === Flow.removeEventType) {
+            } else if (type === Flow.removeEventType) {
                 Flow.onRemove(e);
-            } else if (e.data.type === Flow.clickEventType) {
+            } else if (type === Flow.acceptEventType) {
+                Flow.onAcceptRequest(e);
+            } else if (type === Flow.clickEventType) {
                 Flow.onClick(e);
-            } else if (e.data.type === Flow.chatEventType) {
+            } else if (type === Flow.chatEventType) {
                 Flow.onChat(e);
-            } else if (e.data.type === Flow.fileDownloadEventType) {
+            } else if (type === Flow.fileDownloadEventType) {
                 Flow.onFileDownloadRequest(e);
-            } else if (e.data.type === Flow.dataURLDownloadEventType) {
+            } else if (type === Flow.dataURLDownloadEventType) {
                 Flow.onDataURLDownloadRequest(e);
-            } else if (e.data.type === Flow.setProgressEventType) {
+            } else if (type === Flow.setProgressEventType) {
                 Flow.onSetProgressRequest(e);
-            } else if (e.data.type === Flow.setStatusEventType) {
+            } else if (type === Flow.setStatusEventType) {
                 Flow.onSetStatusRequest(e);
+            } else if (type === Flow.storageEventType) {
+                Flow.onStorageRequest(e);
             }
         } catch (error) {
             console.error("Error while executing worker request:", error.stack);
@@ -466,10 +534,10 @@ class Flow {
 
     static onLogRequest(event) {
         const e = event;
-        if (e.data.content == null) {
-            console.log("Worker Log:", e.data.content);
+        if (e.content == null) {
+            console.log("Worker Log:", e.content);
         } else {
-            const contentArray = JSON.parse(e.data.content);
+            const contentArray = JSON.parse(e.content);
 
             if (Array.isArray(contentArray)) {
                 console.log("Worker Log:", ...contentArray);
@@ -482,6 +550,44 @@ class Flow {
 
     static async evalOnWorker(code) {
         return await Flow.requireResponse(Flow.evalEventType, {code});
+    }
+
+    static async onLoadRequest(event) {
+        const url = event.content;
+        try {
+            const page = await fetchExternalPage(url);
+            Flow.postSuccessResponse(event, page.code);
+        } catch (e) {
+            Flow.postErrorResponse(event, "Failed to fetch.");
+        }
+    }
+
+    static async onStorageRequest(event) {
+        const e = event;
+        const content = event.content;
+        const page = Flow.getPage();
+        let exists = false;
+        if (page.id) exists = true;
+
+        if (content.exists) Flow.postSuccessResponse(e, exists);
+        else if (content.set != null) {
+            const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage'));
+            scriptStorage[id] ??= {};
+            scriptStorage[id][content.set.key] = content.set.value;
+            localStorage.setItem('scriptStorage', JSON.stringify(scriptStorage));
+            Flow.postSuccessResponse(e);
+        } else if (content.get != null) {
+            const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage'));
+            scriptStorage[id] ??= {};
+            const value = scriptStorage[id][content.get];
+            Flow.postSuccessResponse(e, value);
+        } else if (content.delete != null) {
+            const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage'));
+            scriptStorage[id] ??= {};
+            delete scriptStorage[id][content.delete];
+            localStorage.setItem('scriptStorage', JSON.stringify(scriptStorage));
+            Flow.postSuccessResponse(e);
+        }
     }
 
     // Validation
@@ -562,6 +668,7 @@ class Flow {
             settings.markdown = element.markdown;
             settings.katex = options.katex ?? true;
             settings.katexDelimiters = options.katexDelimiters;
+            settings.noHighlight = options.noHighlight;
         } else if (type === Flow.imageType) {
             settings.url = element.url;
             settings.caption = options.caption;
@@ -617,9 +724,10 @@ class Flow {
                 settings.spellcheck = options.spellcheck ?? false;
                 settings.katex = options.katex ?? true;
                 settings.katexDelimiters = options.katexDelimiters;
+                settings.noHighlight = options.noHighlight;
                 settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
             } else if (type === Flow.checkboxInputType) {
-                settings.ticked = options.defaultValue ?? false;
+                settings.checked = options.defaultValue ?? false;
                 settings.description = options.description ?? '';
             } else if (type === Flow.selectInputType) {
                 options.choices.forEach((c, index) => {
@@ -660,7 +768,6 @@ class Flow {
     }
 
     static extractSettingsFromGroup(group) {
-        console.log(group);
         const options = group.options;
         const settings = {};
         settings.name = group.options?.name ?? generateUniqueId();
@@ -904,8 +1011,7 @@ class Flow {
             settings.codeElement = codeElement;
         } else if (type == Flow.markdownType) {
             const markdownContainer = fromHTML(`<div class="w-100">`);
-            console.log(markdownContainer, settings);
-            renderMarkdown(markdownContainer, settings.markdown, { options: { delimiters: settings.katexDelimiters }, sanitize: true, katex: settings.katex });
+            renderMarkdown(markdownContainer, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
             settings.markdownElement = markdownContainer;
             const rawTextElement = fromHTML(`<div class="w-100 markdownRawText hide">`);
             rawTextElement.textContent = settings.markdown;
@@ -1081,7 +1187,7 @@ class Flow {
             codeEditor.textContent = settings.markdown;
             codeEditor.addEventListener('input', e => {
                 Flow.processContentEditableInput(e.srcElement, settings, 'markdown');
-                renderMarkdown(settings.markdownElement, settings.markdown, { options: { delimiters: settings.katexDelimiters }, sanitize: true, katex: settings.katex });
+                renderMarkdown(settings.markdownElement, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
             });
             codeEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
             if (decorated) {
@@ -1105,15 +1211,15 @@ class Flow {
             settings.editorContainer = editorContainer;
             settings.codeEditor = codeEditor;
             const markdownElement = fromHTML(`<div class="w-100 markdownPreview" placeholder="Markdown Output">`);
-            renderMarkdown(markdownElement, settings.markdown, { options: { delimiters: settings.katexDelimiters }, sanitize: true, katex: settings.katex });
+            renderMarkdown(markdownElement, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
             settings.markdownElement = markdownElement;
             contentContainer.appendChild(markdownElement);
             element.appendChild(contentContainer);
         } else if (type == Flow.checkboxInputType) {
             const checkboxContainer = fromHTML(`<div class="checkboxContainer">`);
             const checkboxElement = fromHTML(`<input type="checkbox">`);
-            checkboxElement.checked = settings.ticked;
-            checkboxElement.addEventListener('change', e => Flow.processInput(e.srcElement, settings, 'ticked', 'checked'));
+            checkboxElement.checked = settings.checked;
+            checkboxElement.addEventListener('change', e => Flow.processInput(e.srcElement, settings, 'checked', 'checked'));
             checkboxContainer.appendChild(checkboxElement);
             element.appendChild(checkboxContainer);
             settings.checkboxElement = checkboxElement;
@@ -1292,7 +1398,7 @@ class Flow {
             } else if (type == Flow.markdownInputType) {
                 value.markdown = settings.markdown;
             } else if (type == Flow.checkboxInputType) {
-                value.ticked = settings.ticked;
+                value.checked = settings.checked;
             } else if (type == Flow.selectInputType) {
                 value.value = settings.value;
             } else if (type == Flow.imageInputType) {
@@ -1326,11 +1432,13 @@ class Flow {
 
     static onCancelDialog(groupSettings) {
         if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.group);
-        Flow.postErrorResponse(groupSettings.event);
+        Flow.postErrorResponse(groupSettings.event, "dialog_canceled");
         Flow.closeOutputDialog();
     }
 
     static async onAccept(groupSettings) {
+        if (groupSettings.accepted) return;
+
         if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.group);
 
         const inputValues = Flow.extractInputValues(groupSettings);
@@ -1372,7 +1480,7 @@ class Flow {
             } else if (type == Flow.markdownInputType) {
                 const markdownContainer = fromHTML(`<div class="w-100">`);
                 console.log(markdownContainer, settings);
-                renderMarkdown(markdownContainer, settings.markdown, { options: { delimiters: settings.katexDelimiters }, sanitize: true, katex: settings.katex });
+                renderMarkdown(markdownContainer, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
                 const rawTextContainer = fromHTML(`<div class="w-100 fixText hide">`);
                 rawTextContainer.textContent = settings.markdown;
     
@@ -1384,7 +1492,7 @@ class Flow {
                 element.appendChild(bottomBar);
             } else if (type == Flow.checkboxInputType) {
                 const checkboxElement = fromHTML(`<input type="checkbox" disabled>`);
-                checkboxElement.checked = settings.ticked;
+                checkboxElement.checked = settings.checked;
                 element.appendChild(checkboxElement);
             } else if (type == Flow.selectInputType) {
                 element.classList.add('fixText');
@@ -1593,7 +1701,7 @@ class Flow {
 
     static async onShowRequest(event) {
         const e = event;
-        const content = e.data.content;
+        const content = e.content;
         content.options ??= {};
         const options = content.options;
         options.sticky ??= false;
@@ -1609,23 +1717,22 @@ class Flow {
         }
 
         const settings = Flow.extractSettingsFromGroup(content);
+        console.log(settings);
         settings.event = e;
 
         const inputs = Flow.extractInputElements(settings);
 
-        console.log(settings, options, this.output);
         await Flow.spliceOutput(insertAt, options.deleteAfter, settings);
-        console.log(this.output);
         if (options.deleteBefore > 0) {
             await Flow.spliceOutput(insertAt - options.deleteBefore, options.deleteBefore);
         }
 
-        if (inputs.length == 0) Flow.postSuccessResponse(e);
+        if (inputs.length == 0 || options.noAccept) Flow.postSuccessResponse(e);
     }
 
     static async onRead(event) {
         const e = event;
-        const content = e.data.content;
+        const content = e.content;
         console.log(content);
         const group = Flow.groupByName.get(content.groupName);
         let values = Flow.extractInputValues(group);
@@ -1636,97 +1743,101 @@ class Flow {
 
     static async onUpdate(event) {
         const e = event;
-        const content = e.data.content;
+        const content = e.content;
+        const properties = content.properties;
     
         const settings = Flow.settingsByGroupNameAndName.get(content.groupName).get(content.elementName);
         if (Flow.inputTypes.has(settings.type) && settings.group.accepted) return;
-    
+    console.log(event);
         // Update settings and corresponding elements
-        if (content.hide !== undefined) {
+        if (properties.hide !== undefined) {
             settings.hide = content.hide;
+            console.log(content.hide);
             if (content.hide) settings.htmlElement.classList.add('hide');
             else settings.htmlElement.classList.remove('hide');
         }
-        if (content.disabled !== undefined) {
-            settings.disabled = content.disabled;
+        if (properties.disabled !== undefined) {
+            settings.disabled = properties.disabled;
             if (settings.disabled) {
                 settings.contentElement.setAttribute('disabled', '');
             } else {
                 settings.contentElement.removeAttribute('disabled');
             }
         }
-        if (content.text !== undefined) {
-            settings.text = content.text;
+        if (properties.text !== undefined) {
+            settings.text = properties.text;
             if (settings.type === Flow.paragraphType || settings.type === Flow.titleType || settings.type === Flow.subTitleType) {
-                settings.textElement.textContent = content.text;
+                settings.textElement.textContent = settings.text;
             } else if (settings.type === Flow.codeType) {
-                settings.codeElement.textContent = content.text;
+                settings.codeElement.textContent = settings.text;
             } else if (settings.type === Flow.textInputType || settings.type === Flow.codeInputType) {
-                settings.codeEditor.textContent = content.text;
+                settings.codeEditor.textContent = settings.text;
             }
         }
-        if (content.url !== undefined) {
-            settings.url = content.url;
+        if (properties.url !== undefined) {
+            settings.url = properties.url;
             if (settings.type === Flow.imageType) {
-                settings.imgElement.setAttribute('src', content.url);
+                settings.imgElement.setAttribute('src', settings.url);
             }
         }
-        if (content.caption !== undefined) {
-            settings.caption = content.caption;
+        if (properties.caption !== undefined) {
+            settings.caption = properties.caption;
             if (settings.type === Flow.imageType) {
-                settings.captionElement.textContent = content.caption;
+                settings.captionElement.textContent = settings.caption;
             } else if (settings.type === Flow.imageInputType) {
-                settings.captionCodeEditor.textContent = content.caption;
+                settings.captionCodeEditor.textContent = settings.caption;
             }
         }
-        if (content.editableCaption !== undefined && settings.type === Flow.imageInputType) {
-            if (content.editableCaption) {
+        if (properties.editableCaption !== undefined && settings.type === Flow.imageInputType) {
+            if (properties.editableCaption) {
                 settings.captionCodeEditor.classList.remove('hide');
             } else {
                 settings.captionCodeEditor.classList.add('hide');
             }
         }
-        if (content.ticked !== undefined && settings.type === Flow.checkboxInputType) {
-            settings.ticked = content.ticked;
-            settings.checkboxElement.checked = content.ticked;
+        if (properties.checked !== undefined && settings.type === Flow.checkboxInputType) {
+            settings.checked = properties.checked;
+            settings.checkboxElement.checked = properties.checked;
         }
-        if (content.value !== undefined && settings.type === Flow.selectInputType) {
-            settings.value = content.value;
-            settings.selectElement.value = content.value;
+        if (properties.value !== undefined && settings.type === Flow.selectInputType) {
+            settings.value = properties.value;
+            settings.selectElement.value = properties.value;
         }
-        if (content.spellcheck !== undefined) {
-            settings.spellcheck = content.spellcheck;
+        if (properties.spellcheck !== undefined) {
+            settings.spellcheck = properties.spellcheck;
             if (settings.type === Flow.textInputType || settings.type === Flow.markdownInputType) {
-                settings.codeEditor.setAttribute('spellcheck', content.spellcheck);
+                settings.codeEditor.setAttribute('spellcheck', settings.spellcheck);
             } else if (settings.type === Flow.imageInputType) {
-                settings.captionCodeEditor.setAttribute('spellcheck', content.spellcheck);
+                settings.captionCodeEditor.setAttribute('spellcheck', settings.spellcheck);
             }
         }
-        if (content.placeholder !== undefined && (settings.type === Flow.textInputType || settings.type === Flow.codeInputType || settings.type === Flow.passwordInputType)) {
-            settings.placeholder = content.placeholder;
-            settings.codeEditor.setAttribute('placeholder', content.placeholder);
+        if (properties.placeholder !== undefined && (settings.type === Flow.textInputType || settings.type === Flow.codeInputType || settings.type === Flow.passwordInputType)) {
+            settings.placeholder = properties.placeholder;
+            settings.codeEditor.setAttribute('placeholder', settings.placeholder);
         }
-        if (content.number !== undefined && settings.type === Flow.numberInputType) {
-            settings.number = content.number;
-            settings.inputElement.value = content.number;
+        if (properties.number !== undefined && settings.type === Flow.numberInputType) {
+            settings.number = properties.number;
+            settings.inputElement.value = settings.number;
         }
-        if (content.password !== undefined && settings.type === Flow.passwordInputType) {
-            settings.password = content.password;
-            settings.passwordElement.value = content.password;
+        if (properties.password !== undefined && settings.type === Flow.passwordInputType) {
+            settings.password = properties.password;
+            settings.passwordElement.value = settings.password;
         }
-        if (content.markdown !== undefined) {
-            settings.markdown = content.markdown;
+        if (properties.markdown !== undefined) {
+            settings.markdown = properties.markdown;
             if (settings.type === Flow.markdownType) {
                 settings.rawTextElement.textContent = settings.markdown;
                 renderMarkdown(settings.markdownElement, settings.markdown, {
-                    options: { delimiters: settings.katexDelimiters },
+                    delimiters: settings.katexDelimiters,
+                    noHighlight: settings.noHighlight,
                     sanitize: true,
                     katex: settings.katex
                 });
             } else if (settings.type === Flow.markdownInputType) {
                 settings.codeEditor.value = settings.markdown;
                 renderMarkdown(settings.markdownElement, settings.markdown, {
-                    options: { delimiters: settings.katexDelimiters },
+                    delimiters: settings.katexDelimiters,
+                    noHighlight: settings.noHighlight,
                     sanitize: true,
                     katex: settings.katex
                 });
@@ -1734,23 +1845,23 @@ class Flow {
          
 
         }
-        if (content.files !== undefined && settings.type === Flow.fileInputType) {
+        if (properties.files !== undefined && settings.type === Flow.fileInputType) {
             settings.filesDisplayElement.innerHTML = '';
             settings.files = [];
-            Flow.addFiles(content.files, settings);
+            Flow.addFiles(properties.files, settings);
         }
         if (settings.type === Flow.pasteInputType) {
-            if (content.html !== undefined ||
-                content.rtf !== undefined ||
-                content.text !== undefined ||
-                content.files !== undefined) {
-                Flow.updatePaste(settings, content);
+            if (properties.html !== undefined ||
+                properties.rtf !== undefined ||
+                properties.text !== undefined ||
+                properties.files !== undefined) {
+                Flow.updatePaste(settings, properties);
             }
-            if (content.emptyDescription !== undefined) {
-                settings.emptyDescription = content.pasemptyDescriptionsword;
+            if (properties.emptyDescription !== undefined) {
+                settings.emptyDescription = properties.pasemptyDescriptionsword;
             }
-            if (content.replaceDescription !== undefined) {
-                settings.replaceDescription = content.replaceDescription;
+            if (properties.replaceDescription !== undefined) {
+                settings.replaceDescription = properties.replaceDescription;
             }
         }
 
@@ -1773,21 +1884,34 @@ class Flow {
 
     static async onRemove(event) {
         const e = event;
-        const content = e.data.content;
+        const content = e.content;
         Flow.remove(content.groupName, content.elementName);
+        Flow.postSuccessResponse(e);
+    }
+
+    static async onAcceptRequest(event) {
+        const e = event;
+        const content = e.content;
+        if (content.groupName == null) {
+            Flow.output.forEach(s => Flow.onAccept(s));
+        } else {
+            const group = Flow.groupByName.get(content.groupName);
+            Flow.onAccept(group);
+        }
+
         Flow.postSuccessResponse(e);
     }
 
     static async onClick(event) {
         const e = event;
-        const id = e.data.content;
+        const id = e.content;
         Flow.clickEventById.set(id, event);
         // No response here
     }
 
     static async onChat(event) {
         const e = event;
-        const content = e.data.content;
+        const content = e.content;
         const context = [];
         for (let message of content.context) {
             if (message.url) context.push(ChatGptApi.ToImageMessage(message.prompt, message.url));
@@ -1837,7 +1961,8 @@ class Flow {
                             settings.markdown = text;
                             settings.rawTextElement.textContent = text;
                             renderMarkdown(settings.markdownElement, text, {
-                                options: { delimiters: settings.katexDelimiters },
+                                delimiters: settings.katexDelimiters,
+                                noHighlight: settings.noHighlight,
                                 sanitize: true,
                                 katex: settings.katex
                             });
@@ -1851,7 +1976,8 @@ class Flow {
                         } else if (settings.type === Flow.markdownInputType) {
                             settings.markdown = text;
                             renderMarkdown(settings.markdownElement, text, {
-                                options: { delimiters: settings.katexDelimiters },
+                                delimiters: settings.katexDelimiters,
+                                noHighlight: settings.noHighlight,
                                 sanitize: true,
                                 katex: settings.katex
                             });
@@ -1882,20 +2008,20 @@ class Flow {
             Flow.postSuccessResponse(e, result);
         } catch(error) {
             console.log(error.stack);
-            Flow.postErrorResponse(e, error.message);
+            Flow.postErrorResponse(e, "chat_error");
         }
     }
 
     static async onSetProgressRequest(event) {
         const e = event;
         Flow.showProgress();
-        Flow.setProgress(e.data.content);
+        Flow.setProgress(e.content);
         Flow.postSuccessResponse(e);
     }
 
     static async onSetStatusRequest(event) {
         const e = event;
-        Flow.setStatus(e.data.content);
+        Flow.setStatus(e.content);
         Flow.postSuccessResponse(e);
     }
 
@@ -2095,46 +2221,107 @@ class Flow {
 
     static openStarDialog() {
         const page = Flow.getPage();
+        const isLinked = getPathFromHash() == 'external' && linkedPages.has(url);
+
         Flow.starData.name = page.name ?? '';
         Flow.starData.link = page.link ?? '';
         Flow.starData.hasChanged = false;
 
+        Flow.starData.linkedCheckbox.checked = isLinked;
+
         Flow.starData.nameInputElement.value = Flow.starData.name;
         Flow.starData.linkInputElement.value = Flow.starData.link;
+        if (isLinked) Flow.starData.linkInputElement.classList.add('hide');
+        else Flow.starData.linkInputElement.classList.remove('hide');
+        Flow.starData.urlInputElement.value = Flow.urlEditorElement.textContent;
+        if (isLinked) Flow.starData.urlInputElement.classList.remove('hide');
+        else Flow.starData.urlInputElement.classList.add('hide');
+
+        if (getPathFromHash() == 'extern') {
+            Flow.starData.toggleBar.checked = false;
+            Flow.starData.toggleBar.classList.remove('hide');
+        } else {
+            Flow.starData.toggleBar.classList.add('hide');
+        }
+
+        Flow.updateSaveButton();
 
         Flow.starDialog.classList.remove('hide');
     }
 
     static saveStarSettings() {
         const page = Flow.getPage();
-        if (page.link) {
-            if (Flow.starData.link.trim() == '') {
-                // Delete bookmark
-                deleteLocalPage(page.link);
-                openPage();
+        const name = getPathFromHash();
+        const url = Flow.urlEditorElement.textContent;
+        const isLinked = name == 'external' && linkedPages.has(url);
+        const linked = Flow.starData.linkedCheckbox.checked;
+        if (linked) {
+            const newUrl = Flow.starData.urlInputElement.value;
+            if (isLinked && newUrl.trim() == '') {
+                deleteLinkedPage(url);
             } else {
-                // Move bookmark
-                page.name = Flow.starData.name;
-                moveLocalPage(page, Flow.starData.link);
-                openPage(Flow.starData.link);
+                addLinkedPage(Flow.starData.name, newUrl);
+                openPage('extern?url=' + newUrl);
             }
         } else {
-            if (Flow.starData.link.trim() != '') {
-                // Add bookmark
-                addLocalPage(Flow.starData.name, Flow.starData.link, page.code);
+            if (!defaultPages.has(name)) {
+                if (Flow.starData.link.trim() == '') {
+                    // Delete bookmark
+                    deleteLocalPage(page);
+                    openPage();
+                } else {
+                    // Move bookmark
+                    page.name = Flow.starData.name;
+                    moveLocalPage(page, Flow.starData.link);
+                    openPage(Flow.starData.link);
+                }
+            } else {
+                if (Flow.starData.link.trim() != '') {
+                    // Add bookmark
+                    addLocalPage(Flow.starData.name, Flow.starData.link, page.code);
+                }
             }
         }
+
         Flow.closeStarDialog();
     }
 
     static updateSaveButton() {
         const page = Flow.getPage();
-        if (Flow.starData.link == page.link && Flow.starData.name == page.name) {
-            Flow.starData.saveButton.setAttribute('disabled', '');
-            Flow.starData.saveButton.setAttribute('tooltip', 'No changes');
-        } else {
+        const name = getPathFromHash();
+        const linked = Flow.starData.linkedCheckbox.checked;
+        
+        function enableSave() {
             Flow.starData.saveButton.removeAttribute('disabled');
             Flow.starData.saveButton.setAttribute('tooltip', 'Save changes');
+        }
+
+        function disableSave() {
+            Flow.starData.saveButton.setAttribute('disabled', '');
+            Flow.starData.saveButton.setAttribute('tooltip', 'No changes');
+        }
+
+        if (name == 'extern') {
+            if (linked) {
+                const newUrl = Flow.starData.urlInputElement.value;
+                if (linkedPages.has(newUrl) && Flow.starData.name == linkedPages.get(newUrl).name) {
+                    disableSave();
+                } else {
+                    enableSave();
+                }
+            } else {
+                if (Flow.starData.link.trim() == '') {
+                    disableSave();
+                } else {
+                    enableSave();
+                }
+            }
+        } else {
+            if ((Flow.starData.link == page.link && Flow.starData.name == page.name) || (name == 'flow' && Flow.starData.link.trim() == '')) {
+                disableSave();
+            } else {
+                enableSave();
+            }
         }
     }
 
@@ -2150,17 +2337,45 @@ class Flow {
         element.appendChild(hb(7));
 
         // Star settings
-        Flow.starData = {};
+        const starData = Flow.starData = {};
         const settingsElement = fromHTML(`<div class="listHorizontal">`);
         const fileNameElement = fromHTML(`<div>`);
         fileNameElement.textContent = 'Bookmark As:';
         settingsElement.appendChild(fileNameElement);
+
+        // Toggle bar
+        const toggleBar = fromHTML(`<div class="listHorizontal">`);
+        starData.toggleBar = toggleBar;
+        const label = fromHTML(`<div>Link to External Url`);
+        label.setAttribute('tooltip', `If checked, the script will be saved in a linked state, meaning you can't change it. In return, it is always updated to the latest version.`);
+        toggleBar.appendChild(label);
+        const linkedCheckbox = fromHTML(`<input type="checkbox">`);
+        starData.linkedCheckbox = linkedCheckbox;
+        toggleBar.appendChild(linkedCheckbox);
+        element.appendChild(toggleBar);
+
+        // Name, url and link inputs
         const nameInputElement = fromHTML(`<input type="text" tooltip="Enter name. Discarded if link is empty." placeholder="Enter name here...">`);
+        starData.nameInputElement = nameInputElement;
         settingsElement.appendChild(nameInputElement);
         const linkInputElement = fromHTML(`<input type="text" placeholder="Enter link here...">`);
+        starData.linkInputElement = linkInputElement;
         const linkInputTooltip = `Enter link. An empty link will delete the bookmark. Please export code to json before deleting a bookmark. ` +
             `Using an existing link will override the existing one.`;
         linkInputElement.setAttribute('tooltip', linkInputTooltip);
+        const urlInputElement = fromHTML(`<input type="text" tooltip="Enter an external url." class="hide" placeholder="Enter url here...">`);
+        starData.urlInputElement = urlInputElement;
+        linkedCheckbox.addEventListener('input', e => {
+            if (linkedCheckbox.checked) {
+                linkInputElement.classList.add('hide');
+                urlInputElement.classList.remove('hide');
+            } else {
+                linkInputElement.classList.remove('hide');
+                urlInputElement.classList.add('hide');
+            }
+
+            Flow.updateSaveButton();
+        });
 
         nameInputElement.addEventListener('input', e => {
             Flow.starData.name = e.srcElement.value;
@@ -2185,10 +2400,10 @@ class Flow {
 
             Flow.updateSaveButton();
         });
-        Flow.starData.nameInputElement = nameInputElement;
-        Flow.starData.linkInputElement = linkInputElement;
+        urlInputElement.addEventListener('input', e => Flow.updateSaveButton());
 
         settingsElement.appendChild(linkInputElement);
+        settingsElement.appendChild(urlInputElement);
         element.appendChild(settingsElement);
         element.appendChild(hb(8));
 
@@ -2251,15 +2466,11 @@ window.addEventListener('load', e => Flow.setupDialogs());
 
 function getFlowPage() {
     const name = getPathFromHash();
-    let code;
-    let prompt;
-    if (name == 'flow') {
-        code = localStorage.getItem('lastCode') ?? "";
-        prompt = localStorage.getItem('lastPrompt') ?? "";
-    } else {
-        code = localPages.get(name).code;
-        prompt = localPages.get(name).prompt;
-    }
+    const page = Flow.getPage();
+    let code = page.code;
+    let prompt = page.prompt;
+    const url = getHashQueryVariable('url');
+    const isLinked = name == 'extern' && linkedPages.has(url);
 
     const elements = [];
 
@@ -2282,9 +2493,9 @@ function getFlowPage() {
     exportButton.appendChild(icons.download());
     leftBarList.appendChild(exportButton);
     const starButton = fromHTML(`<button class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
-    starButton.setAttribute('tooltip', name == 'flow' ? 'Bookmark for Easy Access' : 'Edit Bookmark');
+    starButton.setAttribute('tooltip', (defaultPages.has(name)) ? 'Bookmark for Easy Access' : 'Edit Bookmark');
     starButton.addEventListener('click', e => Flow.openStarDialog());
-    const starIcon = name == 'flow' ? icons.star() : icons.starFilled();
+    const starIcon = (defaultPages.has(name) && !isLinked) ? icons.star() : icons.starFilled();
     starButton.appendChild(starIcon);
     leftBarList.appendChild(starButton);
     if (!locked) {
@@ -2300,6 +2511,7 @@ function getFlowPage() {
     leftBarList.appendChild(runButton);
     elements.push(hb(7));
 
+    // Progress and status
     sticky.appendChild(bar);
     sticky.appendChild(hb(2));
     const progressBar = fromHTML(`<progress value="0" max="100" class="w-100 hide">`);
@@ -2308,6 +2520,8 @@ function getFlowPage() {
     const status = fromHTML(`<div class="info indented">Not running...`);
     Flow.statusElement = status;
     sticky.appendChild(status);
+
+    // Sticky output
     const stickyOutputContainer = fromHTML(`<div>`);
     stickyOutputContainer.appendChild(hb(2));
     const stickyOutputElement = fromHTML(`<div>`);
@@ -2320,8 +2534,43 @@ function getFlowPage() {
     elements.push(hb(7));
 
     if (mode == Flow.editMode) {
+        // Extern url bar
+        const urlEditorContainer = fromHTML(`<div class="contenteditableContainer">`);
+        if (name != 'extern') urlEditorContainer.classList.add('hide');
+        const urlEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter url here...">`);
+        const newUrl = url ?? localStorage.getItem('externUrl');
+        urlEditor.textContent = newUrl;
+        urlEditor.setAttribute('spellcheck', false);
+        urlEditor.addEventListener('input', e => Flow.updateUrl(urlEditor.textContent));
+        urlEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
+        Flow.urlEditorElement = urlEditor;
+        urlEditorContainer.appendChild(urlEditor);
+        Flow.urlEditorContainerElement = urlEditorContainer;
+        elements.push(urlEditorContainer);
+        if (name != 'extern') elements.push(hb(2));
+        const externTopList = fromHTML(`<div class="listContainerHorizontal">`);
+        externTopList.appendChild(fromHTML(`<div>`));
+        const rightExternTopList = fromHTML(`<div class="listHorizontal">`);
+
+        // Load extern page button
+        const loadButton = fromHTML(`<button class="largeElement complexButton">`);
+        if (name != 'extern') loadButton.classList.add('hide');
+        Flow.loadScriptButton = loadButton;
+        const loadButtonList = fromHTML(`<div class="listHorizontal">`);
+        const loadIcon = icons.download();
+        loadIcon.classList.add('smallIcon');
+        loadButtonList.appendChild(loadIcon);
+        const loadButtonTextElement = fromHTML(`<div>Load Script`);
+        loadButtonList.appendChild(loadButtonTextElement);
+        loadButton.appendChild(loadButtonList);
+        loadButton.addEventListener('click', e => Flow.loadScript());
+        rightExternTopList.appendChild(loadButton);
+        externTopList.appendChild(rightExternTopList);
+        elements.push(externTopList);
+
         // Code editor
         const codeEditorContainer = fromHTML(`<pre class="contenteditableContainer">`);
+        if (name == 'extern') codeEditorContainer.classList.add('hide');
         const codeEditor = fromHTML(`<code contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter code here...">`);
         codeEditor.setAttribute('spellcheck', false);
         codeEditor.textContent = code;
@@ -2333,13 +2582,27 @@ function getFlowPage() {
         elements.push(codeEditorContainer);
 
         // Stream target
-        const streamTargetElement = fromHTML(`<div class="largeElement bordered fixText hide">`);
+        const streamContainerElement = fromHTML(`<pre class="largeElement bordered hide">`);
+        Flow.streamContainerElement = streamContainerElement;
+        const streamTargetElement = fromHTML(`<code class="fixText" placeholder="Loading...">`);
         Flow.streamTargetElement = streamTargetElement;
-        elements.push(streamTargetElement);
+        streamContainerElement.appendChild(streamTargetElement);
+        elements.push(streamContainerElement);
         elements.push(hb(7));
+
+        // Extern target
+        const externCode = Flow.loadedExternPage?.url == newUrl ? Flow.loadedExternPage.code : '';
+        const externContainerElement = CodeHelpers.createCodeElement(externCode, "javascript");
+        if (name != 'extern' || Flow.loadedExternPage?.url != newUrl) externContainerElement.classList.add('hide');
+        Flow.externContainerElement = externContainerElement;
+        const externTargetElement = externContainerElement.querySelector('code');
+        Flow.externTargetElement = externTargetElement;
+        elements.push(externContainerElement);
+        if (name == 'extern') elements.push(hb(7));
 
         // Prompt editor
         const promptEditorContainer = fromHTML(`<div class="contenteditableContainer">`);
+        if (name == 'extern') promptEditorContainer.classList.add('hide');
         //promptEditorContainer.addEventListener('click', e => Flow.promptEditor.focus()); // removed because doesn't move tabIndex to closest.
         const promptEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter prompt here...">`);
         promptEditor.textContent = prompt;
@@ -2393,6 +2656,7 @@ function getFlowPage() {
         promptEditorContainer.appendChild(footer);
         elements.push(promptEditorContainer);
     } else {
+        // Output container
         const outputContainer = fromHTML(`<div class="divList gap-4">`);
         Flow.outputElement = outputContainer;
         outputContainer.textContent = Flow.noOutputMessage;

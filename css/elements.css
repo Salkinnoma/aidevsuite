@@ -36,7 +36,7 @@
     background: var(--background-color);
 }
 
-.interactive {
+.interactive:not(:disabled) {
     cursor: pointer;
 }
 

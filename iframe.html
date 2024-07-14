@@ -5,47 +5,69 @@
 </head>
 <body>
 <script>
-    //const allowedOrigin = window.location.origin; // Doesn't work because script is sandboxed with different origin (null)
+    const allowedOrigin = window.location.origin;
     let worker;
-    let lastObjectUrl = "";
+    let lastObjectUrl = null;
+    let workerBlobUrls = [];
+    const originSource = "origin";
+    const iframeSource = "iframe";
+    const workerSource = "worker";
 
 
-    function postParentMessage(message) {
-        window.parent.postMessage(message, '*');
+    function postOriginMessage(message, source = iframeSource) {
+        window.parent.postMessage({message, source}, '*');
     }
 
-    function postWorkerMessage(message) {
+    function postOriginResponse(requestEvent, message) {
+        window.parent.postMessage({id: requestEvent.data.id, response: true, message, source: iframeSource}, '*');
+    }
+
+    function postWorkerMessage(message, source = iframeSource) {
         if (worker == null) return;
-        worker.postMessage(message);
+        worker.postMessage({message, source});
     }
 
     function destroyWorker() {
         if (worker == null) return;
-            worker.terminate();
-            worker = null;
+        worker.terminate();
+        worker = null;
     }
 
     window.addEventListener('message', async (event) => {
-        if (event.data.loadWorker != null) {
+        if (event.origin != allowedOrigin || event.data.source != 'origin') return;
+        const data = event.data.message;
+
+        if (data.loadWorker != null) {
             if (worker != null) destroyWorker();
 
+            // Clear old data
             if (lastObjectUrl != null) URL.revokeObjectURL(lastObjectUrl);
-            const blobUrl = window.URL.createObjectURL(
-                new Blob([event.data.loadWorker])
+            workerBlobUrls.forEach(url => URL.revokeObjectURL(lastObjectUrl));
+            workerBlobUrls = [];
+
+            // Create the worker from script
+            lastObjectUrl = URL.createObjectURL(
+                new Blob([data.loadWorker])
             );
-            worker = new Worker(blobUrl);
+            worker = new Worker(lastObjectUrl);
             worker.onmessage = (e) => {
-                postParentMessage({workerData: e.data});
+                postOriginMessage(e.data, workerSource);
+
+                if (e.data.type == 'url') {
+                    workerBlobUrls.push(e.data.content);
+                }
             };
-            postParentMessage('Worker created');
-        } else if (event.data.command === 'terminateWorker') {
+            postOriginResponse(event, 'Worker created');
+        } else if (data.command === 'terminateWorker') {
             destroyWorker();
-        } else if (event.data.workerCommand) {
-            postWorkerMessage(event.data.workerCommand);
+            postOriginResponse(event, 'Worker destroyed');
+        } else if (data.workerCommand) {
+            postWorkerMessage(data.workerCommand, event.data.source);
+            postOriginResponse(event, 'Worker message relayed from ' + event.data.source);
         }
     });
 
-    postParentMessage('worker-loaded');
+    postOriginMessage('worker-loaded');
 </script>
 </body>
 </html>

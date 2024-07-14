@@ -67,5 +67,7 @@ class CodeHelpers {
 }
 
 function highlightCode(codeElement) {
+    codeElement.removeAttribute('data-highlighted');
+    codeElement.classList.remove('hljs');
     hljs.highlightElement(codeElement);
 }

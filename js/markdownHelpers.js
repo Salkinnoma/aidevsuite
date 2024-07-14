@@ -20,6 +20,36 @@ class MarkdownHelpers {
 
     static escapeMarkdownRegex = new RegExp(`${Object.keys(MarkdownHelpers.escapeMarkdownChars).map(k => escapeRegex(k)).join('|')}`, 'g');
 
+    static highlightExtensionEnabled = true;
+    static highlightExtension = {
+        name: 'highlight',
+        level: 'inline',
+        start(src) { return src.match(/==/)?.index; },
+        tokenizer(src, tokens) {
+            console.log(MarkdownHelpers.highlightExtensionEnabled);
+            if (!MarkdownHelpers.highlightExtensionEnabled) return;
+            const rule = /^==([^=]+)==/;  // Regex to match the custom highlight syntax
+            const match = rule.exec(src);
+            if (match) {
+                return {
+                type: 'highlight',
+                raw: match[0],
+                text: match[1].trim(),
+                tokens: this.lexer.inlineTokens(match[1].trim()) // Parse internal inline tokens
+                };
+            }
+        },
+        renderer(token) {
+            return `<mark>${this.parser.parseInline(token.tokens)}</mark>`;
+        },
+        childTokens: ['tokens']
+    };
+
+    static setup() {
+        // Use the extension with Marked
+        marked.use({ extensions: [MarkdownHelpers.highlightExtension] });
+    }
+
     static adjustMarkedOuput(...elements) {
         for (let element of elements) {
             if (element.nodeType != Node.ELEMENT_NODE) continue;
@@ -77,6 +107,8 @@ class MarkdownHelpers {
     }
 }
 
+window.addEventListener('load', e => MarkdownHelpers.setup());
+
 function escapeMarkdown(text) {
     return text.replace(MarkdownHelpers.escapeMarkdownRegex, (match) => MarkdownHelpers.escapeMarkdownChars[match]);
 }
@@ -85,21 +117,27 @@ function escapeMarkdown(text) {
  * the `options` parameter can have the following properties:
  *   - **katex** (bool) [optional]: Whether to render katex. Default is `true`.
  *   - **sanitize** (bool) [optional]: Whether to sanitize the markdown html. Defaults is `false`.
+ *   - **noHighlight** (bool) [optional]: Whether custom `==highlighted text==` syntax is disallowed. Defaults is `false`.
  */
 function renderMarkdown(element, markdown, options = null) {
     options ??= {};
     options.katex ??= true;
 
+    // Escape math
     if (options.katex) markdown = KatexHelpers.escapeMathFromMarkdown(markdown);
-
+    if (options.noHighlight) MarkdownHelpers.highlightExtensionEnabled = false;
+    else MarkdownHelpers.highlightExtensionEnabled = true;
+    // Render markdown
     let html = marked.parse(markdown);
     if (!html) {
         element.innerHTML = '';
         return;
     }
 
+    // Sanitize markdown html output
     if (options.sanitize) html = sanitizeHtml(html);
 
+    // Render math
     const children = fromHTML(html, false);
     MarkdownHelpers.adjustMarkedOuput(...children);
     for (let child of children) {

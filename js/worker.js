@@ -8,10 +8,12 @@ const errorStatus = 'errorStatus';
 // Event types
 const logEventType = "logEventType";
 const evalEventType = "evalEventType";
+const loadEventType = "loadEventType";
 const showEventType = "showEventType";
 const readEventType = "readEventType";
 const updateEventType = "updateEventType";
 const removeEventType = "removeEventType";
+const acceptEventType = "acceptEventType";
 const validateInputEventType = "validateInputEventType";
 const delayedValidateInputEventType = "delayedValidateInputEventType";
 const clickEventType = "clickEventType";
@@ -21,6 +23,7 @@ const fileDownloadEventType = "fileDownloadEventType";
 const dataURLDownloadEventType = "dataURLDownloadEventType";
 const setProgressEventType = "setProgressEventType";
 const setStatusEventType = "setStatusEventType";
+const storageEventType = "storageEventType";
 
 // Element types
 const breakType = "breakType";
@@ -133,22 +136,27 @@ function generateUniqueId() {
     return Date.now() + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
 }
 
+// If you use buttons with `noAccept`, there's a very high chance you will want to await this at the end of your script.
 async function forever() {
     await new Promise(() => {});
-    console.log('This will never run!');
+    log('This will never run!');
 }
 
 // Event logic to communicate with origin
 function postRequest(type, content, id = null, pingId = null, pingSourceEvent = null) {
-    postMessage({id, pingId, pingSourceId: pingSourceEvent?.data.pingId, type, content});
+    postMessage({ id, pingId, pingSourceId: pingSourceEvent?.pingId, type, content });
 }
 
 function postSuccessResponse(requestEvent, content = null, message = null) {
-    postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: successStatus, content, message });
+    postMessage({ id:requestEvent.id, type: requestEvent.type, response: true, status: successStatus, content, message });
 }
 
 function postErrorResponse(requestEvent, message, content = null) {
-    postMessage({ id:requestEvent.data.id, type: requestEvent.data.type, response: true, status: errorStatus, content, message });
+    postMessage({ id:requestEvent.id, type: requestEvent.type, response: true, status: errorStatus, content, message });
+}
+
+function postIFrameMessage(type, content) {
+    postMessage({ iframe: true, type, content });
 }
 
 function requireResponse(type, content, onPing = null, pingSourceEvent = null){
@@ -159,11 +167,10 @@ function requireResponse(type, content, onPing = null, pingSourceEvent = null){
             pingId = generateUniqueId();
             onPingEvent.set(pingId, async (event) => {
                 try {
-                    // Important: Your code will be evaluated in here. The moment it ends, the worker will be terminated and callbacks cease to work. To never terminate, await `forever` at the end of the script.
-                    const result = await onPing(event.data.content, event);
+                    const result = await onPing(event.content, event);
                     postSuccessResponse(event, result);
                 } catch (e) {
-                    postErrorResponse(event, e.stack);
+                    postErrorResponse(event, e);
                 }
             });
         }
@@ -172,11 +179,30 @@ function requireResponse(type, content, onPing = null, pingSourceEvent = null){
             onEvent.delete(id);
             if (pingId != null) onPingEvent.delete(pingId);
 
-            if (event.data.status === errorStatus) reject(event.data.message);
-            else resolve(event.data.content);
+            if (event.status === errorStatus) reject(new Error(event.message));
+            else resolve(event.content);
         });
 
         postRequest(type, content, id, pingId, pingSourceEvent);
+    });
+}
+
+function createObjectUrl(object, options) {
+    const blob = new Blob([object], options);
+    const blobUrl = URL.createObjectURL(blob);
+    postIFrameMessage('url', blobUrl);
+    return blobUrl;
+}
+
+const __importCallbacks = new Map();
+const __importErrorCallbacks = new Map();
+function importCode(code) {
+    return new Promise((resolve, reject) => {
+        const id = generateUniqueId();
+        const blobUrl = createObjectUrl(`async function _____outerImportWrapper_____() {async function _____importWrapper_____() {\n\n\n/* Script starts here */\n${code}\n/* Script ends here */\n\n\n}\ntry{\nawait _____importWrapper_____();\n__importCallbacks.get("${id}")();}\ncatch(e) {\n__importErrorCallbacks.get("${id}")(e);\n}\n}\n_____outerImportWrapper_____();`, {type: commonMimeTypes.javascript});
+        __importCallbacks.set(id, () => resolve());
+        __importErrorCallbacks.set(id, e => reject(e));
+        importScripts(blobUrl); // Evaluate the incoming code
     });
 }
 
@@ -185,27 +211,38 @@ async function log(...data) {
 }
 
 async function onEvalRequest(e){
-    const result = await eval("(async () => {" + e.data.content.code + "})()");  // Evaluate the incoming code
-    const content = result;
-    postSuccessResponse(e, content);
+    // Important: Your code will be evaluated in here. The moment it ends, the worker will be terminated and callbacks like button `onClick` cease to work. To never terminate, await `forever` at the end of the script.
+    await importCode(e.content.code);
+    postSuccessResponse(e);
 }
 
 onmessage = async function(e){
-    if (e.data.type !== logEventType) await log("Origin Message Received:", e.data);
+    if (e.data.source != 'origin') return;
+
+    const data = e.data.message;
+    if (data.type !== logEventType) await log("Origin Message Received:", data);
 
     try {
-        if (onEvent.has(e.data.id)) {
-            onEvent.get(e.data.id)(e);
-        } else if (onPingEvent.has(e.data.pingSourceId)) {
-            onPingEvent.get(e.data.pingSourceId)(e);
-        } else if (e.data.type === evalEventType) {
-            onEvalRequest(e);
+        if (onEvent.has(data.id)) {
+            onEvent.get(data.id)(data);
+        } else if (onPingEvent.has(data.pingSourceId)) {
+            onPingEvent.get(data.pingSourceId)(data);
+        } else if (data.type === evalEventType) {
+            await onEvalRequest(data);
         }
     } catch (error) {
-        postErrorResponse(e, error.stack);
+        postErrorResponse(data, error);
+        throw error;
     }
 };
 
+/**
+ * Load and execute a script from a url.
+ */
+async function load(url) {
+    const result = await requireResponse(loadEventType, url);
+    return await importCode(result);
+}
 
 /**
  * Create elements using various create functions. The `options` parameter of any elements can additionally take the following properties:
@@ -528,7 +565,7 @@ function _mapGroup(group) {
  * - **group** (array): The group parameter accepts an array of elements created via any of the create functions. For inputs, it is recommended to define a name, to allow easy access of the return values.
  * - **options** (object) [optional]: An object that can have the following properties:
  *     - **name** (string) [optional]: This is necessary for the `update`, `remove` and some other functions that require a group name functions.
- *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If an input can be accepted multiple times, set this to `true` and add custom logic that uses the `read` function to read the input values upon a click on a custom button. Default is `false`.
+ *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If you add your own custom button to accept input, you must set this to true! If an input can be accepted multiple times, set this to `true` and add custom logic that uses the `read` function to read the input values upon a click on a custom button. Default is `false`.
  *     - **bordered** (number) [optional]: Whether the group should be bordered. Default is `false`.
  *     - **location** (string) [optional]: The location of the group. Default is `mainLocation`. The following values are supported:
  *         - `mainLocation`: The default location.
@@ -631,7 +668,7 @@ async function showGroup(group, options) {
  * - **password** (string): The password value of the input.
  *
  * ### For `checkboxInputType`
- * - **ticked** (bool): Whether the checkbox was ticked.
+ * - **checked** (bool): Whether the checkbox was checked.
  * 
  * ### For `selectInputType`
  * - **value** (string): The selected value.
@@ -689,13 +726,14 @@ async function readGroup(groupName) {
 
 /**
  * - **groupName** (string): The name of the group to update.
- * - **elementName** (string): The name of the element to update. You cannot update accepted inputs (after awaiting return value).
+ * - **elementName** (string): The name of the element to update. If null, it will be set to `groupName`. You cannot update accepted inputs (after awaiting return value).
  * - **properties** (object): An object that contains the properties to update. The following properties are available:
  *     - All properties passed into any of the create functions, except `type`, `options`, any child element properties and any of the callback functions.
  *     - All properties of the `options` property, except `defaultValue` and any of the callback functions.
  *     - All return value properties from inputs.
  */
 async function update(groupName, elementName, properties) {
+    elementName ??= groupName;
     await requireResponse(updateEventType, {groupName, elementName, properties});
 }
 
@@ -705,6 +743,13 @@ async function update(groupName, elementName, properties) {
  */
 async function remove(groupName = null, elementName = null) {
     await requireResponse(removeEventType, {groupName, elementName});
+}
+
+/**
+ * - **groupName** (string) [optional]: The name of the group to accept input from. This is only useful if `noAccept == true`. If null, all inputs across all groups will be accepted instead.
+ */
+async function accept(groupName = null) {
+    await requireResponse(acceptEventType, {groupName});
 }
 
 /**
@@ -772,6 +817,35 @@ async function setStatus(status) {
     return await requireResponse(setStatusEventType, status);
 }
 
+// Storage that persists across sessions. Useful for inputs that become repetitive for the user.
+class Storage {
+    // Returns false if the script doesn't have access to a storage.
+    static async exists() {
+        await requireResponse(storageEventType, {exists: true});
+    }
+
+    static async set(key, string) {
+        await requireResponse(storageEventType, {set: {key, value: string}});
+    }
+
+    // Returns null if the script doesn't have access to a storage.
+    static async get(key) {
+        return await requireResponse(storageEventType, {get: key});
+    }
+
+    static async delete(key) {
+        await requireResponse(storageEventType, {delete: key});
+    }
+
+    static async setObject(key, object) {
+        await this.set(key, JSON.stringify(object));
+    }
+
+    static async getObject(key) {
+        return JSON.parse(await get(key));
+    }
+}
+
 
 // Internal helper functions
 const _helpers = {
@@ -815,14 +889,36 @@ const _helpers = {
 _helpers.escapeHtmlRegex = _helpers.getEscapeHtmlRegex();
 
 // Extended helper functions
+async function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function clone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+}
+
 let commonMimeTypes = {
     plainText: "text/plain",
     json: "application/json",
     csv: "text/csv",
+    javascript: "text/javascript",
 }
 
 function escapeFileName(filename) {
     return filename.replace(/[^a-zA-Z0-9\.\- ]/g, "_");
+}
+
+function escapeFileNameMinimal(col) {
+    col = col.toLowerCase(); // Lowercase
+    col = col.replace(/[^a-z0-9_]/g, '_'); // Replace non-alphanumeric characters with an underscore
+    col = col.replace(/_+/g, '_'); // Replace multiple underscores with a single one
+    col = col.replace(/_$/, ''); // Remove trailing underscore
+
+    return col;
+}
+
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
 
 function escapeHTML(str) {
@@ -847,6 +943,31 @@ function unescapeHTML(str) {
             return entity;
         }
     });
+}
+
+const second = 1000;
+function seconds(seconds){
+    return second * seconds;
+}
+
+const minute = second * 60;
+function minutes(minutes){
+    return minute * minutes;
+}
+
+const hour = minute * 60;
+function hours(hours){
+    return hour * hours;
+}
+
+const day = hour * 24;
+function days(days){
+    return day * days;
+}
+
+const week = day * 24;
+function weeks(weeks){
+    return week * weeks;
 }
 
 const systemRole = "system";
@@ -958,35 +1079,32 @@ function extractCode(markdown, codeBlocksOnly = true) {
 }
 
 class Samples {
-    static async runSimpleChatBot() {
-        const promptInputName = "promptInputName";
-        let counter = 0;
-        const context = [];
+    static async runSimpleChatBot() { // Simple chatbot implementation. You can use this as reference or even directly call it in your code!
+        const promptInputName = "promptInputName"; // Define name of prompt input for easy reference
+        const context = []; // Define context to pass to chatbot
     
-        async function run() {
-            const prompt = (await read(promptInputName)).text;
-            context.push(toUserMessage(prompt));
+        async function run() { // Define run function to be called on chat button click
+            const prompt = (await read(promptInputName)).text; // Read text value of prompt input
+            context.push(toUserMessage(prompt)); // Add user prompt to chat context
     
-            const userMessageElement = createText(paragraphType, `User:\n${prompt}`, {bordered: true});
-            const assistantMessageElement = createMarkdown("", {name: counter});
-            await showGroup([userMessageElement, assistantMessageElement], {insertAt: counter, name: counter});
+            const userMessageElement = createText(paragraphType, `User:\n${prompt}`, {bordered: true}); // Add border to user message to make it easier for the user to see in the sea of messages
+            const assistantMessageElement = createMarkdown("", {name: context.length}); // Show assistant message in markdown to make it more appealing
+            await showGroup([userMessageElement, assistantMessageElement], {insertBefore: promptInputName, name: context.length}); // Insert with name equal to context length for later reference, and before prompt input, as that should stay at the bottom.
     
-            const result = await chat(context, {element: counter});
-            context.push(toAssistantMessage(result));
-    
-            counter++;
+            const result = await chat(context, {element: counter}); // We chat and stream to the element with name equal to context length
+            context.push(toAssistantMessage(result)); // Save assistant response to chat context
         }
     
-        await setStatus("Ready to chat");
+        await setStatus("Ready to chat"); // Set status as flavor
          // Show input box for the user to enter their prompt
-        const inputElement = createInput(textInputType, {
-            name: promptInputName,
-            placeholder: "Enter your prompt here...",
+        const inputElement = createInput(textInputType, { // Add text input to allow user to input their prompt
+            name: promptInputName, // Add name for later reference
+            placeholder: "Enter your prompt here...", // Add placeholder to better communicate with the user
         });
-        show(inputElement, {noAccept: true}); // No await here
-        const button = createContainer(buttonType, createText(paragraphType, "Chat"), {onClick:run});    
-        const wrapper = createFloatRightWrapper(button);
-        await show(wrapper);
-        // Continues to run in the background
+        await show(inputElement, {noAccept: true}); // Show the input without an accept button, so we can reuse it.
+        const button = createContainer(buttonType, createText(paragraphType, "Chat"), {onClick:run}); // Button that calls run() on click
+        const wrapper = createFloatRightWrapper(button); // Make chat button float to the right
+        await show(wrapper); // Show the button
+        // Continues to run in the background until the script finishes running. To stop the script from finishing, await `forever` at the end of your script.
     }
 }

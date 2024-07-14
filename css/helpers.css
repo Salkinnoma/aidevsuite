@@ -32,18 +32,6 @@
     overflow: auto;
 }
 
-.brand-text {
-    color: var(--brand-color);
-}
-  
-.danger-text {
-    color: var(--danger-color);
-}
-  
-.success-text {
-    color: var(--success-color);
-}
-
 .unselectable {
     user-select: none;
     -webkit-user-select: none; /* Safari */
@@ -199,4 +187,17 @@ b {
 
 .maxHeight-8 {
     max-height: 800px;
+}
+
+
+.brand-text {
+    color: var(--brand-color);
+}
+  
+.danger-text {
+    color: var(--danger-color);
+}
+  
+.success-text {
+    color: var(--success-color);
 }
