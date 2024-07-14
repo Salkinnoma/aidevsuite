@@ -36,9 +36,10 @@ function saveLocalPages() {
     updatePagesSidebar();
 }
 
-function addLocalPage(name, link, code, prompt = null) {
+function addLocalPage(name, link, code, options = null) {
     if (defaultPages.has(link)) return;
 
+    options ??= {};
     if (link.trim() == '') {
         Flow.updateDefaultCode(code);
         return;
@@ -52,7 +53,11 @@ function addLocalPage(name, link, code, prompt = null) {
         id = generateUniqueId();
     } while (ids.has(id));
 
-    localPages.set(link, {name, link, code, prompt, securityId, id});
+    localPages.set(link, {
+        securityId, id, name, link, code,
+        prompt: options.prompt,
+        autoRun: options.autoRun,
+    });
     saveLocalPages();
 }
 
@@ -76,7 +81,7 @@ function deleteLocalPage(page) {
 }
 
 function moveLocalPage(page, newLink) {
-    addLocalPage(page.name, newLink, page.code, page.prompt);
+    addLocalPage(page.name, newLink, page.code, page);
     deleteLocalPage(page);
     saveLocalPages();
 }
@@ -120,8 +125,12 @@ function saveLinkedPages() {
     updatePagesSidebar();
 }
 
-function addLinkedPage(name, url) {
-    linkedPages.set(url, {name, link: url});
+function addLinkedPage(name, url, options = null) {
+    options ??= {};
+    linkedPages.set(url, {
+        name, link: url,
+        autoRun: options.autoRun,
+    });
     saveLinkedPages();
 }
 
@@ -144,20 +153,46 @@ function getValidHashUrls(){
 }
 
 function updatePagesSidebar() {
-    const link = getPathFromHash();
+    const name = getPathFromHash();
     const url = getHashQueryVariable('url');
 
     // Local pages
     const localPagesList = document.getElementById('localPagesList');
     localPagesList.innerHTML = '';
-    localPages.values().forEach(p => localPagesList.appendChild(fromHTML(`<a class="element sidebarElement hoverable" href="#${escapeHTML(p.link)}" ${p.link == link ? 'title="You are here. F5 to reload." disabled' : ''}>${escapeHTML(p.name)}</a>`)));
+    localPages.values().forEach(p => {
+        let link = '#' + p.link;
+        if (p.autoRun) link += '?mode=run';
+
+        const element = fromHTML(`<a class="element sidebarElement hoverable">`);
+        element.textContent = p.name;
+        element.setAttribute('href', link);
+        if (p.link == name) {
+            element.setAttribute('title', "You are here. F5 to reload.");
+            element.setAttribute('disabled', '');
+        }
+
+        localPagesList.appendChild(element)
+    });
     if (localPages.size == 0) localPagesList.classList.add('hide');
     else localPagesList.classList.remove('hide');
 
     // Linked pages
     const linkedPagesList = document.getElementById('linkedPagesList');
     linkedPagesList.innerHTML = '';
-    linkedPages.values().forEach(p => linkedPagesList.appendChild(fromHTML(`<a class="element sidebarElement hoverable" href="#extern?url=${escapeHTML(p.link)}" ${p.link == url ? 'title="You are here. F5 to reload." disabled' : ''}>${escapeHTML(p.name)}</a>`)));
+    linkedPages.values().forEach(p => {
+        let link = '#extern?url=' + p.link;
+        if (p.autoRun) link += '&mode=run';
+
+        const element = fromHTML(`<a class="element sidebarElement hoverable">`);
+        element.textContent = p.name;
+        element.setAttribute('href', link);
+        if (p.link == getHashQueryVariable('url')) {
+            element.setAttribute('title', "You are here. F5 to reload.");
+            element.setAttribute('disabled', '');
+        }
+
+        linkedPagesList.appendChild(element)
+    });
     if (linkedPages.size == 0) linkedPagesList.classList.add('hide');
     else linkedPagesList.classList.remove('hide');
 }

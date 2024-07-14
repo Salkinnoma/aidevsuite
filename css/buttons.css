@@ -6,6 +6,10 @@ button, .fakeButton {
     color: inherit;
     padding: 0;
     font-size: 1rem;
+    user-select: none;
+    -webkit-user-select: none; /* Safari */
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* IE10+/Edge */
 }
 
 .complexButton {

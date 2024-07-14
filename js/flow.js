@@ -2015,7 +2015,7 @@ class Flow {
             if (fileInfo.starred) {
                 addLocalPage(fileInfo.item.name, fileInfo.item.link, fileInfo.item.code);
             } else {
-                // Unstarring input is disabled
+                // Empty because unstarring input is currently not in development
             }
         }
         Flow.closeImportDialog();
@@ -2206,27 +2206,30 @@ class Flow {
 
     static openStarDialog() {
         const page = Flow.getPage();
-        const isLinked = getPathFromHash() == 'external' && linkedPages.has(url);
+        const url = getHashQueryVariable('url');
+        const isLinked = getPathFromHash() == 'extern' && linkedPages.has(url);
+        const linkedPage = linkedPages.get(url);
 
-        Flow.starData.name = page.name ?? '';
+        Flow.starData.name = isLinked ? linkedPage.name : page.name ?? '';
         Flow.starData.link = page.link ?? '';
         Flow.starData.hasChanged = false;
 
         Flow.starData.linkedCheckbox.checked = isLinked;
+        Flow.starData.autoRunCheckbox.checked = isLinked ? linkedPage.autoRun : !!page.autoRun;
 
         Flow.starData.nameInputElement.value = Flow.starData.name;
         Flow.starData.linkInputElement.value = Flow.starData.link;
         if (isLinked) Flow.starData.linkInputElement.classList.add('hide');
         else Flow.starData.linkInputElement.classList.remove('hide');
-        Flow.starData.urlInputElement.value = Flow.urlEditorElement.textContent;
+        Flow.starData.urlInputElement.value = getHashQueryVariable('url');
         if (isLinked) Flow.starData.urlInputElement.classList.remove('hide');
         else Flow.starData.urlInputElement.classList.add('hide');
 
         if (getPathFromHash() == 'extern') {
-            Flow.starData.toggleBar.checked = false;
-            Flow.starData.toggleBar.classList.remove('hide');
+            Flow.starData.linkedToggleBar.checked = false;
+            Flow.starData.linkedToggleBar.classList.remove('hide');
         } else {
-            Flow.starData.toggleBar.classList.add('hide');
+            Flow.starData.linkedToggleBar.classList.add('hide');
         }
 
         Flow.updateSaveButton();
@@ -2237,16 +2240,16 @@ class Flow {
     static saveStarSettings() {
         const page = Flow.getPage();
         const name = getPathFromHash();
-        const url = Flow.urlEditorElement.textContent;
-        const isLinked = name == 'external' && linkedPages.has(url);
+        const url = getHashQueryVariable('url');
+        const isLinked = name == 'extern' && linkedPages.has(url);
         const linked = Flow.starData.linkedCheckbox.checked;
+        const autoRun = Flow.starData.autoRunCheckbox.checked;
         if (linked) {
-            const newUrl = Flow.starData.urlInputElement.value;
-            if (isLinked && newUrl.trim() == '') {
+            if (isLinked && url.trim() == '') {
                 deleteLinkedPage(url);
             } else {
-                addLinkedPage(Flow.starData.name, newUrl);
-                openPage('extern?url=' + newUrl);
+                addLinkedPage(Flow.starData.name, url, {autoRun});
+                openPage('extern?url=' + url);
             }
         } else {
             if (!defaultPages.has(name)) {
@@ -2254,16 +2257,20 @@ class Flow {
                     // Delete bookmark
                     deleteLocalPage(page);
                     openPage();
+                } else if (Flow.starData.link == page.link) {
+                    page.autoRun = autoRun;
+                    updateLocalPage(page);
                 } else {
                     // Move bookmark
                     page.name = Flow.starData.name;
+                    page.autoRun = autoRun;
                     moveLocalPage(page, Flow.starData.link);
                     openPage(Flow.starData.link);
                 }
             } else {
                 if (Flow.starData.link.trim() != '') {
                     // Add bookmark
-                    addLocalPage(Flow.starData.name, Flow.starData.link, page.code);
+                    addLocalPage(Flow.starData.name, Flow.starData.link, page.code, {autoRun});
                 }
             }
         }
@@ -2275,6 +2282,7 @@ class Flow {
         const page = Flow.getPage();
         const name = getPathFromHash();
         const linked = Flow.starData.linkedCheckbox.checked;
+        const autoRun = Flow.starData.autoRunCheckbox.checked;
         
         function enableSave() {
             Flow.starData.saveButton.removeAttribute('disabled');
@@ -2288,8 +2296,9 @@ class Flow {
 
         if (name == 'extern') {
             if (linked) {
-                const newUrl = Flow.starData.urlInputElement.value;
-                if (linkedPages.has(newUrl) && Flow.starData.name == linkedPages.get(newUrl).name) {
+                const newUrl = getHashQueryVariable('url');
+                const linkedPage = linkedPages.get(newUrl);
+                if (linkedPages.has(newUrl) && Flow.starData.name == linkedPage.name && !!linkedPage.autoRun == autoRun) {
                     disableSave();
                 } else {
                     enableSave();
@@ -2302,7 +2311,7 @@ class Flow {
                 }
             }
         } else {
-            if ((Flow.starData.link == page.link && Flow.starData.name == page.name) || (name == 'flow' && Flow.starData.link.trim() == '')) {
+            if ((Flow.starData.link == page.link && Flow.starData.name == page.name && !!linkedPage.autoRun == autoRun) || (name == 'flow' && Flow.starData.link.trim() == '')) {
                 disableSave();
             } else {
                 enableSave();
@@ -2328,16 +2337,16 @@ class Flow {
         fileNameElement.textContent = 'Bookmark As:';
         settingsElement.appendChild(fileNameElement);
 
-        // Toggle bar
-        const toggleBar = fromHTML(`<div class="listHorizontal">`);
-        starData.toggleBar = toggleBar;
+        // Linked toggle bar
+        const linkedToggleBar = fromHTML(`<div class="listHorizontal">`);
+        starData.linkedToggleBar = linkedToggleBar;
         const label = fromHTML(`<div>Link to External Url`);
         label.setAttribute('tooltip', `If checked, the script will be saved in a linked state, meaning you can't change it. In return, it is always updated to the latest version.`);
-        toggleBar.appendChild(label);
+        linkedToggleBar.appendChild(label);
         const linkedCheckbox = fromHTML(`<input type="checkbox">`);
         starData.linkedCheckbox = linkedCheckbox;
-        toggleBar.appendChild(linkedCheckbox);
-        element.appendChild(toggleBar);
+        linkedToggleBar.appendChild(linkedCheckbox);
+        element.appendChild(linkedToggleBar);
 
         // Name, url and link inputs
         const nameInputElement = fromHTML(`<input type="text" tooltip="Enter name. Discarded if link is empty." placeholder="Enter name here...">`);
@@ -2390,6 +2399,22 @@ class Flow {
         settingsElement.appendChild(linkInputElement);
         settingsElement.appendChild(urlInputElement);
         element.appendChild(settingsElement);
+
+                
+        // Auto run toggle bar
+        const autoRunToggleBar = fromHTML(`<div class="listHorizontal">`);
+        starData.autoRunToggleBar = autoRunToggleBar;
+        const autoRunLabel = fromHTML(`<div>Auto Run`);
+        label.setAttribute('tooltip', `If checked, the sidebar link will open the script in run mode.`);
+        autoRunToggleBar.appendChild(autoRunLabel);
+        const autoRunCheckbox = fromHTML(`<input type="checkbox">`);
+        starData.autoRunCheckbox = autoRunCheckbox;
+        autoRunToggleBar.appendChild(autoRunCheckbox);
+        element.appendChild(autoRunToggleBar);
+        autoRunCheckbox.addEventListener('input', e => {
+            Flow.updateSaveButton();
+        });
+
         element.appendChild(hb(8));
 
         // Footer
