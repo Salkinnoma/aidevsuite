@@ -123,21 +123,19 @@ class Flow {
         const url = Flow.urlEditorElement.textContent;
         Flow.setStatus('Loading external script...');
 
+        await Flow.externCodeEditorPromise;
         Flow.externContainerElement.classList.remove('hide');
-        Flow.externTargetElement.setAttribute('placeholder', 'Loading...');
-        Flow.externTargetElement.textContent = '';
+        Flow.externTargetElement.setValue('Loading...');
         try {
             const page = await fetchExternalPage(url);
             page.url = url;
             Flow.loadedExternPage = page;
-            Flow.externTargetElement.textContent = page.code;
-            Flow.externTargetElement.setAttribute('placeholder', 'Loaded script seems to be empty...');
+            if (page.code.length == 0) Flow.externTargetElement.setValue('Loaded script seems to be empty...');
+            else Flow.externTargetElement.setValue(page.code);
             Flow.setStatus('Finished loading external script.');
-
-            highlightCode(Flow.externTargetElement);
         } catch (e) {
             console.log(e);
-            Flow.externTargetElement.setAttribute('placeholder', 'Failed loading external script.');
+            Flow.externTargetElement.setValue('Failed loading external script.');
             Flow.setStatus('Error: Failed loading external script: ' + e.message, true);
         }
     }
@@ -2597,15 +2595,16 @@ function getFlowPage() {
         elements.push(externTopList);
 
         // Code editor
-        const codeEditorResult = CodeHelpers.createCodeEditor({
-            content: code,
-            onInput: Flow.onCodeInput,
-            noMonaco: name == 'extern',
-        });
-        if (name == 'extern') codeEditorResult.codeEditorContainer.classList.add('hide');
-        elements.push(codeEditorResult.codeEditorContainer);
-        Flow.codeEditorContainerElement = codeEditorResult.codeEditorContainer;
-        codeEditorResult.codeEditorPromise.then(e => Flow.codeEditor = e);
+        if (name != 'extern') {
+            const codeEditorResult = CodeHelpers.createCodeEditor({
+                content: code,
+                onInput: Flow.onCodeInput,
+            });
+            elements.push(codeEditorResult.codeEditorContainer);
+            Flow.codeEditorContainerElement = codeEditorResult.codeEditorContainer;
+            codeEditorResult.codeEditorPromise.then(e => Flow.codeEditor = e);
+            Flow.codeEditorPromise = codeEditorResult.codeEditorPromise;
+        }
 
         // Stream target
         const streamContainerElement = fromHTML(`<pre class="largeElement bordered hide height-8 scroll-y">`);
@@ -2617,14 +2616,27 @@ function getFlowPage() {
         elements.push(hb(7));
 
         // Extern target
-        const externCode = (Flow.loadedExternPage?.url == newUrl && newUrl != null) ? Flow.loadedExternPage.code : '';
-        const externContainerElement = CodeHelpers.createCodeElement(externCode, "javascript");
-        if (name != 'extern' || Flow.loadedExternPage?.url != newUrl || newUrl == null) externContainerElement.classList.add('hide');
-        Flow.externContainerElement = externContainerElement;
-        const externTargetElement = externContainerElement.querySelector('code');
-        Flow.externTargetElement = externTargetElement;
-        elements.push(externContainerElement);
-        if (name == 'extern') elements.push(hb(7));
+        if (name == 'extern') {
+            const externCode = (Flow.loadedExternPage?.url == newUrl && newUrl != null) ? Flow.loadedExternPage.code : '';
+            const externCodeResult = CodeHelpers.createCodeEditor({
+                content: externCode,
+                readOnly: true,
+            });
+            if (name != 'extern' || Flow.loadedExternPage?.url != newUrl || newUrl == null) externCodeResult.codeEditorContainer.classList.add('hide');
+            elements.push(externCodeResult.codeEditorContainer);
+            Flow.externContainerElement = externCodeResult.codeEditorContainer;
+            externCodeResult.codeEditorPromise.then(e => Flow.externTargetElement = e);
+            Flow.externCodeEditorPromise = externCodeResult.codeEditorPromise;
+            elements.push(hb(7));
+        }
+
+        // const externContainerElement = CodeHelpers.createCodeElement(externCode, "javascript");
+        // if (name != 'extern' || Flow.loadedExternPage?.url != newUrl || newUrl == null) externContainerElement.classList.add('hide');
+        // Flow.externContainerElement = externContainerElement;
+        // const externTargetElement = externContainerElement.querySelector('code');
+        // Flow.externTargetElement = externTargetElement;
+        // elements.push(externContainerElement);
+        // if (name == 'extern') elements.push(hb(7));
 
         // Prompt editor
         const promptEditorContainer = fromHTML(`<div class="contenteditableContainer">`);
