@@ -23,7 +23,7 @@ class CodeHelpers {
             copyButton.setAttribute('tooltip', 'Copied!');
             copyTime = Date.now();
             const oldCopyTime = copyTime;
-            window.setTimeout(function() {
+            window.setTimeout(function () {
                 if (oldCopyTime == copyTime) copyButton.setAttribute('tooltip', 'Copy Code'); // Only update if it hasn't been modified in the meantime.
             }, seconds(3));
         });
@@ -64,6 +64,25 @@ class CodeHelpers {
         for (let pre of pres) CodeHelpers._adjustPre(pre);
     }
 
+    static createCodeEditor(options) {
+        options ??= {};
+        if (options.noMonaco) {
+            const codeEditorContainer = fromHTML(`<pre class="contenteditableContainer">`);
+            const codeEditor = fromHTML(`<code contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter code here...">`);
+            if (options.onInput != null) codeEditor.addEventListener('input', options.onInput);
+            codeEditor.setAttribute('spellcheck', false);
+            codeEditor.textContent = options.content ?? '';
+            codeEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
+            codeEditorContainer.appendChild(codeEditor);
+            return { codeEditorContainer, codeEditor };
+        } else {
+            const codeEditorContainer = fromHTML(`<div class="rounded-xl bordered" style="height: ${options.height ?? '800px'};">`);
+            const codeEditorPromise = Monaco.initEditor(codeEditorContainer, options.content, options.language ?? 'javascript', options);
+            if (options.onInput != null) codeEditorPromise.then(e => e.onDidChangeModelContent(options.onInput));
+            return { codeEditorContainer, codeEditorPromise };
+        }
+
+    }
 }
 
 function highlightCode(codeElement) {

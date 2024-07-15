@@ -138,7 +138,7 @@ function generateUniqueId() {
 
 // If you use buttons with `noAccept`, there's a very high chance you will want to await this at the end of your script.
 async function forever() {
-    await new Promise(() => {});
+    await new Promise(() => { });
     log('This will never run!');
 }
 
@@ -148,18 +148,18 @@ function postRequest(type, content, id = null, pingId = null, pingSourceEvent = 
 }
 
 function postSuccessResponse(requestEvent, content = null, message = null) {
-    postMessage({ id:requestEvent.id, type: requestEvent.type, response: true, status: successStatus, content, message });
+    postMessage({ id: requestEvent.id, type: requestEvent.type, response: true, status: successStatus, content, message });
 }
 
 function postErrorResponse(requestEvent, message, content = null) {
-    postMessage({ id:requestEvent.id, type: requestEvent.type, response: true, status: errorStatus, content, message });
+    postMessage({ id: requestEvent.id, type: requestEvent.type, response: true, status: errorStatus, content, message });
 }
 
 function postIFrameMessage(type, content) {
     postMessage({ iframe: true, type, content });
 }
 
-function requireResponse(type, content, onPing = null, pingSourceEvent = null){
+function requireResponse(type, content, onPing = null, pingSourceEvent = null) {
     return new Promise((resolve, reject) => {
         const id = generateUniqueId();
         let pingId = null;
@@ -196,10 +196,13 @@ function createObjectUrl(object, options) {
 
 const __importCallbacks = new Map();
 const __importErrorCallbacks = new Map();
+/**
+ * Allows importing code. The code is wrapped in an async function and can be awaited.
+ */
 function importCode(code) {
     return new Promise((resolve, reject) => {
         const id = generateUniqueId();
-        const blobUrl = createObjectUrl(`async function _____outerImportWrapper_____() {async function _____importWrapper_____() {\n\n\n/* Script starts here */\n${code}\n/* Script ends here */\n\n\n}\ntry{\nawait _____importWrapper_____();\n__importCallbacks.get("${id}")();}\ncatch(e) {\n__importErrorCallbacks.get("${id}")(e);\n}\n}\n_____outerImportWrapper_____();`, {type: commonMimeTypes.javascript});
+        const blobUrl = createObjectUrl(`async function _____outerImportWrapper_____() {async function _____importWrapper_____() {\n\n\n/* Script starts here */\n${code}\n/* Script ends here */\n\n\n}\ntry{\nawait _____importWrapper_____();\n__importCallbacks.get("${id}")();}\ncatch(e) {\n__importErrorCallbacks.get("${id}")(e);\n}\n}\n_____outerImportWrapper_____();`, { type: commonMimeTypes.javascript });
         __importCallbacks.set(id, () => resolve());
         __importErrorCallbacks.set(id, e => reject(e));
         importScripts(blobUrl); // Evaluate the incoming code
@@ -210,13 +213,13 @@ async function log(...data) {
     return await requireResponse(logEventType, JSON.stringify(data));
 }
 
-async function onEvalRequest(e){
+async function onEvalRequest(e) {
     // Important: Your code will be evaluated in here. The moment it ends, the worker will be terminated and callbacks like button `onClick` cease to work. To never terminate, await `forever` at the end of the script.
     await importCode(e.content.code);
     postSuccessResponse(e);
 }
 
-onmessage = async function(e){
+onmessage = async function (e) {
     if (e.data.source != 'origin') return;
 
     const data = e.data.message;
@@ -706,7 +709,7 @@ async function show(element, options = null) {
         requireResponse(clickEventType, element.id, _ => onClickMap.get(element.id)()); // Don't await
     }
 
-    const response = await requireResponse(showEventType, {element, options}, async (content, event) => {
+    const response = await requireResponse(showEventType, { element, options }, async (content, event) => {
         let map = null;
         if (event.type == validateInputEventType) {
             map = onValidateMap;
@@ -724,14 +727,14 @@ async function show(element, options = null) {
  * If the element is an input element, it returns the current values of the input as described by the `show` function.
  */
 async function read(id) {
-    return await requireResponse(readEventType, {id});
+    return await requireResponse(readEventType, { id });
 }
 
 /**
  * Returns the current values of all nested inputs of the element (and itself if it is an input) as described by the `show` function. If `id` is null, it returns all elements regardless of their parent.
  */
 async function readAll(id = null) {
-    return await requireResponse(readEventType, {id, all: true});
+    return await requireResponse(readEventType, { id, all: true });
 }
 
 /**
@@ -742,21 +745,21 @@ async function readAll(id = null) {
  *     - All return value properties from inputs.
  */
 async function update(id, properties) {
-    await requireResponse(updateEventType, {id, properties});
+    await requireResponse(updateEventType, { id, properties });
 }
 
 /**
  * - **id** (string) [optional]: The id of the element to delete. All nested elements are also deleted.
  */
 async function remove(id) {
-    await requireResponse(removeEventType, {id});
+    await requireResponse(removeEventType, { id });
 }
 
 /**
  * - **id** (string) [optional]: The id of the top level element to accept input from. This is only useful if `noAccept == true`. If null, all inputs across all top level elements will be accepted instead.
  */
 async function accept(id = null) {
-    await requireResponse(acceptEventType, {id});
+    await requireResponse(acceptEventType, { id });
 }
 
 /**
@@ -774,11 +777,11 @@ async function chat(context, options = null) {
 
     let response;
     if (onUpdate == null) {
-        response = await requireResponse(chatEventType, {context, options});
+        response = await requireResponse(chatEventType, { context, options });
     } else {
         delete options.onUpdate;
         options.hasOnUpdate = true;
-        response = await requireResponse(chatEventType, {context, options}, (content, event) => {
+        response = await requireResponse(chatEventType, { context, options }, (content, event) => {
             const transformed = onUpdate(content);
             postSuccessResponse(event, transformed);
         });
@@ -828,20 +831,20 @@ async function setStatus(status) {
 class Storage {
     // Returns false if the script doesn't have access to a storage.
     static async exists() {
-        await requireResponse(storageEventType, {exists: true});
+        await requireResponse(storageEventType, { exists: true });
     }
 
     static async set(key, string) {
-        await requireResponse(storageEventType, {set: {key, value: string}});
+        await requireResponse(storageEventType, { set: { key, value: string } });
     }
 
     // Returns null if the script doesn't have access to a storage.
     static async get(key) {
-        return await requireResponse(storageEventType, {get: key});
+        return await requireResponse(storageEventType, { get: key });
     }
 
     static async delete(key) {
-        await requireResponse(storageEventType, {delete: key});
+        await requireResponse(storageEventType, { delete: key });
     }
 
     static async setObject(key, object) {
@@ -857,21 +860,21 @@ class Storage {
 // Internal helper functions
 const _helpers = {
     escapeHtmlChars: {
-        '¢' : 'cent',
-        '£' : 'pound',
-        '¥' : 'yen',
+        '¢': 'cent',
+        '£': 'pound',
+        '¥': 'yen',
         '€': 'euro',
-        '©' :'copy',
-        '®' : 'reg',
-        '<' : 'lt',
-        '>' : 'gt',
-        '"' : 'quot',
-        '&' : 'amp',
-        '\'' : '#39',
+        '©': 'copy',
+        '®': 'reg',
+        '<': 'lt',
+        '>': 'gt',
+        '"': 'quot',
+        '&': 'amp',
+        '\'': '#39',
     },
-    getEscapeHtmlRegex(){
+    getEscapeHtmlRegex() {
         let escapeHtmlRegexString = '[';
-        for(let key in _helpers.escapeHtmlChars) {
+        for (let key in _helpers.escapeHtmlChars) {
             escapeHtmlRegexString += key;
         }
         escapeHtmlRegexString += ']';
@@ -880,17 +883,17 @@ const _helpers = {
     },
     htmlEntities: {
         nbsp: ' ',
-            cent: '¢',
-            pound: '£',
-            yen: '¥',
-            euro: '€',
-            copy: '©',
-            reg: '®',
-            lt: '<',
-            gt: '>',
-            quot: '"',
-            amp: '&',
-            apos: '\''
+        cent: '¢',
+        pound: '£',
+        yen: '¥',
+        euro: '€',
+        copy: '©',
+        reg: '®',
+        lt: '<',
+        gt: '>',
+        quot: '"',
+        amp: '&',
+        apos: '\''
     },
 };
 _helpers.escapeHtmlRegex = _helpers.getEscapeHtmlRegex();
@@ -929,7 +932,7 @@ function escapeRegex(string) {
 }
 
 function escapeHTML(str) {
-    return str.replace(_helpers.escapeHtmlRegex, function(m) {
+    return str.replace(_helpers.escapeHtmlRegex, function (m) {
         return '&' + _helpers.escapeHtmlChars[m] + ';';
     });
 }
@@ -953,27 +956,27 @@ function unescapeHTML(str) {
 }
 
 const second = 1000;
-function seconds(seconds){
+function seconds(seconds) {
     return second * seconds;
 }
 
 const minute = second * 60;
-function minutes(minutes){
+function minutes(minutes) {
     return minute * minutes;
 }
 
 const hour = minute * 60;
-function hours(hours){
+function hours(hours) {
     return hour * hours;
 }
 
 const day = hour * 24;
-function days(days){
+function days(days) {
     return day * days;
 }
 
 const week = day * 24;
-function weeks(weeks){
+function weeks(weeks) {
     return week * weeks;
 }
 
@@ -981,7 +984,7 @@ const systemRole = "system";
 const userRole = "user";
 const assistantRole = "assistant";
 class ChatHelpers {
-    static messageToString(message){
+    static messageToString(message) {
         return message.role + ": " + message.content;
     }
 
@@ -1012,22 +1015,22 @@ class ChatHelpers {
     ]);
 }
 
-function toMessage(role, prompt, url = null){
-    return {role, prompt, url};
+function toMessage(role, prompt, url = null) {
+    return { role, prompt, url };
 }
 
-function toSystemMessage(prompt){
+function toSystemMessage(prompt) {
     return toMessage(systemRole, prompt);
 }
 
 /**
  * The image url is optional and only available for models that allow images.
  */
-function toUserMessage(prompt, url = null){
+function toUserMessage(prompt, url = null) {
     return toMessage(userRole, prompt, url);
 }
 
-function toAssistantMessage(prompt){
+function toAssistantMessage(prompt) {
     return toMessage(assistantRole, prompt);
 }
 
@@ -1079,7 +1082,7 @@ function extractCode(markdown, codeBlocksOnly = true) {
     if (isCodeBlock) {
         codes.push(markdown.substring(codeStart, markdown.length - amount));
     } else if (isIndentedCode) {
-        if(!codeBlocksOnly) codes.push(markdown.substring(codeStart, markdown.length - amount));
+        if (!codeBlocksOnly) codes.push(markdown.substring(codeStart, markdown.length - amount));
     }
 
     return codes;
@@ -1092,22 +1095,22 @@ class Samples {
         const promptInput = createInput(textInputType, { // Add text input to allow user to input their prompt
             placeholder: "Enter your prompt here...", // Add placeholder to better communicate with the user
         });
-        await show(promptInput, {noAccept: true}); // Show the input without an accept button, so we can reuse it.
+        await show(promptInput, { noAccept: true }); // Show the input without an accept button, so we can reuse it.
 
         const context = []; // Define context to pass to chatbot
         async function run() { // Define run function to be called on chat button click
             const prompt = (await read(promptInput.id)).text; // Read text value of prompt input
             context.push(toUserMessage(prompt)); // Add user prompt to chat context
-    
-            const userMessageElement = createText(paragraphType, `User:\n${prompt}`, {bordered: true}); // Add border to user message to make it easier for the user to see in the sea of messages
-            await show(userMessageElement, {insertBefore: promptInput.id}); // Insert before prompt input, as that should stay at the bottom.
+
+            const userMessageElement = createText(paragraphType, `User:\n${prompt}`, { bordered: true }); // Add border to user message to make it easier for the user to see in the sea of messages
+            await show(userMessageElement, { insertBefore: promptInput.id }); // Insert before prompt input, as that should stay at the bottom.
             const assistantMessageElement = createMarkdown(""); // Show assistant message in markdown to make it more appealing
-            await show(assistantMessageElement, {insertBefore: promptInput.id}); // Insert before prompt input, as that should stay at the bottom.
-    
-            const result = await chat(context, {id: assistantMessageElement.id}); // Chat and stream to the last assistant message element.
+            await show(assistantMessageElement, { insertBefore: promptInput.id }); // Insert before prompt input, as that should stay at the bottom.
+
+            const result = await chat(context, { id: assistantMessageElement.id }); // Chat and stream to the last assistant message element.
             context.push(toAssistantMessage(result)); // Save assistant response to chat context
         }
-    
+
         const button = createButton(createText(paragraphType, "Chat"), run); // Button that calls run() on click
         const wrapper = createFloatRightWrapper(button); // Make chat button float to the right
         await show(wrapper); // Show the button

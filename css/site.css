@@ -35,7 +35,7 @@ body {
 
 .container {
     width: 100%;
-    max-width: 720px;
+    max-width: 800px;
     padding-right: var(--bs-gutter-x,.75rem);
     padding-left: var(--bs-gutter-x,.75rem);
     padding-bottom: 64px;

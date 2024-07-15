@@ -7,19 +7,19 @@ class ChatGptApi {
         return { role, content };
     }
 
-    static toSystemMessage(prompt){
+    static toSystemMessage(prompt) {
         return ChatGptApi.toMessage(ChatGptApi.systemRole, prompt);
     }
 
-    static toUserMessage(prompt){
+    static toUserMessage(prompt) {
         return ChatGptApi.toMessage(ChatGptApi.userRole, prompt);
     }
 
-    static toAssistantMessage(prompt){
+    static toAssistantMessage(prompt) {
         return ChatGptApi.toMessage(ChatGptApi.assistantRole, prompt);
     }
 
-    static toImageMessage(prompt, url){
+    static toImageMessage(prompt, url) {
         return ChatGptApi.toMessage(ChatGptApi.userRole, [
             {
                 "type": "text",
@@ -34,7 +34,7 @@ class ChatGptApi {
         ]);
     }
 
-    static logMessage(message){
+    static logMessage(message) {
         console.log(message.role + ":", message.content);
     }
 
@@ -64,7 +64,7 @@ class ChatGptApi {
         ChatGptApi.gpt4TurboIdentifier
     ]);
 
-    static getModelName(gptModel){
+    static getModelName(gptModel) {
         let model = ChatGptApi.gptModelNamesByIdentifier.get(gptModel) ?? ChatGptApi.gptModelNamesByIdentifier.get(ChatGptApi.defaultModel);
         return model;
     }
@@ -142,14 +142,14 @@ class ChatGptApi {
             }
 
             console.log("GPT Model used:", model);
-            if(json && json['choices'] && json['choices'].length > 0) {
+            if (json && json['choices'] && json['choices'].length > 0) {
                 console.log('Request:', messagesCopy);
                 console.log('Response:', json);
                 console.log('Response content:', json['choices'][0]['message']['content']);
                 if (openAiSeed) {
                     console.log('Seed:', openAiSeed, 'Fingerprint:', json.system_fingerprint);
                 }
-                return {response: json['choices'][0]['message'], finish_reason: json.finish_reason};
+                return { response: json['choices'][0]['message'], finish_reason: json.finish_reason };
             }
 
             console.log("Json response:", json);
@@ -162,7 +162,7 @@ class ChatGptApi {
             lastError = errorMessage;
 
             if (retries < maxRetries) {
-                await sleep((retries + 1 + Math.random())*1000);
+                await sleep((retries + 1 + Math.random()) * 1000);
             } else throw lastError;
         }
     }
@@ -227,9 +227,9 @@ class ChatGptApi {
             let errorMessage = error.length > 0 ? error : response?.statusText;
             console.warn('ChatGptApi.getChatResponse ERROR Try Again', retries, errorMessage);
             lastError = errorMessage;
-            
+
             if (retries < maxRetries) {
-                await sleep((retries + 1 + Math.random())*1000);
+                await sleep((retries + 1 + Math.random()) * 1000);
             } else throw lastError;
         }
     }
@@ -260,7 +260,7 @@ class ChatGptApi {
 
     static async _internalStreamChat(messages, onUpdate, options, previousResponse = null) {
         options ??= {};
-        const streamOptions = {gptModel: options.gptModel, seed: options.seed, apiKey: options.apiKey};
+        const streamOptions = { gptModel: options.gptModel, seed: options.seed, apiKey: options.apiKey };
         let reader = await ChatGptApi.getChatStream(messages, streamOptions);
 
         let fullResponse = previousResponse ?? '';
@@ -274,12 +274,12 @@ class ChatGptApi {
             }
 
             let value, done;
-            try{
-                ( { value, done } = await reader.read());
+            try {
+                ({ value, done } = await reader.read());
             } catch (e) {
                 console.log("Error reading stream:", e.message);
                 if (e.message === "network error") {
-                    await sleep((1 + Math.random())*1000);
+                    await sleep((1 + Math.random()) * 1000);
                     reader = await ChatGptApi.getChatStream(messages, streamOptions);
                     fullResponse = previousResponse ?? '';
                     onUpdate('');
@@ -302,45 +302,47 @@ class ChatGptApi {
                 }
 
                 const json = trimmedLine.replace("data: ", "");
-               try{
-                   let obj;
-                   if (buffer === "") {
-                       obj = JSON.parse(json);
-                   } else {
-                       try {
-                           obj = JSON.parse(json);
-                           console.warn("Failed resolving chunk split error. Skipped data:", buffer);
-                       } catch (e) {
-                           const fullData = buffer + json;
-                           obj = JSON.parse(fullData);
-                           console.log("Successfully resolved chunk split error. Full data:", fullData);
-                       }
-                       buffer = "";
-                   }
+                try {
+                    let obj;
+                    if (buffer === "") {
+                        obj = JSON.parse(json);
+                    } else {
+                        try {
+                            obj = JSON.parse(json);
+                            console.warn("Failed resolving chunk split error. Skipped data:", buffer);
+                        } catch (e) {
+                            const fullData = buffer + json;
+                            obj = JSON.parse(fullData);
+                            console.log("Successfully resolved chunk split error. Full data:", fullData);
+                        }
+                        buffer = "";
+                    }
 
-                   const content = obj.choices?.[0]?.delta?.content?.toString() ?? "";
-                   finish_reason = obj.finish_reason;
+                    const content = obj.choices?.[0]?.delta?.content?.toString() ?? "";
+                    finish_reason = obj.finish_reason;
 
-                   fullResponse = fullResponse.concat(content);
-                   onUpdate(fullResponse);
-               } catch (e) {
-                   if (e.message.includes("JSON") && json != null) {
-                       buffer += json;
-                       console.log("Chunk split error:", e.message, "For stream:", json);
-                   } else {
-                       console.warn("Error decoding stream:", e.message, "For stream:", json);
-                   }
+                    fullResponse = fullResponse.concat(content);
+                    try {
+                        onUpdate(fullResponse);
+                    } catch (e) { }
+                } catch (e) {
+                    if (e.message.includes("JSON") && json != null) {
+                        buffer += json;
+                        console.log("Chunk split error:", e.message, "For stream:", json);
+                    } else {
+                        console.warn("Error decoding stream:", e.message, "For stream:", json);
+                    }
 
-                   if (buffer.length > 1000000) {
-                       options.stopStream = true;
-                       console.warn("Buffer grew too large:", e.message);
-                   }
-               }
+                    if (buffer.length > 1000000) {
+                        options.stopStream = true;
+                        console.warn("Buffer grew too large:", e.message);
+                    }
+                }
             }
         }
 
         console.log('Request:', messages);
         console.log('Response:', fullResponse);
-        return {response: fullResponse, finish_reason};
+        return { response: fullResponse, finish_reason };
     }
 }

@@ -1,5 +1,5 @@
 class ParsingHelpers {
-    static extractCode(markdown, codeBlocksOnly = true) {
+    static extractCode(markdown, codeBlocksOnly = true, concatenate = true) {
         let amount = 0;
         let isCodeBlock = false;
         let isIndentedCode = false;
@@ -47,8 +47,10 @@ class ParsingHelpers {
         if (isCodeBlock) {
             codes.push(markdown.substring(codeStart, markdown.length - amount));
         } else if (isIndentedCode) {
-            if(!codeBlocksOnly) codes.push(markdown.substring(codeStart, markdown.length - amount));
+            if (!codeBlocksOnly) codes.push(markdown.substring(codeStart, markdown.length - amount));
         }
+
+        if (concatenate) codes = codes.join('\n');
 
         return codes;
     }

@@ -122,7 +122,7 @@ function wrapElement(element, wrapper) {
     wrapper.appendChild(element);
 }
 
-(function() {
+(function () {
     const observer = new MutationObserver(() => {
         if (document.body) {
             observer.disconnect(); // Stop observing once the body is found
@@ -150,3 +150,10 @@ const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
 function intDivision(a, b) {
     return Math.floor(a / b);
 }
+
+// Stop save events
+document.addEventListener('keydown', function (event) {
+    if (event.ctrlKey && event.key === 's') {
+        event.preventDefault();
+    }
+});
