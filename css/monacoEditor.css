@@ -14,8 +14,8 @@
     background-color: var(--background-color);
 }
 
-.textEditor.monacoWrapper {
-    padding-right: 2px;
+.textEditor .monacoWrapper {
+    padding-right: 5px;
 }
 
 .textEditor {
