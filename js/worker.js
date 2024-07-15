@@ -197,7 +197,7 @@ function createObjectUrl(object, options) {
 const __importCallbacks = new Map();
 const __importErrorCallbacks = new Map();
 /**
- * Allows importing code. The code is wrapped in an async function and can be awaited.
+ * You probably don't want to use this.
  */
 function importCode(code) {
     return new Promise((resolve, reject) => {
@@ -315,6 +315,18 @@ function createText(type, text, options = null) {
     return content;
 }
 
+function createParagraph(text, options = null) {
+    return createText(paragraphType, text, options);
+}
+
+function createTitle(text, options = null) {
+    return createText(titleType, text, options);
+}
+
+function createSubTitle(text, options = null) {
+    return createText(subTitleType, text, options);
+}
+
 /**
  * - **options** (object): An object that can have the following properties:
  *     - **language** (string) [optional]: The language of the code.
@@ -338,7 +350,7 @@ function createCode(code, options = null) {
  *         [
  *             {left: "$$", right: "$$", display: true},
  *             {left: "\\(", right: "\\)", display: false},
- *             //{left: "$", right: "$", display: false} // LaTeX uses $…$, but it ruins the display of normal `$` in text ($ must come after $$). Use \(...\) for inline math instead.
+ *             //{left: "$", right: "$", display: false} // This single dollar syntax $…$ is disabled, because it ruins the display of normal `$` in text. Use backslash+brackets \(...\) for inline math instead.
  *             {left: "\\begin{equation}", right: "\\end{equation}", display: true},
  *             {left: "\\begin{align}", right: "\\end{align}", display: true},
  *             {left: "\\begin{alignat}", right: "\\end{alignat}", display: true},
@@ -504,7 +516,6 @@ function createSimpleButton(elements, onClick, options = null) {
  * ### `textInputType`
  * - **defaultValue** (string) [optional]: The default text value for the input. Default is an empty string `''`.
  * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter text here..."`.
- * - **spellcheck** (bool) [optional]: Whether to enable spellcheck. Default is `false`.
  * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
  *
  * ### `numberInputType`
@@ -524,7 +535,6 @@ function createSimpleButton(elements, onClick, options = null) {
  * ### `markdownInputType`
  * - **defaultValue** (string) [optional]: The default code value for the input. Default is an empty string `''`.
  * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter markdown here..."`.
- * - **spellcheck** (bool) [optional]: Whether to enable spellcheck. Default is `false`.
  * - **katex** (bool) [optional]: Whether to render katex. Default is `true`.
  * - **katexDelimiters** (array) [optional]: The delimiters to use to find find math equations. Default: Same as for `createText`.
  * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
@@ -545,7 +555,6 @@ function createSimpleButton(elements, onClick, options = null) {
  * - **editableCaption** (bool) [optional]: Whether the caption can be edited. Default is false.
  * - **defaultCaptionValue** (string) [optional]: The default caption value for the input. Default is an empty string `''`.
  * - **captionPlaceholder** (string) [optional]: The placeholder text that appears when the caption input is empty. Default is `"Enter caption here..."`.
- * - **spellcheck** (bool) [optional]: Whether to enable spellcheck for the caption. Default is `false`.
  * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
  * - **captionMaxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
  *
@@ -574,7 +583,6 @@ function createInput(type, options = null) {
 
     return content;
 }
-
 
 function _extractElements(element) {
     const elements = [];

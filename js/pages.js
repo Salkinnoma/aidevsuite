@@ -5,7 +5,13 @@ const defaultPages = new Set([
     'home',
     'flow',
     'extern',
+    'worker',
     'help',
+]);
+
+const specialFlowPages = new Set([
+    'flow',
+    'extern',
 ]);
 
 let localPages = new Map();
@@ -89,13 +95,13 @@ function moveLocalPage(page, newLink) {
 async function fetchExternalPage(url) {
     if (url.startsWith('#')) {
         const page = localPages.get(removeFirstChar(url));
-        return {code: page.code};
+        return { code: page.code };
     }
 
     const response = await fetch(url);
     const data = await response.json();
     if (data.securityId !== securityId) throw new Error('Security check failed.');
-    
+
     return data;
 }
 
@@ -148,7 +154,7 @@ function suggestNameForPageLink(link) {
     return escapeFileNameMinimal(link);
 }
 
-function getValidHashUrls(){
+function getValidHashUrls() {
     return [...defaultPages, ...localPages.keys()];
 }
 
@@ -160,7 +166,7 @@ function updatePagesSidebar() {
     const localPagesList = document.getElementById('localPagesList');
     localPagesList.innerHTML = '';
     localPages.values().forEach(p => {
-        let link = '#' + p.link;
+        let link = '#local/' + p.link;
         if (p.autoRun) link += '?mode=run';
 
         const element = fromHTML(`<a class="element sidebarElement hoverable">`);
@@ -202,6 +208,7 @@ function loadPage() {
     const hash = getHashUrl();
     loadLocalPages();
     loadLinkedPages();
+    const topPath = getPathPartFromHash(0);
 
     const page = document.getElementById('pages');
 
@@ -212,10 +219,12 @@ function loadPage() {
     if (hash == '' || hash == '#' || hash == '#home') {
         removeHash();
         newPage = getHomePage();
-    } else if (localPages.has(link) ||
+    } else if (topPath == 'local' ||
         link == 'flow' ||
         link == 'extern') {
         newPage = getFlowPage();
+    } else if (link == 'worker') {
+        newPage = getWorkerPage();
     } else if (link == 'help') {
         newPage = getHelpPage();
     } else {
@@ -299,8 +308,31 @@ function getHomePage() {
         });
     }
     container.appendChild(samplesGrid);
-    
+
     return container;
+}
+
+function getWorkerPage() {
+    const element = fromHTML(`<div>`);
+    const title = fromHTML(`<h1>Worker Script`);
+    element.appendChild(title);
+    const paragraph = fromHTML(`<div>This script is where all of your code is executed.`);
+    element.appendChild(paragraph);
+    element.appendChild(hb(4));
+    Flow.clearMonacoContext();
+    const codeResult = CodeHelpers.createCodeEditor({
+        content: "Loading...",
+        readOnly: true,
+        language: 'javascript',
+        showMinimap: true,
+    });
+    element.appendChild(codeResult.codeEditorContainer);
+    Flow.getWorkerScript().then(async code => {
+        const editor = await codeResult.codeEditorPromise;
+        editor.setValue(code);
+        editor.update();
+    });
+    return element;
 }
 
 function getHelpPage() {

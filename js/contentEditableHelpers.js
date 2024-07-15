@@ -2,11 +2,11 @@ class ContentEditableHelpers {
     static setupEventListeners() {
         // Select all elements with the contenteditable-type attribute
         const editableElements = document.querySelectorAll('[contenteditable-type]');
-        
+
         // Check and register the paste and input event listener for existing elements
         editableElements.forEach(ContentEditableHelpers.checkAndConvertPlainTextOnly);
-        
-    
+
+
         // Create a MutationObserver to monitor for newly added elements
         const observer = new MutationObserver((mutationsList) => {
             for (const mutation of mutationsList) {
@@ -15,9 +15,11 @@ class ContentEditableHelpers {
                         if (node.nodeType === Node.ELEMENT_NODE) {
                             if (node.hasAttribute('contenteditable-type')) {
                                 ContentEditableHelpers.checkAndConvertPlainTextOnly(node);
+                                node.addEventListener('input', e => ContentEditableHelpers.onInput());
                             }
                             node.querySelectorAll('[contenteditable-type]').forEach(child => {
                                 ContentEditableHelpers.checkAndConvertPlainTextOnly(child);
+                                child.addEventListener('input', e => ContentEditableHelpers.onInput());
                             });
                         }
                     });
@@ -26,13 +28,13 @@ class ContentEditableHelpers {
                 }
             }
         });
-        
+
         // Start observing the document for added nodes and attribute changes
         observer.observe(document.body, { childList: true, attributes: true, subtree: true });
     }
 
     static convertToPlainText(element) {
-        element.addEventListener('paste', function(event) {
+        element.addEventListener('paste', function (event) {
             event.preventDefault();
 
             // Get pasted data via clipboard API
@@ -40,7 +42,7 @@ class ContentEditableHelpers {
             document.execCommand('insertText', false, text);
         });
     }
-    
+
     // Function to check and convert elements with contenteditable-type="plainTextOnly"
     static checkAndConvertPlainTextOnly(element) {
         if (element.getAttribute('contenteditable-type') === 'plainTextOnly') {
@@ -52,11 +54,15 @@ class ContentEditableHelpers {
         }
     }
 
+    static onInput(event) {
+        doScrollTick();
+    }
+
     static checkForTab(event) {
         if (event.key !== "Tab") return;
 
         event.preventDefault();
-    
+
         const tabCharacter = "\u00a0\u00a0\u00a0\u00a0";
         const selection = window.getSelection();
         const range = selection.getRangeAt(0);

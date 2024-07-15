@@ -1,7 +1,33 @@
 .overflow-guard {
-    border-radius: 10px;
+    border-radius: 0 0 10px 10px;
 }
 
 .monaco-editor {
-    border-radius: 50px;
+    border-radius: 0 0 50px 50px;
+}
+
+.monacoTarget {
+    width: auto !important;
+}
+
+.textEditor {
+    background-color: var(--background-color);
+}
+
+.textEditor.monacoWrapper {
+    padding-right: 2px;
+}
+
+.textEditor {
+    border: 1px solid var(--border-color);
+}
+
+.textEditor .monaco-editor,
+.textEditor .monaco-diff-editor,
+.textEditor .monaco-component {
+    --vscode-editor-background: var(--background-color);
+    --vscode-editorStickyScroll-background: var(--background-color);
+    --vscode-breadcrumb-background: var(--background-color);
+    --vscode-editorGutter-background: var(--background-color);
+    --vscode-editorMarkerNavigation-background: var(--background-color);
 }

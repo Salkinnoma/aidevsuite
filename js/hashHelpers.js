@@ -14,13 +14,13 @@ function getHashQueryVariable(param, log = false) {
     return value;
 }
 
-function getHashParams(){
+function getHashParams() {
     let hashParts = window.location.hash.split("?");
     let hashSearchParams = new URLSearchParams(hashParts.length === 1 ? '' : hashParts[1]);
     return hashSearchParams;
 }
 
-function getHashUrl(){
+function getHashUrl() {
     let hashParts = window.location.hash.split("?");
     return hashParts[0];
 }
@@ -29,7 +29,12 @@ function getPathFromHash() {
     return removeFirstChar(getHashUrl());
 }
 
-function buildUrlWithNewHashParams(hashSearchParams){
+function getPathPartFromHash(index) {
+    const parts = getPathFromHash().split("/");
+    return parts.length > index ? parts[index] : null;
+}
+
+function buildUrlWithNewHashParams(hashSearchParams) {
     let url = new URL(window.location);
     url.hash = '';
     let hashParts = window.location.hash.split("?");
@@ -39,7 +44,7 @@ function buildUrlWithNewHashParams(hashSearchParams){
     return urlString;
 }
 
-function getUrlWithChangedHashParam(name, value){
+function getUrlWithChangedHashParam(name, value) {
     const hashParams = this.getHashParams();
     if (value == null || value == "") {
         hashParams.delete(name);

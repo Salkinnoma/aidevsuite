@@ -29,10 +29,27 @@ class Monaco {
             inherit: true,
             rules: [],
             colors: {
-                'editor.background': '#222222',
+                'editor.background': '#111111',
             },
         });
-        monaco.editor.setTheme('my-dark');
+        monaco.editor.defineTheme('my-light', {
+            base: 'vs',
+            inherit: true,
+            rules: [],
+            colors: {
+                'editor.background': '#FFFFFF',
+            },
+        });
+
+        Monaco.updateTheme();
+    }
+
+    static updateTheme() {
+        if (colorScheme == lightColorScheme) {
+            monaco.editor.setTheme('my-light');
+        } else {
+            monaco.editor.setTheme('my-dark');
+        }
     }
 
     static _tryInitializeMonaco(element) {
@@ -68,10 +85,57 @@ class Monaco {
         options.automaticLayout ??= true;
         options.formatOnPaste ??= true;
         options.formatOnType ??= true;
-        options.wrappingIndent ??= 'deepIndent';
+        if (!options.text) options.wrappingIndent ??= 'deepIndent';
         options.autoDetectHighContrast = false;
-        options.padding ??= { top: '25px' };
-        return monaco.editor.create(containerElement, options);
+        options.padding ??= { top: '25px', bottom: '25px' };
+        if (!options.showMinimap) options.minimap ??= {
+            enabled: false,
+        }
+
+        options.expand ??= options.height == null;
+        if (options.expand) {
+            options.scrollBeyondLastLine = false;
+        }
+
+        if (options.minimal) {
+            options.overviewRulerLanes ??= 0;
+        }
+
+        if (options.text) {
+            options.language = null;
+            options.fontFamily = "Arial";
+            options.fontSize = 16;
+            options.overviewRulerLanes ??= 0;
+            options.wordBasedSuggestions ??= "off";
+        }
+
+        const editor = monaco.editor.create(containerElement, options);
+
+        if (options.placeholder != null) {
+            new PlaceholderContentWidget(options.placeholder, editor);
+        }
+
+        if (options.expand) {
+            let ignoreEvent = false;
+            function updateHeight() {
+                const contentHeight = Math.min(options.maxHeight ?? 800, editor.getContentHeight());
+                const contentWidth = containerElement.parentElement.offsetWidth;
+                containerElement.style.width = `${contentWidth}px`;
+                containerElement.style.height = `${contentHeight}px`;
+                try {
+                    ignoreEvent = true;
+                    editor.layout({ width: contentWidth, height: contentHeight });
+                } finally {
+                    ignoreEvent = false;
+                }
+                doScrollTick();
+            };
+            editor.onDidContentSizeChange(updateHeight);
+            updateHeight();
+            editor.update = updateHeight;
+        }
+
+        return editor;
     }
 
     static initEditor(containerElement, content, language, options) {
@@ -109,6 +173,61 @@ class Monaco {
     }
 }
 
+/**
+ * Represents an placeholder renderer for monaco editor
+ * Roughly based on https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/codeEditor/browser/untitledTextEditorHint/untitledTextEditorHint.ts
+ */
+class PlaceholderContentWidget {
+    static ID = 'editor.widget.placeholderHint';
+
+
+    constructor(placeholder, editor) {
+        this.placeholder = placeholder;
+        this.editor = editor;
+        // register a listener for editor code changes
+        editor.onDidChangeModelContent(() => this.onDidChangeModelContent());
+        // ensure that on initial load the placeholder is shown
+        this.onDidChangeModelContent();
+    }
+
+    onDidChangeModelContent() {
+        if (this.editor.getValue() === '') {
+            this.editor.addContentWidget(this);
+        } else {
+            this.editor.removeContentWidget(this);
+        }
+    }
+
+    getId() {
+        return PlaceholderContentWidget.ID;
+    }
+
+    getDomNode() {
+        if (!this.domNode) {
+            this.domNode = fromHTML(`<div class="placeholder">`);
+            this.domNode.style.pointerEvents = 'none'
+            this.domNode.style.width = 'max-content';
+            this.domNode.textContent = this.placeholder;
+            this.domNode.style.fontStyle = 'italic';
+            this.editor.applyFontInfo(this.domNode);
+        }
+
+        return this.domNode;
+    }
+
+    getPosition() {
+        return {
+            position: { lineNumber: 1, column: 1 },
+            preference: [monaco.editor.ContentWidgetPositionPreference.EXACT],
+        };
+    }
+
+    dispose() {
+        this.editor.removeContentWidget(this);
+    }
+}
+
 require.config({ paths: { vs: 'dist/monaco-editor/min/vs' } });
 
 window.addEventListener('load', e => Monaco.setupEventListeners());
+window.addEventListener('color-scheme-changed', e => Monaco.updateTheme());

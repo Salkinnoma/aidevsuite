@@ -1,7 +1,7 @@
 
 class CodeHelpers {
     static createCodeElement(code, language) {
-        const preContainer = fromHTML(`<div class="preContainer ">`);
+        const preContainer = fromHTML(`<div class="preContainer">`);
         const languageClass = language != null ? 'language-' + escapeHTML(language) : null;
 
         const pre = fromHTML(`<pre>`);
@@ -28,7 +28,6 @@ class CodeHelpers {
             }, seconds(3));
         });
         const copyIcon = icons.copy();
-        //copyIcon.classList.add('code-copy-icon');
         copyButton.appendChild(copyIcon);
         codeBar.appendChild(copyButton);
         preContainer.appendChild(codeBar);
@@ -66,7 +65,32 @@ class CodeHelpers {
 
     static createCodeEditor(options) {
         options ??= {};
+
+        const preContainer = fromHTML(`<div class="preContainer">`);
+
+        // Code bar
+        const codeBar = fromHTML(`<div class="codeBar listContainerHorizontal">`);
+        const codeLanguage = fromHTML(`<div class="codeLanguage">`);
+        codeLanguage.textContent = options.language ?? 'any';
+        codeBar.appendChild(codeLanguage);
+        const copyButton = fromHTML('<button tooltip="Copy Code" class="largeElement hoverable">');
+        let copyTime = Date.now();
+        const copyIcon = icons.copy();
+        copyButton.appendChild(copyIcon);
+        codeBar.appendChild(copyButton);
+        preContainer.appendChild(codeBar);
+
         if (options.noMonaco) {
+            copyButton.addEventListener('click', e => {
+                copyToClipboard(codeElement.innerText);
+                copyButton.setAttribute('tooltip', 'Copied!');
+                copyTime = Date.now();
+                const oldCopyTime = copyTime;
+                window.setTimeout(function () {
+                    if (oldCopyTime == copyTime) copyButton.setAttribute('tooltip', 'Copy Code'); // Only update if it hasn't been modified in the meantime.
+                }, seconds(3));
+            });
+
             const codeEditorContainer = fromHTML(`<pre class="contenteditableContainer">`);
             const codeEditor = fromHTML(`<code contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter code here...">`);
             if (options.onInput != null) codeEditor.addEventListener('input', options.onInput);
@@ -74,12 +98,33 @@ class CodeHelpers {
             codeEditor.textContent = options.content ?? '';
             codeEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
             codeEditorContainer.appendChild(codeEditor);
-            return { codeEditorContainer, codeEditor };
+
+            preContainer.appendChild(codeEditorContainer);
+            return { preContainer, codeEditor };
         } else {
-            const codeEditorContainer = fromHTML(`<div class="rounded-xl bordered" style="height: ${options.height ?? '800px'};">`);
-            const codeEditorPromise = Monaco.initEditor(codeEditorContainer, options.content, options.language ?? 'javascript', options);
+            const codeEditorContainerWrapper = fromHTML(`<div class="monacoWrapper">`);
+            const codeEditorContainerWrapperInner = fromHTML(`<div class="monacoWrapperInner">`);
+            const codeEditorContainer = fromHTML(`<div class="monacoTarget" style="height: ${options.height ?? '800px'};">`);
+            if (options.text) preContainer.classList.add('textEditor');
+            codeEditorContainerWrapperInner.appendChild(codeEditorContainer);
+            codeEditorContainerWrapper.appendChild(codeEditorContainerWrapperInner);
+            preContainer.appendChild(codeEditorContainerWrapper);
+
+            const codeEditorPromise = Monaco.initEditor(codeEditorContainer, options.content, options.language, options);
             if (options.onInput != null) codeEditorPromise.then(e => e.onDidChangeModelContent(options.onInput));
-            return { codeEditorContainer, codeEditorPromise };
+
+            copyButton.addEventListener('click', async e => {
+                const codeEditor = await codeEditorPromise;
+                copyToClipboard(codeEditor.getValue());
+                copyButton.setAttribute('tooltip', 'Copied!');
+                copyTime = Date.now();
+                const oldCopyTime = copyTime;
+                window.setTimeout(function () {
+                    if (oldCopyTime == copyTime) copyButton.setAttribute('tooltip', 'Copy Code'); // Only update if it hasn't been modified in the meantime.
+                }, seconds(3));
+            });
+
+            return { codeEditorContainer: preContainer, codeEditorPromise };
         }
 
     }
