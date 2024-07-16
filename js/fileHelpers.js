@@ -1,5 +1,14 @@
-function escapeFileName(filename) {
-    return filename.replace(/[^a-zA-Z0-9]/g, "_");
+function escapeFileName(name) {
+    return name.replace(/[^a-zA-Z0-9\. \-]/g, "_");
+}
+
+function escapeFileNameMinimal(name) {
+    name = name.toLowerCase(); // Lowercase
+    name = name.replace(/[^a-z0-9_]/g, '_'); // Replace non-alphanumeric characters with an underscore
+    name = name.replace(/_+/g, '_'); // Replace multiple underscores with a single one
+    name = name.replace(/_$/, ''); // Remove trailing underscore
+
+    return name;
 }
 
 let commonMimeTypes = {

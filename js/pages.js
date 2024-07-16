@@ -17,7 +17,7 @@ const specialFlowPages = new Set([
 let localPages = new Map();
 let linkedPages = new Map();
 
-const samples = ['Fetch', 'Chat'];
+const samples = ['data/Fetch.json', 'data/Simple Chat.json', 'data/Chat.json'];
 
 const pageLoadedEvent = new CustomEvent("pageloaded");
 function loadLocalPages() {
@@ -301,8 +301,7 @@ function getHomePage() {
 
     // Sample pages grid
     const samplesGrid = fromHTML(`<div class="listHorizontal">`);
-    for (let sample of samples) {
-        const link = 'data/' + sample + '.json';
+    for (let link of samples) {
         fetchExternalPage(link).then(page => {
             const pageElement = fromHTML(`<a class="giantElement raised xl-font">`);
             pageElement.setAttribute('href', '#extern?url=' + link);
@@ -327,7 +326,7 @@ function getWorkerPage() {
     element.appendChild(hb(4));
     Flow.clearMonacoContext();
     const codeResult = CodeHelpers.createCodeEditor({
-        content: "Loading...",
+        placeholder: "Loading...",
         readOnly: true,
         language: 'javascript',
         showMinimap: true,

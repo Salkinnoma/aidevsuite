@@ -8,7 +8,7 @@ class Flow {
     static loadedExternPage = null;
     static onIframeEvent = new Map();
 
-    static sampleClassLinks = ['data/Chat.json'];
+    static sampleClassLinks = ['data/Simple Chat.json'];
     static sampleClassPages = new Map();
     static baseWorkerScript = null;
     static workerScript = null;
@@ -194,7 +194,7 @@ class Flow {
     }
 
     static async wrapPageInStaticFunction(page) {
-        return `static async ${escapeFileNameMinimal(page.name)}() {\n${addIndent(page.code)}\n}`;
+        return `static async ${escapeCamelCase(page.name)}() {\n${addIndent(page.code)}\n}`;
     }
 
     static onCodeInput(event) {
@@ -671,7 +671,7 @@ class Flow {
 
         if (content.exists) Flow.postSuccessResponse(e, exists);
         else if (content.set != null) {
-            const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage'));
+            const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage')) ?? {};
             scriptStorage[id] ??= {};
             scriptStorage[id][content.set.key] = content.set.value;
             const jsonStorage = JSON.stringify(scriptStorage);
@@ -684,12 +684,12 @@ class Flow {
                 Flow.postSuccessResponse(e);
             }
         } else if (content.get != null) {
-            const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage'));
+            const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage')) ?? {};
             scriptStorage[id] ??= {};
             const value = scriptStorage[id][content.get];
             Flow.postSuccessResponse(e, value);
         } else if (content.delete != null) {
-            const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage'));
+            const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage')) ?? {};
             scriptStorage[id] ??= {};
             delete scriptStorage[id][content.delete];
             localStorage.setItem('scriptStorage', JSON.stringify(scriptStorage));
@@ -2341,7 +2341,13 @@ class Flow {
         const page = Flow.getPage();
         const item = { securityId: page.securityId, name: page.name, code: page.code, link: page.link };
         const json = JSON.stringify(item);
-        const fileName = item.name ? escapeFileName(item.name) : escapeFileName(item.link);
+        let name = item.name;
+        const url = getHashQueryVariable('url');
+        if (linkedPages.has(url)) {
+            name = linkedPages.get(url).name;
+        }
+
+        const fileName = name ? escapeFileName(name) : escapeFileName(item.link);
         downloadJson(fileName, json);
     }
 

@@ -59,17 +59,6 @@ const _htmlStringHelpers = {
 };
 _htmlStringHelpers.escapeHtmlRegex = _htmlStringHelpers.getEscapeHtmlRegex();
 
-function escapeFileName(filename) {
-    return filename.replace(/[^a-zA-Z0-9]/g, "_");
-}
-function escapeFileNameMinimal(col) {
-    col = col.toLowerCase(); // Lowercase
-    col = col.replace(/[^a-z0-9_]/g, '_'); // Replace non-alphanumeric characters with an underscore
-    col = col.replace(/_+/g, '_'); // Replace multiple underscores with a single one
-    col = col.replace(/_$/, ''); // Remove trailing underscore
-
-    return col;
-}
 function escapeHTML(str) {
     return str.replace(_htmlStringHelpers.escapeHtmlRegex, function (m) {
         return '&' + _htmlStringHelpers.escapeHtmlChars[m] + ';';
@@ -99,6 +88,15 @@ function escapeRegex(string) {
 
 function escapeReplacement(string) {
     return string.replace(/\$/g, '$$$$');
+}
+
+function escapeCamelCase(name) {
+    const parts = escapeFileName(name).replace('\.\-', ' ').replace('( )*', ' ').trim().split(' ');
+    if (parts[0].length != 0) parts[0] = parts[0][0].toLowerCase() + parts[0].slice(1);
+    for (let i = 1; i < parts.length; i++) {
+        if (parts[i].length != 0) parts[i] = parts[i][0].toUpperCase() + parts[i].slice(1);
+    }
+    return parts.join('');
 }
 
 function removeFirstChar(str) {
