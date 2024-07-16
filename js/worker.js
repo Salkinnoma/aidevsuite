@@ -496,6 +496,8 @@ function createSimpleButton(elements, onClick, options = null) {
 }
 
 /**
+ * Creates an input. After an shown input is accepted, it is automatically converted into its non input counterpart for the user to review. To stop this, you must `remove` the element.
+ * 
  * ## Parameters
  * - **type** (string): Specifies the type of input. All `inputTypes` are supported.
  * - **options** (object): An object that contains various options specific to the `type` of input. The options available depend on the input type.
@@ -506,7 +508,7 @@ function createSimpleButton(elements, onClick, options = null) {
  * - **disabled** (bool) [optional]: Whether user input is disabled. Default is `false`.
  *
  * ### All Input Types
- * - **onValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called whenever the value of an input changes. Its parameters are group, element. The return value of onValidate must be an object with the following properties:
+ * - **onValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called whenever the value of an input changes. Its parameters are allInputs, input. The return value of onValidate must be an object with the following properties:
  *     - **valid** (bool): Whether the value is valid.
  *     - **message** (string) [optional]: An error message. Defaults to `'Invalid value. Please choose a different value.'`.
  * - **onDelayedValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called only when a user wants to accept input. This doesn't work in combination with `noAccept`. Its parameters are group, element. The return value of onValidate must be an object with the following properties:
@@ -629,7 +631,7 @@ function _mapElements(elements) {
  *     - **noCloseOnOverlay** (bool) [optional]: This is exclusive to dialogs with `noAccept == true`. This requires implementing custom closing logic. Default is `false`.
  *
  * ## Return value when awaited
- *  When this function is awaited, and `noAccept` is not set, it returns an object that contains each input element (only input elements), including all nested input elements, from the element parameter with their id as a key. If there is only a single input element, then the element is returned directly instead of as part of an object. If there is no input element, null is returned. Each returned element has the following properties.
+ *  When this function is awaited, it waits until it the user presses the accept button (which cannot happen if `noAccept == true`), or the `accept` function is called on the input. Then it returns an object that contains each input element (only input elements), including all nested input elements, from the element parameter with their id as a key. If there is only a single input element, then the element is returned directly instead of as part of an object. If there is no input element, null is returned. Each returned element has the following properties.
  * 
  * ### For `textInputType`
  * - **text** (string): The text value of the input.
@@ -718,13 +720,14 @@ async function show(element, options = null) {
     }
 
     const response = await requireResponse(showEventType, { element, options }, async (content, event) => {
+        log("hello");
         let map = null;
         if (event.type == validateInputEventType) {
             map = onValidateMap;
         } else if (event.type == delayedValidateInputEventType) {
             map = onDelayedValidateMap;
         }
-        return await map.get(content.element.id)(_mapElements(content.elements), content.element);
+        return await map.get(content.input.id)(content.input, _mapElements(content.allInputs));
     });
 
     if (options.noAccept) return null;
@@ -732,14 +735,14 @@ async function show(element, options = null) {
 }
 
 /**
- * If the element is an input element, it returns the current values of the input as described by the `show` function.
+ * If the element is an input element, it returns the current values of the input as described by the `show` function, as well as `isInvalid`, which indicates whether validation failed.
  */
 async function read(id) {
     return await requireResponse(readEventType, { id });
 }
 
 /**
- * Returns the current values of all nested inputs of the element (and itself if it is an input) as described by the `show` function. If `id` is null, it returns all elements regardless of their parent.
+ * Returns the current values of all nested inputs of the element (and itself if it is an input) as described by the `show` function, as well as `isInvalid`. If `id` is null, it returns all elements regardless of their parent.
  */
 async function readAll(id = null) {
     return await requireResponse(readEventType, { id, all: true });

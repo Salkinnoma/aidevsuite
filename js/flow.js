@@ -644,12 +644,13 @@ class Flow {
     static async requestValidation(settings, delayed = false) {
         if ((delayed && !settings.hasDelayedValidation) || (!delayed && !settings.hasValidation)) return;
 
-        const inputValues = Flow.extractInputValues(settings.group);
+        const inputValues = Flow.output.map(group => Flow.extractInputValues(group)).flat();
         const inputs = Flow.extractInputElements(settings.group);
         const targetInputValue = inputValues.find(v => v.id == settings.id);
+
         const response = await Flow.requireResponse(
             delayed ? Flow.delayedValidateInputEventType : Flow.validateInputEventType,
-            { group: inputValues, element: targetInputValue },
+            { allInputs: inputValues, input: targetInputValue },
             null,
             settings.group.event
         );
@@ -774,7 +775,7 @@ class Flow {
                 settings.katex = options.katex ?? true;
                 settings.katexDelimiters = options.katexDelimiters;
                 settings.noHighlight = options.noHighlight;
-                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
+                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 8));
             } else if (type === Flow.checkboxInputType) {
                 settings.checked = options.defaultValue ?? false;
                 settings.description = options.description ?? '';
@@ -1004,7 +1005,6 @@ class Flow {
         }
 
         if (decorated) {
-            console.log(settings);
             container.classList.add('decoratedContainer');
             const leftElement = fromHTML(`<div>`);
             settings.leftElement = leftElement;
@@ -1060,7 +1060,7 @@ class Flow {
                 language: settings.language,
                 readOnly: true,
                 placeholder: settings.placeholder,
-                maxHeight: settings.maxHeight == 0 ? null : settings.maxHeight * 100,
+                maxHeight: settings.maxHeight * 100,
             });
             settings.editorContainer = codeEditorResult.codeEditorContainer;
             codeEditorResult.codeEditorPromise.then(e => settings.codeEditor = e);
@@ -1160,7 +1160,7 @@ class Flow {
                 onInput: e => Flow.processMonacoInput(settings, 'text'),
                 text: true,
                 placeholder: settings.placeholder,
-                maxHeight: settings.maxHeight == 0 ? null : settings.maxHeight * 100,
+                maxHeight: settings.maxHeight * 100,
             });
             settings.editorContainer = textEditorResult.codeEditorContainer;
             textEditorResult.codeEditorPromise.then(e => settings.textEditor = e);
@@ -1192,7 +1192,7 @@ class Flow {
                 language: settings.language,
                 onInput: e => Flow.processMonacoInput(settings, 'code'),
                 placeholder: settings.placeholder,
-                maxHeight: settings.maxHeight == 0 ? null : settings.maxHeight * 100,
+                maxHeight: settings.maxHeight * 100,
             });
             settings.editorContainer = codeEditorResult.codeEditorContainer;
             codeEditorResult.codeEditorPromise.then(e => settings.codeEditor = e);
@@ -1203,7 +1203,9 @@ class Flow {
             settings.streamTarget = streamTarget;
             element.appendChild(streamTarget);
         } else if (type == Flow.markdownInputType) {
-            const contentContainer = fromHTML(`<div class="flex bordered rounded-xl">`);
+            const contentContainer = fromHTML(`<div class="flex bordered rounded-xl markdownEditor">`);
+
+            // Markdown editor
             const markdownEditorResult = CodeHelpers.createCodeEditor({
                 content: settings.markdown,
                 language: "markdown",
@@ -1213,23 +1215,34 @@ class Flow {
                 },
                 text: true,
                 placeholder: settings.placeholder,
-                maxHeight: settings.maxHeight == 0 ? null : settings.maxHeight * 100,
+                maxHeight: settings.maxHeight * 100,
             });
             markdownEditorResult.codeEditorContainer.classList.add('w-100');
             settings.editorContainer = markdownEditorResult.codeEditorContainer;
             markdownEditorResult.codeEditorPromise.then(e => settings.markdownEditor = e);
             contentContainer.appendChild(markdownEditorResult.codeEditorContainer);
 
+            // Stream target
             const streamTarget = fromHTML(`<div contenteditable="false" class="w-100 fixText hide scroll-y">`);
             if (settings.maxHeight > 0) streamTarget.classList.add("maxHeight-" + settings.maxHeight);
             settings.streamTarget = streamTarget;
             contentContainer.appendChild(streamTarget);
 
+            const outputContainer = fromHTML(`<div class="w-100">`);
+            // Fake bar for same height, could also add bottom border
+            // const fakeBar = fromHTML(`<div class="listContainerHorizontal">`);
+            // const starButton = fromHTML(`<div class="largeElement hoverable invisible">`);
+            // starButton.appendChild(icons.copy());
+            // fakeBar.appendChild(starButton);
+            // outputContainer.appendChild(fakeBar);
+
+            // Markdown output
             const markdownElement = fromHTML(`<div class="w-100 markdownPreview scroll-y" placeholder="Markdown Output">`);
-            if (settings.maxHeight > 0) streamTarget.classList.add("maxHeight-" + settings.maxHeight);
+            if (settings.maxHeight > 0) markdownElement.classList.add("maxHeight-" + settings.maxHeight);
             renderMarkdown(markdownElement, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
             settings.markdownElement = markdownElement;
-            contentContainer.appendChild(markdownElement);
+            outputContainer.appendChild(markdownElement);
+            contentContainer.appendChild(outputContainer);
             element.appendChild(contentContainer);
         } else if (type == Flow.checkboxInputType) {
             const checkboxContainer = fromHTML(`<div class="checkboxContainer">`);
@@ -1393,6 +1406,7 @@ class Flow {
             }
             unprocessed = newUnprocessed;
         }
+
         return inputs;
     }
 
@@ -1400,7 +1414,7 @@ class Flow {
         const inputs = Flow.extractInputElements(groupSettings);
         const inputValues = [];
         for (let settings of inputs) {
-            const value = { id: settings.id };
+            const value = { id: settings.id, isInvalid: settings.isInvalid };
             const type = settings.type;
 
             if (type == Flow.textInputType) {
@@ -1625,6 +1639,9 @@ class Flow {
         // Create elements
         const elements = insertGroupSettings.map(s => Flow.fromGroupSettings(s));
 
+        // Splice settings
+        const deleted = Flow.output.splice(start, deleteCount, ...insertGroupSettings);
+
         // Validate inputs before showing (but after creating)
         for (let groupSettings of insertGroupSettings) {
             const inputs = Flow.extractInputElements(groupSettings);
@@ -1632,9 +1649,6 @@ class Flow {
                 await Flow.requestValidation(settings);
             }
         }
-
-        // Splice settings
-        const deleted = Flow.output.splice(start, deleteCount, ...insertGroupSettings);
 
         // Remove deleted elements from their respective parent elements
         deleted.forEach(s => {
@@ -1728,7 +1742,7 @@ class Flow {
             await Flow.spliceOutput(insertAt - options.deleteBefore, options.deleteBefore);
         }
 
-        if (inputs.length == 0 || options.noAccept) Flow.postSuccessResponse(e);
+        if (inputs.length == 0) Flow.postSuccessResponse(e);
     }
 
     static async onRead(event) {
@@ -1758,7 +1772,6 @@ class Flow {
         // Update settings and corresponding elements
         if (properties.hide !== undefined) {
             settings.hide = content.hide;
-            console.log(content.hide);
             if (content.hide) settings.htmlElement.classList.add('hide');
             else settings.htmlElement.classList.remove('hide');
         }

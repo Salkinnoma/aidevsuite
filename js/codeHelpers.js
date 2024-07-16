@@ -68,20 +68,23 @@ class CodeHelpers {
 
         const preContainer = fromHTML(`<div class="preContainer">`);
 
+        let copyButton = null;
         // Code bar
-        const codeBar = fromHTML(`<div class="codeBar listContainerHorizontal">`);
-        const codeLanguage = fromHTML(`<div class="codeLanguage">`);
-        codeLanguage.textContent = options.language ?? 'any';
-        codeBar.appendChild(codeLanguage);
-        const copyButton = fromHTML('<button tooltip="Copy Code" class="largeElement hoverable">');
-        let copyTime = Date.now();
-        const copyIcon = icons.copy();
-        copyButton.appendChild(copyIcon);
-        codeBar.appendChild(copyButton);
-        preContainer.appendChild(codeBar);
+        if (!options.noBar) {
+            const codeBar = fromHTML(`<div class="codeBar listContainerHorizontal">`);
+            const codeLanguage = fromHTML(`<div class="codeLanguage">`);
+            codeLanguage.textContent = options.language ?? 'any';
+            codeBar.appendChild(codeLanguage);
+            copyButton = fromHTML('<button tooltip="Copy Code" class="largeElement hoverable">');
+            const copyIcon = icons.copy();
+            copyButton.appendChild(copyIcon);
+            codeBar.appendChild(copyButton);
+            preContainer.appendChild(codeBar);
+        }
 
+        let copyTime = Date.now();
         if (options.noMonaco) {
-            copyButton.addEventListener('click', e => {
+            copyButton?.addEventListener('click', e => {
                 copyToClipboard(codeElement.innerText);
                 copyButton.setAttribute('tooltip', 'Copied!');
                 copyTime = Date.now();
@@ -113,7 +116,7 @@ class CodeHelpers {
             const codeEditorPromise = Monaco.initEditor(codeEditorContainer, options.content, options.language, options);
             if (options.onInput != null) codeEditorPromise.then(e => e.onDidChangeModelContent(options.onInput));
 
-            copyButton.addEventListener('click', async e => {
+            copyButton?.addEventListener('click', async e => {
                 const codeEditor = await codeEditorPromise;
                 copyToClipboard(codeEditor.getValue());
                 copyButton.setAttribute('tooltip', 'Copied!');
