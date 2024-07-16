@@ -29,6 +29,8 @@ class Settings {
             settings.disableAI = disableAIElement.checked;
             Flow.refreshMonacoContext();
             WorkerPage.workerEditor?.setValue(await Flow.getWorkerScript());
+            if (settings.disableAI) Flow.promptEditorContainerElement?.classList.add('hide');
+            else Flow.promptEditorContainerElement?.classList.remove('hide');
         });
         disableAISetting.appendChild(disableAIElement);
         chatbotPage.appendChild(disableAISetting);

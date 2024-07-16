@@ -2760,6 +2760,7 @@ function getFlowPage() {
                 placeholder: "Enter prompt here...",
             });
             const promptEditorContainer = Flow.promptEditorContainerElement = promptEditorResult.codeEditorContainer;
+            if (settings.disableAI) promptEditorContainer.classList.add('hide');
             elements.push(promptEditorContainer);
             promptEditorResult.codeEditorPromise.then(e => Flow.promptEditor = e);
             Flow.promptEditorPromise = promptEditorResult.codeEditorPromise;
@@ -2806,7 +2807,6 @@ function getFlowPage() {
 
             footer.appendChild(rightFooterList);
             promptEditorContainer.appendChild(footer);
-            elements.push(promptEditorContainer);
         }
 
         if (name == 'extern' && Flow.loadedExternPage?.url != newUrl && newUrl) Flow.loadScript();
