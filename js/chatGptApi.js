@@ -306,7 +306,7 @@ class ChatGptApi {
                             const fullData = buffer + json;
                             if (fullData.startsWith('data: ')) fullData.replace("data: ", "");
                             obj = JSON.parse(fullData);
-                            console.log("Successfully resolved chunk split error. Full data:", fullData);
+                            //console.log("Successfully resolved chunk split error. Full data:", fullData);
                         }
                         buffer = "";
                     }
@@ -321,7 +321,7 @@ class ChatGptApi {
                 } catch (e) {
                     if (e.message.includes("JSON") && json != null) {
                         buffer += json;
-                        console.log("Chunk split error:", e.message, "For stream:", json);
+                        //console.log("Chunk split error:", e.message, "For stream:", json);
                     } else {
                         console.warn("Error decoding stream:", e.message, "For stream:", json);
                     }
