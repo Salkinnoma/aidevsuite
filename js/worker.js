@@ -773,34 +773,6 @@ async function accept(id = null) {
     await requireResponse(acceptEventType, { id });
 }
 
-/**
- * This allows communicating with a chatbot. A chatbot always responds with markdown.
- * - **context** (array): A list of message objects.
- * - **options** (object): An object that can have the following properties:
- *     - **id** (string) [optional]: Allows streaming to an element. If streaming to an input, it will be disabled for user input while streaming. This only works on elements with a string value, such as text, caption, code etc..
- *     - **onUpdate** (function) [optional]: Allows streaming to a callback function. The function can optionally return a string to update the value to e.g. extract code blocks. The function takes in the following parameters:
- *         - **response** (string): The newly streamed tokens concatenated with the previous response text.
- *     - **model** (string) [optional]: The model to be used. Default is `ChatHelpers.gpt4OmniIdentifier`.
- *     - **seed** (number) [optional]: The seed to be used. Very unreliable.
- */
-async function chat(context, options = null) {
-    const onUpdate = options?.onUpdate;
-
-    let response;
-    if (onUpdate == null) {
-        response = await requireResponse(chatEventType, { context, options });
-    } else {
-        delete options.onUpdate;
-        options.hasOnUpdate = true;
-        response = await requireResponse(chatEventType, { context, options }, (content, event) => {
-            const transformed = onUpdate(content);
-            postSuccessResponse(event, transformed);
-        });
-    }
-
-    return response;
-}
-
 async function requestFileDownload(name, type, content) {
     const file = {
         name: name,
@@ -991,60 +963,6 @@ function weeks(weeks) {
     return week * weeks;
 }
 
-const systemRole = "system";
-const userRole = "user";
-const assistantRole = "assistant";
-class ChatHelpers {
-    static messageToString(message) {
-        return message.role + ": " + message.content;
-    }
-
-    static gpt4OmniName = "GPT-4 Omni";
-    static gpt4TurboName = "GPT-4 Turbo";
-    static gpt4Name = "GPT-4";
-    static gpt3_5TurboName = "GPT-3.5 Turbo";
-
-    static gpt4OmniIdentifier = "gpt-4o";
-    static gpt4TurboIdentifier = "gpt-4-turbo";
-    static gpt4Identifier = "gpt-4";
-    static gpt3_5TurboIdentifier = "gpt-3.5-turbo";
-
-    static defaultModel = this.gpt4OmniIdentifier;
-
-    static gptModelNames = {
-        [this.gpt4OmniIdentifier]: this.gpt4OmniName,
-        [this.gpt4TurboIdentifier]: this.gpt4TurboName,
-        [this.gpt4Identifier]: this.gpt4Name,
-        [this.gpt3_5TurboIdentifier]: this.gpt3_5TurboName
-    }
-
-    static gptModels = new Set(Object.keys(this.gptModelNames));
-
-    static gptModelsThatAllowImages = new Set([
-        this.gpt4OmniIdentifier,
-        this.gpt4TurboIdentifier
-    ]);
-}
-
-function toMessage(role, prompt, url = null) {
-    return { role, prompt, url };
-}
-
-function toSystemMessage(prompt) {
-    return toMessage(systemRole, prompt);
-}
-
-/**
- * The image url is optional and only available for models that allow images.
- */
-function toUserMessage(prompt, url = null) {
-    return toMessage(userRole, prompt, url);
-}
-
-function toAssistantMessage(prompt) {
-    return toMessage(assistantRole, prompt);
-}
-
 function extractCode(markdown, codeBlocksOnly = true) {
     let amount = 0;
     let isCodeBlock = false;
@@ -1097,34 +1015,4 @@ function extractCode(markdown, codeBlocksOnly = true) {
     }
 
     return codes;
-}
-
-class Samples {
-    static async runSimpleChatBot() { // Simple chatbot implementation. You can use this as reference or even directly call it in your code!
-        await setStatus("Ready to chat"); // Set status as flavor
-        // Show input box for the user to enter their prompt
-        const promptInput = createInput(textInputType, { // Add text input to allow user to input their prompt
-            placeholder: "Enter your prompt here...", // Add placeholder to better communicate with the user
-        });
-        show(promptInput, { noAccept: true }); // Show the input without an accept button, so we can reuse it. Since it can't be accepted, we cannot await it.
-
-        const context = []; // Define context to pass to chatbot
-        async function run() { // Define run function to be called on chat button click
-            const prompt = (await read(promptInput.id)).text; // Read text value of prompt input
-            context.push(toUserMessage(prompt)); // Add user prompt to chat context
-
-            const userMessageElement = createText(paragraphType, `User:\n${prompt}`, { bordered: true }); // Add border to user message to make it easier for the user to see in the sea of messages
-            await show(userMessageElement, { insertBefore: promptInput.id }); // Insert before prompt input, as that should stay at the bottom.
-            const assistantMessageElement = createMarkdown(""); // Show assistant message in markdown to make it more appealing
-            await show(assistantMessageElement, { insertBefore: promptInput.id }); // Insert before prompt input, as that should stay at the bottom.
-
-            const result = await chat(context, { id: assistantMessageElement.id }); // Chat and stream to the last assistant message element.
-            context.push(toAssistantMessage(result)); // Save assistant response to chat context
-        }
-
-        const button = createButton(createText(paragraphType, "Chat"), run); // Button that calls run() on click
-        const wrapper = createFloatRightWrapper(button); // Make chat button float to the right
-        await show(wrapper); // Show the button
-        // Continues to run in the background until the script finishes running. To stop the script from finishing, await `forever` at the end of your script.
-    }
 }

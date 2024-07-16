@@ -1,5 +1,15 @@
 
 class Settings {
+    static _initialSettings = JSON.parse(localStorage.getItem('settings')) || {};
+
+    static _settingsHandler = {
+        set(settings, property, value) {
+            settings[property] = value;
+            localStorage.setItem('settings', JSON.stringify(settings));
+            return true;
+        }
+    };
+
     static element = null;
     static pagesElement = null;
 
@@ -8,14 +18,30 @@ class Settings {
     static getChatbotPage() {
         const chatbotPage = fromHTML(`<div class="hide">`);
         chatbotPage.setAttribute('settings-page', Settings.chatbotPage);
-        const apiKeySetting = fromHTML(`<div class="listHorizontal">`);
-        const apiKeyLabel = fromHTML(`<div>OpenAI Api Key`);
-        apiKeySetting.appendChild(apiKeyLabel);
-        const apiKeyElement = fromHTML(`<input type="password" placeholder="Enter api key...">`);
-        apiKeyElement.value = localStorage.getItem('openAIApiKey')
-        apiKeyElement.addEventListener('input', e => localStorage.setItem('openAIApiKey', apiKeyElement.value));
-        apiKeySetting.appendChild(apiKeyElement);
-        chatbotPage.appendChild(apiKeySetting);
+
+        // Disable AI
+        const disableAISetting = fromHTML(`<div tooltip="Disables all AI functionality." class="listHorizontal">`);
+        const disableAILabel = fromHTML(`<div>Disable AI`);
+        disableAISetting.appendChild(disableAILabel);
+        const disableAIElement = fromHTML(`<input type="checkbox">`);
+        disableAIElement.checked = settings.disableAI;
+        disableAIElement.addEventListener('input', async e => {
+            settings.disableAI = disableAIElement.checked;
+            Flow.refreshMonacoContext();
+            WorkerPage.workerEditor?.setValue(await Flow.getWorkerScript());
+        });
+        disableAISetting.appendChild(disableAIElement);
+        chatbotPage.appendChild(disableAISetting);
+
+        // OpenAI Api key
+        const openAIApiKeySetting = fromHTML(`<div class="listHorizontal">`);
+        const openAIApiKeyLabel = fromHTML(`<div>OpenAI Api Key`);
+        openAIApiKeySetting.appendChild(openAIApiKeyLabel);
+        const openAIApiKeyElement = fromHTML(`<input type="password" placeholder="Enter api key...">`);
+        openAIApiKeyElement.value = settings.openAIApiKey;
+        openAIApiKeyElement.addEventListener('input', e => settings.openAIApiKey = openAIApiKeyElement.value);
+        openAIApiKeySetting.appendChild(openAIApiKeyElement);
+        chatbotPage.appendChild(openAIApiKeySetting);
         return chatbotPage;
     }
 
@@ -26,11 +52,11 @@ class Settings {
     static open(page = null) {
         page ??= Settings.chatbotPage;
         Settings.close();
-    
+
         const dialogsContainer = document.getElementById('dialogs');
         const dialogElement = fromHTML(`<div class="dialog">`);
         const contentElement = fromHTML(`<div class="dialogContent">`);
-    
+
         const element = fromHTML(`<div class="dialogInnerContent largeElement bordered grounded">`);
         const titleBar = fromHTML(`<div class="listContainerHorizontal">`);
         titleBar.appendChild(fromHTML(`<h1>Settings`));
@@ -48,27 +74,30 @@ class Settings {
         element.appendChild(pageBar);
         element.appendChild(hb(6));
         const pagesElement = fromHTML(`<div>`);
-    
+
         // Settings pages
         pagesElement.appendChild(Settings.getChatbotPage());
-    
+
         element.appendChild(pagesElement);
         Settings.pagesElement = pagesElement;
         element.appendChild(hb(6));
-    
+
         contentElement.appendChild(element);
         dialogElement.appendChild(contentElement);
         const overlayElement = fromHTML(`<div class="dialogOverlay">`);
         overlayElement.addEventListener('click', e => Settings.close());
         dialogElement.appendChild(overlayElement);
         dialogsContainer.appendChild(dialogElement);
-    
+
         Settings.element = dialogElement;
-        
+
         Settings.changePage(page);
     }
-    
+
     static close() {
         if (Settings.element) Settings.element.remove();
     }
 }
+
+// Create a proxy for the settings object
+const settings = new Proxy(Settings._initialSettings, Settings._settingsHandler);

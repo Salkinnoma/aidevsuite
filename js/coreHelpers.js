@@ -157,3 +157,12 @@ document.addEventListener('keydown', function (event) {
         event.preventDefault();
     }
 });
+
+async function fetchText(url) {
+    const response = await fetch(url);
+    return await response.text();
+}
+
+async function fetchJson(url) {
+    return JSON.parse(await fetchText(url));
+}

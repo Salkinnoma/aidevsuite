@@ -7,6 +7,12 @@ class Flow {
     static isRunning = false;
     static loadedExternPage = null;
     static onIframeEvent = new Map();
+
+    static sampleClassLinks = ['data/Chat.json'];
+    static sampleClassPages = new Map();
+    static baseWorkerScript = null;
+    static workerScript = null;
+
     static progress = 0;
     static maxProgress = 1;
     static status = "Running...";
@@ -39,6 +45,12 @@ class Flow {
         }
     }
 
+    static async refreshMonacoContext() {
+        Monaco.clearNonEditorContext();
+        Flow.monacoContext = null;
+        Flow.loadMonacoContext();
+    }
+
     static onPageLoaded() {
         const name = getPathFromHash();
         if (name !== 'flow' && name !== 'extern' && !localPages.has(getPathPartFromHash(1))) return;
@@ -58,20 +70,41 @@ class Flow {
         }
     }
 
-    static setupIframe() {
-        const iframe = document.getElementById("sandbox");
-        Flow.iframe = iframe;
+    static async setupIframe() {
+        return new Promise((resolve, reject) => {
+            Flow.iframe?.remove();
 
-        window.addEventListener('message', function setupWorker(event) {
-            if (event.data.source == 'origin') return;
-            const data = event.data.message;
+            const iframeContainer = document.getElementById("iframeContainer");
 
-            if (event.data.source == 'worker') {
-                Flow.onWorkerMessage(data);
-            } else if (event.data.source == 'iframe') {
-                if (!event.data.response) console.log('IFrame Message Received:', data ?? event);
-                Flow.onIframeEvent.get(event.data.id)?.(event.data);
-            }
+            // Create the iframe element
+            const iframe = fromHTML(`<iframe id="sandbox" sandbox="allow-scripts" src="iframe.html" style="display:none;">`);
+
+            Flow.iframe = iframe;
+
+            window.addEventListener('message', function setupWorker(event) {
+                if (event.data.source == 'origin') return;
+                const data = event.data.message;
+
+                if (event.data.source == 'worker') {
+                    Flow.onWorkerMessage(data);
+                } else if (event.data.source == 'iframe') {
+                    if (!event.data.response) console.log('IFrame Message Received:', data ?? event);
+                    Flow.onIframeEvent.get(event.data.id)?.(event.data);
+                }
+            });
+
+            // Resolve the promise when the iframe is loaded
+            iframe.onload = () => {
+                resolve(iframe);
+            };
+
+            // Reject the promise if there's an error loading the iframe
+            iframe.onerror = () => {
+                reject(new Error('Failed to load iframe'));
+            };
+
+            // Append the iframe to the document body
+            iframeContainer.appendChild(iframe);
         });
     }
 
@@ -164,6 +197,10 @@ class Flow {
         doScrollTick();
     }
 
+    static async wrapPageInStaticFunction(page) {
+        return `static async ${escapeFileNameMinimal(page.name)}() {\n${addIndent(page.code)}\n}`;
+    }
+
     static onCodeInput(event) {
         let text = Flow.codeEditor.getValue();
         Flow.updateCode(text);
@@ -191,11 +228,13 @@ class Flow {
         Flow.updatePrompt(text);
     }
 
-    static run() {
+    static async run() {
         const mode = getHashQueryVariable('mode') ?? Flow.editMode;
         if (Flow.isRunning) {
             Flow.interruptRun();
         }
+
+        await Flow.setupIframe();
 
         if (mode == Flow.runMode) {
             Flow.executeCode();
@@ -342,11 +381,30 @@ class Flow {
         await Flow.requireIframeResponse({ loadWorker: await Flow.getWorkerScript() });
     }
 
-    static workerScript = null;
-    static async getWorkerScript() {
-        if (Flow.workerScript == null) {
-            const response = await fetch('js/worker.js');
-            Flow.workerScript = await response.text();
+    static async getWorkerScript(forceRefresh = false) {
+        if (Flow.workerScript == null || forceRefresh) {
+            Flow.baseWorkerScript = await fetchText('js/worker.js');
+            Flow.workerAIPartScript = await fetchText('js/workerAIPart.js');
+            for (let link of Flow.sampleClassLinks) {
+                const page = await fetchExternalPage(link);
+                Flow.sampleClassPages.set(link, page);
+            }
+        }
+
+        Flow.workerScript = Flow.baseWorkerScript;
+        if (!settings.disableAI) Flow.workerScript += '\n\n' + Flow.workerAIPartScript;
+
+        let samplePages = [...Flow.sampleClassPages.entries()];
+        if (settings.disableAI) samplePages = samplePages.filter(s => !s[0].endsWith('data/Chat.json'));
+        samplePages = samplePages.map(s => s[1]);
+        if (samplePages.length != 0) {
+            let classScript = '\n\nclass Samples {\n';
+            for (let page of samplePages) {
+                let pageFunction = await Flow.wrapPageInStaticFunction(page);
+                classScript += addIndent(pageFunction);
+            }
+            classScript += '\n}';
+            Flow.workerScript += classScript;
         }
 
         return Flow.workerScript;
@@ -2539,7 +2597,6 @@ class Flow {
     }
 }
 
-window.addEventListener('load', e => Flow.setupIframe());
 window.addEventListener('load', e => Flow.setupDialogs());
 
 function getFlowPage() {

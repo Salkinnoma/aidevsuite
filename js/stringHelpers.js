@@ -21,21 +21,21 @@ function getIndexBeyond(searchTerm, text, startIndex = 0) {
 
 const _htmlStringHelpers = {
     escapeHtmlChars: {
-        '¢' : 'cent',
-        '£' : 'pound',
-        '¥' : 'yen',
+        '¢': 'cent',
+        '£': 'pound',
+        '¥': 'yen',
         '€': 'euro',
-        '©' :'copy',
-        '®' : 'reg',
-        '<' : 'lt',
-        '>' : 'gt',
-        '"' : 'quot',
-        '&' : 'amp',
-        '\'' : '#39',
+        '©': 'copy',
+        '®': 'reg',
+        '<': 'lt',
+        '>': 'gt',
+        '"': 'quot',
+        '&': 'amp',
+        '\'': '#39',
     },
-    getEscapeHtmlRegex(){
+    getEscapeHtmlRegex() {
         let escapeHtmlRegexString = '[';
-        for(let key in _htmlStringHelpers.escapeHtmlChars) {
+        for (let key in _htmlStringHelpers.escapeHtmlChars) {
             escapeHtmlRegexString += key;
         }
         escapeHtmlRegexString += ']';
@@ -71,7 +71,7 @@ function escapeFileNameMinimal(col) {
     return col;
 }
 function escapeHTML(str) {
-    return str.replace(_htmlStringHelpers.escapeHtmlRegex, function(m) {
+    return str.replace(_htmlStringHelpers.escapeHtmlRegex, function (m) {
         return '&' + _htmlStringHelpers.escapeHtmlChars[m] + ';';
     });
 }
@@ -101,10 +101,10 @@ function escapeReplacement(string) {
     return string.replace(/\$/g, '$$$$');
 }
 
-function removeFirstChar(str){
+function removeFirstChar(str) {
     return str.substring(1);
 }
-function removeLastChar(str){
+function removeLastChar(str) {
     return str.substring(0, str.length - 1);
 }
 
@@ -114,4 +114,8 @@ function isString(str, orNull = false) {
 
 function getStringByteSize(string) {
     string.length * 2;
+}
+
+function addIndent(string, spaces = 4) {
+    return string.split('\n').map(l => ' '.repeat(spaces) + l).join('\n');
 }

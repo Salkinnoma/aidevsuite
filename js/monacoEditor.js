@@ -76,6 +76,10 @@ class Monaco {
         monaco.editor.getModels().forEach(model => model.dispose());
     }
 
+    static clearNonEditorContext() {
+        monaco.editor.getModels().filter(m => !m.isAttachedToEditor()).forEach(model => model.dispose());
+    }
+
     static _createEditor(containerElement, content, language, options = null) {
         options ??= {};
         options.value = content;

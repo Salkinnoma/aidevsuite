@@ -93,14 +93,17 @@ function moveLocalPage(page, newLink) {
 }
 
 async function fetchExternalPage(url) {
-    if (url.startsWith('#')) {
-        const page = localPages.get(removeFirstChar(url));
+    const localIdentifier = '#local/';
+    if (url.startsWith(localIdentifier)) {
+        const page = localPages.get(url.split(localIdentifier)[1].split('?')[0]);
         return { code: page.code };
     }
 
-    const response = await fetch(url);
-    const data = await response.json();
-    if (data.securityId !== securityId) throw new Error('Security check failed.');
+    const data = await fetchJson(url);
+    if (data.securityId !== securityId) {
+        console.log("Error Source:", url, data);
+        throw new Error('Security check failed.')
+    };
 
     return data;
 }
@@ -312,6 +315,9 @@ function getHomePage() {
     return container;
 }
 
+class WorkerPage {
+    static workerEditor = null;
+}
 function getWorkerPage() {
     const element = fromHTML(`<div>`);
     const title = fromHTML(`<h1>Worker Script`);
@@ -326,6 +332,7 @@ function getWorkerPage() {
         language: 'javascript',
         showMinimap: true,
     });
+    codeResult.codeEditorPromise.then(e => WorkerPage.workerEditor = e);
     element.appendChild(codeResult.codeEditorContainer);
     Flow.getWorkerScript().then(async code => {
         const editor = await codeResult.codeEditorPromise;
