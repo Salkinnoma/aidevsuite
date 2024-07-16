@@ -1019,7 +1019,7 @@ class Flow {
             container.classList.add('bordered');
             container.classList.add('largeElement');
         }
-        if (settings.disabled) element.setAttribute('disabled', '');
+        settings.disabledElements = [];
         settings.contentElement = element;
 
         if (type == Flow.breakType) {
@@ -1141,6 +1141,7 @@ class Flow {
                 mainChildElements.forEach(e => element.appendChild(e));
             } else if (type == Flow.buttonType) {
                 const buttonElement = fromHTML(`<button class="listHorizontal">`);
+                settings.disabledElements.push(buttonElement);
                 if (settings.buttonSubType == Flow.complexButtonType) {
                     buttonElement.classList.add('complexButton');
                     buttonElement.classList.add('largeElement');
@@ -1161,7 +1162,9 @@ class Flow {
                 text: true,
                 placeholder: settings.placeholder,
                 maxHeight: settings.maxHeight * 100,
+                readOnly: settings.disabled,
             });
+            settings.disabledElements.push(textEditorResult.codeEditorContainer);
             settings.editorContainer = textEditorResult.codeEditorContainer;
             textEditorResult.codeEditorPromise.then(e => settings.textEditor = e);
             element.appendChild(textEditorResult.codeEditorContainer);
@@ -1172,6 +1175,7 @@ class Flow {
             element.appendChild(streamTarget);
         } else if (type == Flow.numberInputType) {
             const inputElement = fromHTML(`<input type="number">`);
+            settings.disabledElements.push(inputElement);
             inputElement.value = settings.number;
             inputElement.addEventListener('input', e => {
                 InputHelpers.fixNumberInput(e.srcElement);
@@ -1181,6 +1185,7 @@ class Flow {
             settings.inputElement = inputElement;
         } else if (type == Flow.passwordInputType) {
             const passwordElement = fromHTML(`<input type="password">`);
+            settings.disabledElements.push(passwordElement);
             passwordElement.value = settings.password;
             passwordElement.setAttribute('placeholder', settings.placeholder);
             passwordElement.addEventListener('input', e => Flow.processInput(e.srcElement, settings, 'password', 'value'));
@@ -1193,7 +1198,9 @@ class Flow {
                 onInput: e => Flow.processMonacoInput(settings, 'code'),
                 placeholder: settings.placeholder,
                 maxHeight: settings.maxHeight * 100,
+                readOnly: settings.disabled,
             });
+            settings.disabledElements.push(codeEditorResult.codeEditorContainer);
             settings.editorContainer = codeEditorResult.codeEditorContainer;
             codeEditorResult.codeEditorPromise.then(e => settings.codeEditor = e);
             element.appendChild(codeEditorResult.codeEditorContainer);
@@ -1216,7 +1223,9 @@ class Flow {
                 text: true,
                 placeholder: settings.placeholder,
                 maxHeight: settings.maxHeight * 100,
+                readOnly: settings.disabled,
             });
+            settings.disabledElements.push(markdownEditorResult.codeEditorContainer);
             markdownEditorResult.codeEditorContainer.classList.add('w-100');
             settings.editorContainer = markdownEditorResult.codeEditorContainer;
             markdownEditorResult.codeEditorPromise.then(e => settings.markdownEditor = e);
@@ -1247,6 +1256,7 @@ class Flow {
         } else if (type == Flow.checkboxInputType) {
             const checkboxContainer = fromHTML(`<div class="checkboxContainer">`);
             const checkboxElement = fromHTML(`<input type="checkbox">`);
+            settings.disabledElements.push(checkboxElement);
             checkboxElement.checked = settings.checked;
             checkboxElement.addEventListener('change', e => Flow.processInput(e.srcElement, settings, 'checked', 'checked'));
             checkboxContainer.appendChild(checkboxElement);
@@ -1254,6 +1264,7 @@ class Flow {
             settings.checkboxElement = checkboxElement;
         } else if (type == Flow.selectInputType) {
             const selectElement = fromHTML(`<select>`);
+            settings.disabledElements.push(selectElement);
             selectElement.addEventListener('change', e => Flow.processInput(e.srcElement, settings, 'value', 'value'));
             settings.choices.forEach(c => {
                 const choiceElement = fromHTML(`<option>`);
@@ -1271,6 +1282,7 @@ class Flow {
             }
             const contentContainer = fromHTML(`<div>`);
             const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText">`);
+            settings.disabledElements.push(codeEditor);
             if (settings.maxHeight != 0) codeEditor.classList.add('maxHeight-' + settings.maxHeight);
             codeEditor.setAttribute('placeholder', settings.placeholder);
             codeEditor.textContent = settings.url;
@@ -1288,6 +1300,7 @@ class Flow {
             imgElement.setAttribute('alt', settings.caption ?? "");
             figureElement.appendChild(imgElement);
             const captionCodeEditor = fromHTML(`<figcaption contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 contenteditableContainerFooter fixText">`);
+            settings.disabledElements.push(captionCodeEditor);
             if (!settings.editableCaption) captionCodeEditor.classList.add('hide');
             if (settings.captionMaxHeight != 0) codeEditor.classList.add('maxHeight-' + settings.captionMaxHeight);
             figureElement.appendChild(captionCodeEditor);
@@ -1342,6 +1355,7 @@ class Flow {
             selectFilesElement.addEventListener('change', e => Flow.processFileInput(e, settings));
             dropArea.appendChild(selectFilesElement);
             const dropButtonElement = fromHTML(`<button class="w-100 dropButton largeElement complexButton">`);
+            settings.disabledElements.push(dropButtonElement);
             dropButtonElement.textContent = settings.selectDescription;
             dropArea.appendChild(dropButtonElement);
             fileElement.appendChild(dropArea);
@@ -1359,6 +1373,7 @@ class Flow {
             element.appendChild(fileElement);
         } else if (type == Flow.pasteInputType) {
             const pasteElement = fromHTML(`<div class="w-100 largeElement bordered" tabIndex="0">`);
+            settings.disabledElements.push(pasteElement);
             pasteElement.addEventListener('paste', e => Flow.processPaste(e, settings));
             const descriptionElement = fromHTML(`<i>`);
             descriptionElement.textContent = settings.emptyDescription;
@@ -1386,6 +1401,11 @@ class Flow {
             element.appendChild(validationContainer);
             settings.validationMessageElement = validationMessageElement;
             settings.validationContainer = validationContainer;
+        }
+
+        if (settings.disabled) {
+            if (settings.disabledElements.length == 0) settings.disabledElements.push(element);
+            settings.disabledElements.forEach(e => e.setAttribute('disabled', ''));
         }
 
         settings.leftChildren?.forEach(s => settings.leftElement.appendChild(Flow.fromElementSettings(s)));
@@ -1777,11 +1797,8 @@ class Flow {
         }
         if (properties.disabled !== undefined) {
             settings.disabled = properties.disabled;
-            if (settings.disabled) {
-                settings.contentElement.setAttribute('disabled', '');
-            } else {
-                settings.contentElement.removeAttribute('disabled');
-            }
+            if (settings.disabled) settings.disabledElements.forEach(e => e.addAttribute('disabled', ''));
+            else settings.disabledElements.forEach(e => e.removeAttribute('disabled'));
         }
         if (properties.text !== undefined) {
             settings.text = properties.text;
