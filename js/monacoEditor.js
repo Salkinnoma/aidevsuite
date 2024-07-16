@@ -118,9 +118,8 @@ class Monaco {
 
         const editor = monaco.editor.create(containerElement, options);
 
-        if (options.placeholder != null) {
-            new PlaceholderContentWidget(options.placeholder, editor);
-        }
+        const placeholder = new PlaceholderContentWidget(options.placeholder, editor);
+        editor.updatePlaceholder = p => placeholder.updatePlaceholder(p);
 
         if (options.expand) {
             let ignoreEvent = false;
@@ -220,6 +219,10 @@ class PlaceholderContentWidget {
         }
 
         return this.domNode;
+    }
+
+    updatePlaceholder(placeholder) {
+        this.domNode.textContent = this.placeholder = placeholder;
     }
 
     getPosition() {

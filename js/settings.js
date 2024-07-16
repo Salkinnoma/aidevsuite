@@ -41,7 +41,17 @@ class Settings {
         openAIApiKeySetting.appendChild(openAIApiKeyLabel);
         const openAIApiKeyElement = fromHTML(`<input type="password" placeholder="Enter api key...">`);
         openAIApiKeyElement.value = settings.openAIApiKey;
-        openAIApiKeyElement.addEventListener('input', e => settings.openAIApiKey = openAIApiKeyElement.value);
+        openAIApiKeyElement.addEventListener('input', e => {
+            settings.openAIApiKey = openAIApiKeyElement.value;
+
+            if (settings.openAIApiKey) {
+                Flow.rewriteScriptButton?.removeAttribute('disabled');
+                Flow.generateScriptButton?.removeAttribute('disabled');
+            } else {
+                Flow.rewriteScriptButton?.setAttribute('disabled', '');
+                Flow.generateScriptButton?.setAttribute('disabled', '');
+            }
+        });
         openAIApiKeySetting.appendChild(openAIApiKeyElement);
         chatbotPage.appendChild(openAIApiKeySetting);
         return chatbotPage;

@@ -69,14 +69,6 @@ class ChatGptApi {
         return model;
     }
 
-    static setLocalApiKey(apiKey) {
-        return localStorage.setItem('openAIApiKey', apiKey);
-    }
-
-    static getLocalApiKey() {
-        return localStorage.getItem('openAIApiKey');
-    }
-
     /**
      * options:
      * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null, continueAfterMaxTokens = true, maxTokens = 4096
@@ -102,7 +94,7 @@ class ChatGptApi {
     static async _internalGetChatResponse(messages, options = null) {
         options ??= {};
         const model = options.gptModel ?? ChatGptApi.defaultModel;
-        const apiKey = options.apiKey ?? ChatGptApi.getLocalApiKey();
+        const apiKey = options.apiKey ?? settings.openAIApiKey;
         if (!apiKey) throw new Error('Required OpenAI Api Key was missing.');
 
         const messagesCopy = [...messages];
@@ -173,7 +165,7 @@ class ChatGptApi {
     static async getChatStream(messages, options = null) {
         options ??= {};
         const model = options.gptModel ?? ChatGptApi.defaultModel;
-        const apiKey = options.apiKey ?? ChatGptApi.getLocalApiKey();
+        const apiKey = options.apiKey ?? settings.openAIApiKey;
         if (!apiKey) throw new Error('Required OpenAI Api Key was missing.');
 
         const messagesCopy = [...messages];
@@ -312,6 +304,7 @@ class ChatGptApi {
                             console.warn("Failed resolving chunk split error. Skipped data:", buffer);
                         } catch (e) {
                             const fullData = buffer + json;
+                            if (fullData.startsWith('data: ')) fullData.replace("data: ", "");
                             obj = JSON.parse(fullData);
                             console.log("Successfully resolved chunk split error. Full data:", fullData);
                         }

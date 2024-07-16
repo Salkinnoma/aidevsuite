@@ -61,12 +61,20 @@ class Flow {
 
         Flow.setupMonacoContext();
 
-        if (Flow.isRunning) {
-            Flow.interruptRun();
-        }
-
         if (Flow.mode == Flow.runMode) {
             Flow.run();
+        }
+    }
+
+    static async setupMessageChannel(event) {
+        if (event.data.source == 'origin') return;
+        const data = event.data.message;
+
+        if (event.data.source == 'worker') {
+            Flow.onWorkerMessage(data);
+        } else if (event.data.source == 'iframe') {
+            if (!event.data.response) console.log('IFrame Message Received:', data ?? event);
+            Flow.onIframeEvent.get(event.data.id)?.(event.data);
         }
     }
 
@@ -80,18 +88,6 @@ class Flow {
             const iframe = fromHTML(`<iframe id="sandbox" sandbox="allow-scripts" src="iframe.html" style="display:none;">`);
 
             Flow.iframe = iframe;
-
-            window.addEventListener('message', function setupWorker(event) {
-                if (event.data.source == 'origin') return;
-                const data = event.data.message;
-
-                if (event.data.source == 'worker') {
-                    Flow.onWorkerMessage(data);
-                } else if (event.data.source == 'iframe') {
-                    if (!event.data.response) console.log('IFrame Message Received:', data ?? event);
-                    Flow.onIframeEvent.get(event.data.id)?.(event.data);
-                }
-            });
 
             // Resolve the promise when the iframe is loaded
             iframe.onload = () => {
@@ -177,20 +173,20 @@ class Flow {
 
         await Flow.externCodeEditorPromise;
         Flow.externContainerElement.classList.remove('hide');
-        Flow.externTargetElement.setValue('Loading...');
+        Flow.externTargetElement.updatePlaceholder('Loading...');
         Flow.externTargetElement.update();
         doScrollTick();
         try {
             const page = await fetchExternalPage(url);
             page.url = url;
             Flow.loadedExternPage = page;
-            if (page.code.length == 0) Flow.externTargetElement.setValue('Loaded script seems to be empty...');
+            if (page.code.length == 0) Flow.externTargetElement.updatePlaceholder('Loaded script seems to be empty...');
             else Flow.externTargetElement.setValue(page.code);
             Flow.externTargetElement.update();
             Flow.setStatus('Finished loading external script.');
         } catch (e) {
             console.log(e);
-            Flow.externTargetElement.setValue('Failed loading external script.');
+            Flow.externTargetElement.updatePlaceholder('Failed loading external script.');
             Flow.externTargetElement.update();
             Flow.setStatus('Error: Failed loading external script: ' + e.message, true);
         }
@@ -229,19 +225,20 @@ class Flow {
     }
 
     static async run() {
-        const mode = getHashQueryVariable('mode') ?? Flow.editMode;
-        if (Flow.isRunning) {
-            Flow.interruptRun();
-        }
-
-        await Flow.setupIframe();
-
-        if (mode == Flow.runMode) {
-            Flow.executeCode();
-        } else {
+        if (Flow.mode != Flow.runMode) {
             goToUrl(getUrlWithChangedHashParam('mode', Flow.runMode));
             return;
         }
+
+        if (Flow.isRunning) {
+            Flow.setStatus("Terminating previous session...");
+            Flow.interruptRun();
+        }
+
+        Flow.setStatus("Booting up...");
+        await Flow.setupIframe();
+
+        Flow.executeCode();
     }
 
     static edit() {
@@ -272,6 +269,7 @@ class Flow {
         const userMessage = ChatGptApi.toUserMessage(prompt);
         const context = rewrite ? [systemMessage, secondSystemMessage, userMessage] : [systemMessage, userMessage];
 
+        Flow.streamTargetElement.textContent = "";
         Flow.codeEditorContainerElement.classList.add('hide');
         Flow.streamContainerElement.classList.remove('hide');
 
@@ -332,6 +330,7 @@ class Flow {
 
     static interruptRun() {
         Flow.destroyWorker();
+        Flow.clearOutput();
         Flow.dialogOutputContainer.classList.add('hide');
         Flow.isRunning = false;
     }
@@ -882,6 +881,7 @@ class Flow {
         settings.id = element.id;
         Flow.groupById.set(settings.id, settings);
         settings.element = Flow.extractSettingsFromElement(element, settings);
+        settings.acceptButtonContent = options.acceptButtonContent == null ? null : Flow.extractSettingsFromElement(options.acceptButtonContent, settings);
         settings.noAccept = options.noAccept ?? false;
         settings.accepted = false;
         settings.location = options.location ?? Flow.mainLocation;
@@ -1123,7 +1123,7 @@ class Flow {
             settings.editorContainer = codeEditorResult.codeEditorContainer;
             codeEditorResult.codeEditorPromise.then(e => settings.codeEditor = e);
             element.appendChild(codeEditorResult.codeEditorContainer);
-            const streamTarget = fromHTML(`<div contenteditable="false" class="w-100 fixText hide scroll-y">`);
+            const streamTarget = fromHTML(`<div contenteditable="false" class="w-100 fixText hide scroll-y codeBlock">`);
             if (settings.language != null) streamTarget.classList.add('language-' + settings.language);
             if (settings.maxHeight > 0) streamTarget.classList.add("maxHeight-" + settings.maxHeight);
             settings.streamTarget = streamTarget;
@@ -1263,7 +1263,7 @@ class Flow {
             codeEditorResult.codeEditorPromise.then(e => settings.codeEditor = e);
             element.appendChild(codeEditorResult.codeEditorContainer);
 
-            const streamTarget = fromHTML(`<code contenteditable="false" class="w-100 largeElement fixText hide scroll-y">`);
+            const streamTarget = fromHTML(`<code contenteditable="false" class="w-100 largeElement fixText hide scroll-y codeBlock">`);
             if (settings.maxHeight > 0) streamTarget.classList.add("maxHeight-" + settings.maxHeight);
             settings.streamTarget = streamTarget;
             element.appendChild(streamTarget);
@@ -1544,21 +1544,22 @@ class Flow {
         Flow.closeOutputDialog();
     }
 
-    static async onAccept(groupSettings) {
+    static async onAccept(groupSettings, forceAccept = false) {
         if (groupSettings.accepted) return;
 
         if (groupSettings.location == Flow.dialogLocation) Flow.remove(groupSettings.id);
 
         const inputValues = Flow.extractInputValues(groupSettings);
-        groupSettings.accepted = true;
         if (groupSettings.location != Flow.dialogLocation) groupSettings.acceptButtonElement.remove();
 
         const inputs = Flow.extractInputElements(groupSettings);
-        for (let settings of inputs) {
-            await Flow.requestDelayedValidation(settings)
+        if (!forceAccept) {
+            for (let settings of inputs) {
+                await Flow.requestDelayedValidation(settings)
+            }
         }
 
-        if (groupSettings.isInvalid) return;
+        if (groupSettings.isInvalid && !forceAccept) return;
 
         groupSettings.accepted = true;
         Flow.postSuccessResponse(groupSettings.event, inputValues);
@@ -1678,7 +1679,8 @@ class Flow {
                 footer.appendChild(fromHTML(`<div>`));
                 const acceptButton = fromHTML(`<button class="largeElement complexButton">`);
                 if (settings.isInvalid) acceptButton.setAttribute('disabled', '');
-                acceptButton.textContent = "Accept";
+                if (settings.acceptButtonContent == null) acceptButton.textContent = "Accept";
+                else acceptButton.appendChild(Flow.fromElementSettings(settings.acceptButtonContent));
                 acceptButton.addEventListener('click', e => Flow.onAccept(settings));
                 footer.appendChild(acceptButton);
                 element.appendChild(footer);
@@ -1707,6 +1709,11 @@ class Flow {
         }
 
         return element;
+    }
+
+    static clearOutput() {
+        Flow.output.forEach(s => s.htmlElement.remove());
+        Flow.output = [];
     }
 
     static async spliceOutput(start = -1, deleteCount = 0, ...insertGroupSettings) {
@@ -1992,10 +1999,10 @@ class Flow {
         const e = event;
         const content = e.content;
         if (content.id == null) {
-            Flow.output.forEach(s => Flow.onAccept(s));
+            Flow.output.forEach(s => Flow.onAccept(s, true));
         } else {
             const group = Flow.groupById.get(content.id);
-            Flow.onAccept(group);
+            Flow.onAccept(group, true);
         }
 
         Flow.postSuccessResponse(e);
@@ -2131,6 +2138,18 @@ class Flow {
             console.log(error.stack);
             Flow.postErrorResponse(e, "chat_error");
         }
+    }
+
+    static async onFileDownloadRequest(event) {
+        const e = event;
+        const content = e.content;
+        downloadFile(content.name, content.content, content.type);
+    }
+
+    static async onDataURLDownloadRequest(event) {
+        const e = event;
+        const content = e.content;
+        downloadDataURL(content.name, content.dataURL);
     }
 
     static async onSetProgressRequest(event) {
@@ -2718,7 +2737,7 @@ function getFlowPage() {
         }
 
         // Stream target
-        const streamContainerElement = fromHTML(`<pre class="largeElement bordered hide maxHeight-8 scroll-y">`);
+        const streamContainerElement = fromHTML(`<pre class="largeElement codeBlock hide maxHeight-8 scroll-y">`);
         Flow.streamContainerElement = streamContainerElement;
         const streamTargetElement = fromHTML(`<code class="fixText language-javascript" placeholder="Loading...">`);
         Flow.streamTargetElement = streamTargetElement;
@@ -2770,6 +2789,7 @@ function getFlowPage() {
 
             // Rewrite button
             const rewriteButton = fromHTML(`<button class="largeElement complexButton">`);
+            if (!settings.openAIApiKey) rewriteButton.setAttribute('disabled', '');
             Flow.rewriteScriptButton = rewriteButton;
             const rewriteButtonList = fromHTML(`<div class="listHorizontal">`);
             const rewriteIcon = icons.retry();
@@ -2784,6 +2804,7 @@ function getFlowPage() {
 
             // Generate button
             const generateButton = fromHTML(`<button class="largeElement complexButton">`);
+            if (!settings.openAIApiKey) generateButton.setAttribute('disabled', '');
             Flow.generateScriptButton = generateButton;
             const generateButtonList = fromHTML(`<div class="listHorizontal">`);
             const sparklesIcon = icons.sparkles();
@@ -2822,3 +2843,4 @@ function getFlowPage() {
 }
 
 window.addEventListener('pageloaded', e => Flow.onPageLoaded());
+window.addEventListener('message', e => Flow.setupMessageChannel(e));

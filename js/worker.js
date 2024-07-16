@@ -618,11 +618,12 @@ function _mapElements(elements) {
  * ## Parameters
  * - **element** (object): The `element` parameter accepts an element created via any of the create functions.
  * - **options** (object) [optional]: An object that can have the following properties:
- *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If you add your own custom button to accept input, you must set this to true! If an input can be accepted multiple times, set this to `true` and add custom logic that uses the `read` function to read the input values upon a click on a custom button. Default is `false`.
+ *     - **acceptButtonContent** (object) [optional]: An element to be shown within the default accept button. Default is a paragraph with `Accept`.
+ *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If an input can be accepted multiple times, add a custom button that uses the `read` function to read the input values `onClick`. If you add your own custom accept button (instead of modifying `acceptButtonContent`), you must set this to true. Default is `false`.
  *     - **location** (string) [optional]: The location of the group. Default is `mainLocation`. The following values are supported:
  *         - `mainLocation`: The default location.
  *         - `stickyLocation`: The group will stick to the top of the page.
- *         - `dialogLocation`: The group will be shown within a dialog. It is recommended to start the group with a title. Only one dialog can be shown at a time. Removing a dialog element will close the dialog. A dialog element is automatically `remove`d after the user closes (noAccept == true only), cancels (noAccept == false only) or accepts (noAccept == false only) it. This will be awaited. Returns error response on cancel.
+ *         - `dialogLocation`: The group will be shown as a dialog. It is recommended to start the group with a title. Only one dialog can be shown at a time, which is why `noAccept` is discouraged on a dialog. Removing a dialog element will close the dialog. A dialog element is automatically `remove`d after the user closes (noAccept == true only), cancels (noAccept == false only) or accepts (noAccept == false only) it. This will be awaited. Returns error response on cancel.
  *     - **insertAt** (number) [optional]: Where to insert. This allows negative indices. The default is `-1`.
  *     - **insertBefore** (string) [optional]: `id` of the group to insert before.
  *     - **insertAfterInstead** (bool) [optional]: Modifies insertBefore to insert after that group instead. Default is `false`.
@@ -631,7 +632,7 @@ function _mapElements(elements) {
  *     - **noCloseOnOverlay** (bool) [optional]: This is exclusive to dialogs with `noAccept == true`. This requires implementing custom closing logic. Default is `false`.
  *
  * ## Return value when awaited
- *  When this function is awaited, it waits until it the user presses the accept button (which cannot happen if `noAccept == true`), or the `accept` function is called on the input. Then it returns an object that contains each input element (only input elements), including all nested input elements, from the element parameter with their id as a key. If there is only a single input element, then the element is returned directly instead of as part of an object. If there is no input element, null is returned. Each returned element has the following properties.
+ *  When this function is awaited, it waits until it the user presses the accept button (which cannot happen if `noAccept == true`), or the `accept` function is called on the input. Then it returns an object that contains each input element (only input elements), including all nested input elements, from the element parameter with their id as a key. If there is only a single input element, then the element is returned directly instead of as part of an object. If there is no input element, null is returned. Each returned element is an object with the following properties.
  * 
  * ### For `textInputType`
  * - **text** (string): The text value of the input.
@@ -659,27 +660,27 @@ function _mapElements(elements) {
  * - **caption** (string): The caption value of the input.
  *
  * ### For `fileInputType`
- * - **files** (array): List of files with the following properties:
+ * - **files** (array): List of objects with the following properties:
  *     - **name** (string): The name of the file.
  *     - **size** (number): The size of the file in bytes.
  *     - **type** (string): The MIME type of the file.
  *     - **lastModified** (number): The last modified timestamp of the file.
  *     - **lastModifiedDate** (Date): The last modified date of the file.
- *     - **text** (string): The text content of the file.
- *     - **dataURL** (string): The Data URL of the file.
+ *     - **text** (string): The text content of the file. This is a STRING! DONT AWAIT OR CALL IT!
+ *     - **dataURL** (string): The Data URL of the file. This is a STRING! DONT AWAIT OR CALL IT!
  *
  * ### For `pasteInputType`
  * - **html** (string): The html value of the input.
  * - **text** (string): The text value of the input.
  * - **rtf** (string): The rtf value of the input.
- * - **files** (array): List of files with the following properties:
+ * - **files** (array): List of objects with the following properties:
  *     - **name** (string): The name of the file.
  *     - **size** (number): The size of the file in bytes.
  *     - **type** (string): The MIME type of the file.
  *     - **lastModified** (number): The last modified timestamp of the file.
  *     - **lastModifiedDate** (Date): The last modified date of the file.
- *     - **text** (string): The text content of the file.
- *     - **dataURL** (string): The Data URL of the file.
+ *     - **text** (string): The text content extracted from the file. This is a STRING! DONT AWAIT OR CALL IT!
+ *     - **dataURL** (string): The Data URL extracted from the file. This is a STRING! DONT AWAIT OR CALL IT!
  * */
 async function show(element, options = null) {
     options ??= {};
@@ -735,7 +736,7 @@ async function show(element, options = null) {
 }
 
 /**
- * If the element is an input element, it returns the current values of the input as described by the `show` function, as well as `isInvalid`, which indicates whether validation failed.
+ * If the element is an input element, it returns the current values of the input as described by the `show` function, as well as `isInvalid`, which indicates whether validation failed. It does NOT await user input. Calling this directly after showing something with `noAccept` is pointless.
  */
 async function read(id) {
     return await requireResponse(readEventType, { id });
@@ -767,7 +768,7 @@ async function remove(id) {
 }
 
 /**
- * - **id** (string) [optional]: The id of the top level element to accept input from. This is only useful if `noAccept == true`. If null, all inputs across all top level elements will be accepted instead.
+ * - **id** (string) [optional]: The id of the top level element to accept input from. This ignores validation. If you have a promise for showing `noAccept == true`, then you need to use this function to fulfill the promise. If null, all inputs across all top level elements will be accepted instead.
  */
 async function accept(id = null) {
     await requireResponse(acceptEventType, { id });
