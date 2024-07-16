@@ -1106,7 +1106,7 @@ class Samples {
         const promptInput = createInput(textInputType, { // Add text input to allow user to input their prompt
             placeholder: "Enter your prompt here...", // Add placeholder to better communicate with the user
         });
-        await show(promptInput, { noAccept: true }); // Show the input without an accept button, so we can reuse it.
+        show(promptInput, { noAccept: true }); // Show the input without an accept button, so we can reuse it. Since it can't be accepted, we cannot await it.
 
         const context = []; // Define context to pass to chatbot
         async function run() { // Define run function to be called on chat button click

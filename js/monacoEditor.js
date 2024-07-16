@@ -107,6 +107,9 @@ class Monaco {
             options.fontSize = 16;
             options.overviewRulerLanes ??= 0;
             options.wordBasedSuggestions ??= "off";
+            options.stickyScroll ??= {
+                enabled: false,
+            };
         }
 
         const editor = monaco.editor.create(containerElement, options);
