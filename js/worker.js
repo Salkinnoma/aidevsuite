@@ -719,7 +719,6 @@ async function show(element, options = null) {
     }
 
     const response = await requireResponse(showEventType, { element, options }, async (content, event) => {
-        log("hello");
         let map = null;
         if (event.type == validateInputEventType) {
             map = onValidateMap;
