@@ -36,9 +36,9 @@ body {
 .container {
     width: 100%;
     max-width: 800px;
-    padding-right: var(--bs-gutter-x,.75rem);
-    padding-left: var(--bs-gutter-x,.75rem);
-    padding-bottom: 64px;
+    padding-right: var(--bs-gutter-x, .75rem);
+    padding-left: var(--bs-gutter-x, .75rem);
+    padding-bottom: 16px;
     margin-right: auto;
     margin-left: auto;
 }
@@ -51,4 +51,8 @@ body {
 
 p {
     margin: 0;
+}
+
+.flowStickyContainer {
+    box-shadow: -2px 0 0 0 var(--background-color), 2px 0 0 0 var(--background-color);
 }

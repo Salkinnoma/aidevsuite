@@ -237,3 +237,7 @@ b {
 .success-text {
     color: var(--success-color);
 }
+
+.centerContentHorizontally {
+    justify-content: center;
+}

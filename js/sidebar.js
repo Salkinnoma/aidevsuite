@@ -1,9 +1,11 @@
+const minWidthForPermaOpenSidebar = 1340;
+
 let preSidebarStyleElement;
 function preSidebar() {
     var width = document.documentElement.clientWidth;
 
     let css;
-    if (width <= 1878) {
+    if (width < minWidthForPermaOpenSidebar) {
         // Close
         css = '.sidebar { display: none!important; } .sidebarOpenOnly { display: none!important; } .sidebarControlsDisabledOnly { display: none!important; }';
     }
@@ -74,7 +76,7 @@ function closeSidebar() {
 function updateSidebar() {
     var width = document.documentElement.clientWidth;
 
-    if (width <= 1878) {
+    if (width < minWidthForPermaOpenSidebar) {
         closeSidebar();
         if (!sidebarControlsEnabled || sidebarControlsEnabled == null) {
             sidebarControlsEnabled = true;

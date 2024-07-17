@@ -79,3 +79,7 @@ function toUserMessage(prompt, url = null) {
 function toAssistantMessage(prompt) {
     return toMessage(assistantRole, prompt);
 }
+
+function toImageMessage(url) {
+    return { userRole, prompt: "", url };
+}

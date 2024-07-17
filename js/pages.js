@@ -14,6 +14,12 @@ const specialFlowPages = new Set([
     'extern',
 ]);
 
+const flowPages = new Set([
+    'flow',
+    'extern',
+    'local',
+]);
+
 let localPages = new Map();
 let linkedPages = new Map();
 
@@ -219,12 +225,14 @@ function loadPage() {
     let newPage;
     console.log("Page loaded:", hash);
     const link = getPathFromHash();
+    let isFlow = false;
     if (hash == '' || hash == '#' || hash == '#home') {
         removeHash();
         newPage = getHomePage();
     } else if (topPath == 'local' ||
         link == 'flow' ||
         link == 'extern') {
+        isFlow = true;
         newPage = getFlowPage();
     } else if (link == 'worker') {
         newPage = getWorkerPage();
@@ -237,6 +245,7 @@ function loadPage() {
 
     if (!Array.isArray(newPage)) newPage = [newPage];
     page.replaceChildren(...newPage);
+    if (isFlow) Flow.adjustContentHeight();
 
     updatePagesSidebar();
     updateSidebar();

@@ -6,6 +6,7 @@ class Settings {
         set(settings, property, value) {
             settings[property] = value;
             localStorage.setItem('settings', JSON.stringify(settings));
+            window.settings = settings;
             return true;
         }
     };
@@ -113,3 +114,4 @@ class Settings {
 
 // Create a proxy for the settings object
 const settings = new Proxy(Settings._initialSettings, Settings._settingsHandler);
+window.settings = settings;

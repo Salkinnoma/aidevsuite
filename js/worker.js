@@ -50,7 +50,6 @@ const buttonType = "buttonType";
 // Bar sub types
 const navBarType = "navBarType";
 const listBarType = "listBarType";
-const fillBarType = "fillBarType";
 
 // Button sub types
 const simpleButtonType = "simpleButtonType";
@@ -254,6 +253,7 @@ async function load(url) {
  * - **breakBefore** (number) [optional]: Adds a break before with the value as its size. Must be between 0 and 8. Default is `0`.
  * - **breakAfter** (number) [optional]: Adds a break after with the value as its size. Must be between 0 and 8. Default is `0`.
  * - **hide** (bool) [optional]: This can be useful when smoothly wanting to add to elements of containers without recreating the entire container, as they can't be added via `update`. Default is `false`.
+ * - **stretch** (bool) [optional]: Whether the element should try to maximize its width.
  * - **leftElements** (array) [optional]: An array of small elements to float to the left of an element.
  * - **rightElements** (array) [optional]: An array of small elements to float to the right of an element.
  */
@@ -287,7 +287,7 @@ function createRuler(options = null) {
     return content;
 }
 
-// Create empty placeholder elements for use in navBarLists, as they use `justify-content: space-between;`
+// Create empty placeholder elements. Can for use in navBarLists, as they use `justify-content: space-between;`. Can also `hide` them to use them as an anchor for `insertBefore` and `insertAfter`.
 function createEmpty(options = null) {
     const content = {
         id: options?.id ?? generateUniqueId(),
@@ -406,6 +406,10 @@ function createIcon(ds, iconProvider, options = null) {
     return content;
 }
 
+function createPresetIcon(name, options = null) {
+    return createIcon(name, null, options);
+}
+
 /**
  * ## Parameters
  * - **type** (string): Specifies the type of the container. All `containerTypes` are supported. Use `verticalType` for simple grouping of elements without any effect on their appearance.
@@ -424,8 +428,8 @@ function createIcon(ds, iconProvider, options = null) {
  * ### `barType`
  * - **barSubType** (string) [optional]: The type of the bar or list. Default is `navBarType`. Supported values are:
  *     - `navBarType` // Uses `justify-content: space-between;`, works well with `emptyType` elements. E.g. a navBar with an emptyElement and a button will cause the button to float right.
- *     - `listBarType` // Normal wrapping list
- *     - `fillBarType` // Uses `flex` to try to share the horzontal space but also fill it
+ *     - `listBarType` // Normal wrapping list. You can use `stretch` on its children to fill the available width.
+ * - **centered** (bool) [optional]: Whether the items should be centered. Default is `false`.
  * 
  * ### `buttonType`
  * - **buttonSubType** (string) [optional]: Specifies the type of the button. Default is `complexButtonType`. Supported values are:
@@ -460,18 +464,12 @@ function createCenteredGroup(elements, options = null) {
 }
 
 function createNavBar(elements, options = null) {
-    return createContainer(navBarType, elements, options);
+    return createContainer(barType, elements, options);
 }
 
 function createHorizontalList(elements, options = null) {
     options ??= {};
     options.barSubType = listBarType;
-    return createContainer(barType, elements, options);
-}
-
-function createFilledBar(elements, options = null) {
-    options ??= {};
-    options.barSubType = fillBarType;
     return createContainer(barType, elements, options);
 }
 
@@ -586,15 +584,16 @@ function createInput(type, options = null) {
     return content;
 }
 
-function _extractElements(element) {
+function _extractElements(group) {
     const elements = [];
-    let unprocessedElements = [element];
+    let unprocessedElements = [group];
+    if (group.acceptButtonContent != null) unprocessedElements = unprocessedElements.concat(group.acceptButtonContent);
     while (unprocessedElements.length !== 0) {
         let newUnprocessedElements = [];
         for (let element of unprocessedElements) {
             if (containerTypes.has(element.type)) newUnprocessedElements = newUnprocessedElements.concat(element.elements);
-            if (element.leftElements != null) newUnprocessedElements = newUnprocessedElements.concat(element.leftElements);
-            if (element.rightElements != null) newUnprocessedElements = newUnprocessedElements.concat(element.rightElements);
+            if (element.options?.leftElements != null) newUnprocessedElements = newUnprocessedElements.concat(element.options.leftElements);
+            if (element.options?.rightElements != null) newUnprocessedElements = newUnprocessedElements.concat(element.options.rightElements);
             elements.push(element);
         }
         unprocessedElements = newUnprocessedElements;
@@ -620,13 +619,13 @@ function _mapElements(elements) {
  * - **options** (object) [optional]: An object that can have the following properties:
  *     - **acceptButtonContent** (object) [optional]: An element to be shown within the default accept button. Default is a paragraph with `Accept`.
  *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If an input can be accepted multiple times, add a custom button that uses the `read` function to read the input values `onClick`. If you add your own custom accept button (instead of modifying `acceptButtonContent`), you must set this to true. Default is `false`.
- *     - **location** (string) [optional]: The location of the group. Default is `mainLocation`. The following values are supported:
+ *     - **location** (string) [optional]: The location of element. Default is `mainLocation`. The following values are supported:
  *         - `mainLocation`: The default location.
- *         - `stickyLocation`: The group will stick to the top of the page.
- *         - `dialogLocation`: The group will be shown as a dialog. It is recommended to start the group with a title. Only one dialog can be shown at a time, which is why `noAccept` is discouraged on a dialog. Removing a dialog element will close the dialog. A dialog element is automatically `remove`d after the user closes (noAccept == true only), cancels (noAccept == false only) or accepts (noAccept == false only) it. This will be awaited. Returns error response on cancel.
+ *         - `stickyLocation`: The element will stick to the top of the page.
+ *         - `dialogLocation`: The element will be shown as a dialog. It is recommended to start the element with a title. Only one dialog can be shown at a time, which is why `noAccept` is discouraged on a dialog. Removing a dialog element will close the dialog. A dialog element is automatically `remove`d after the user closes (noAccept == true only), cancels (noAccept == false only) or accepts (noAccept == false only) it. This will be awaited. Returns error response on cancel.
  *     - **insertAt** (number) [optional]: Where to insert. This allows negative indices. The default is `-1`.
- *     - **insertBefore** (string) [optional]: `id` of the group to insert before.
- *     - **insertAfterInstead** (bool) [optional]: Modifies insertBefore to insert after that group instead. Default is `false`.
+ *     - **insertBefore** (string) [optional]: `id` of the top level element to insert before.
+ *     - **insertAfter** (string) [optional]: `id` of the top level element to insert after.
  *     - **deleteAfter** (number) [optional]: How many to delete after this. The default is `0`.
  *     - **deleteBefore** (number) [optional]: How many to delete before this. The default is `0`.
  *     - **noCloseOnOverlay** (bool) [optional]: This is exclusive to dialogs with `noAccept == true`. This requires implementing custom closing logic. Default is `false`.
@@ -690,7 +689,6 @@ async function show(element, options = null) {
     const elements = _extractElements(element);
     const inputs = elements.filter(e => inputTypes.has(e.type));
 
-
     for (let [index, element] of elements.entries()) {
         element.options ??= {};
 
@@ -709,7 +707,7 @@ async function show(element, options = null) {
         }
 
         if (element.options?.onClick != null) {
-            const onClick = element.options?.onClick;
+            const onClick = element.options.onClick;
             delete element.options.onClick;
             onClickMap.set(element.id, onClick);
         }
@@ -746,7 +744,8 @@ async function read(id) {
  * Returns the current values of all nested inputs of the element (and itself if it is an input) as described by the `show` function, as well as `isInvalid`. If `id` is null, it returns all elements regardless of their parent.
  */
 async function readAll(id = null) {
-    return await requireResponse(readEventType, { id, all: true });
+    const inputs = await requireResponse(readEventType, { id, all: true });
+    return _mapElements(inputs);
 }
 
 /**

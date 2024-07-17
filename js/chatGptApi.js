@@ -304,7 +304,7 @@ class ChatGptApi {
                             if (!obj.choices) throw new Error();
                             console.warn("Failed resolving chunk split error. Skipped data:", buffer);
                         } catch (e) {
-                            const fullData = buffer + json;
+                            let fullData = buffer + json;
                             if (fullData.startsWith('data: ')) fullData = fullData.replace("data: ", "");
                             obj = JSON.parse(fullData);
                             //console.log("Successfully resolved chunk split error. Full data:", fullData);
