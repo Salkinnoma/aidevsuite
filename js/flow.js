@@ -2654,7 +2654,7 @@ class Flow {
         const contentElement = innerContainer.querySelector('.promptContainer');
         const fillerElement = innerContainer.querySelector('.contentContainer');
 
-        if (!Flow.mode == Flow.editMode) {
+        if (Flow.mode != Flow.editMode) {
             fillerElement.style.height = '';
             return;
         }
