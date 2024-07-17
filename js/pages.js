@@ -85,8 +85,8 @@ function deleteLocalPage(page) {
 
     localPages.delete(page.link);
 
-    const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage'));
-    delete scriptStorage[id];
+    const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage')) ?? {};
+    if (page.id != null) delete scriptStorage[page.id];
     localStorage.setItem('scriptStorage', JSON.stringify(scriptStorage));
 
     saveLocalPages();

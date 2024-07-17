@@ -2487,7 +2487,7 @@ class Flow {
                 }
             }
         } else {
-            if ((Flow.starData.link == page.link && Flow.starData.name == page.name && !!linkedPage.autoRun == autoRun) || (name == 'flow' && Flow.starData.link.trim() == '')) {
+            if ((Flow.starData.link == page.link && Flow.starData.name == page.name && !!page.autoRun == autoRun) || (name == 'flow' && Flow.starData.link.trim() == '')) {
                 disableSave();
             } else {
                 enableSave();

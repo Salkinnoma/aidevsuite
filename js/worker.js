@@ -618,7 +618,7 @@ function _mapElements(elements) {
  * - **element** (object): The `element` parameter accepts an element created via any of the create functions.
  * - **options** (object) [optional]: An object that can have the following properties:
  *     - **acceptButtonContent** (object) [optional]: An element to be shown within the default accept button. Default is a paragraph with `Accept`.
- *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If an input can be accepted multiple times, add a custom button that uses the `read` function to read the input values `onClick`. If you add your own custom accept button (instead of modifying `acceptButtonContent`), you must set this to true. Default is `false`.
+ *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If an input can be accepted multiple times, add a custom button that uses the `read` function to read the input values `onClick`. If you add your own custom accept button (instead of modifying `acceptButtonContent`), you must set this to true. If true, you CANNOT await this, or the script will never continue. Default is `false`.
  *     - **location** (string) [optional]: The location of element. Default is `mainLocation`. The following values are supported:
  *         - `mainLocation`: The default location.
  *         - `stickyLocation`: The element will stick to the top of the page.
@@ -631,7 +631,7 @@ function _mapElements(elements) {
  *     - **noCloseOnOverlay** (bool) [optional]: This is exclusive to dialogs with `noAccept == true`. This requires implementing custom closing logic. Default is `false`.
  *
  * ## Return value when awaited
- *  When this function is awaited, it waits until it the user presses the accept button (which cannot happen if `noAccept == true`), or the `accept` function is called on the input. Then it returns an object that contains each input element (only input elements), including all nested input elements, from the element parameter with their id as a key. If there is only a single input element, then the element is returned directly instead of as part of an object. If there is no input element, null is returned. Each returned element is an object with the following properties.
+ *  When this function is awaited, it waits until it the user presses the accept button (which cannot happen if `noAccept == true`), or the `accept` function is called on the input. Therefore, NEVER await this if `noAccept == true`, otherwise the script will never continue. Then it returns an object that contains each input element (only input elements), including all nested input elements, from the element parameter with their id as a key. If there is only a single input element, then the element is returned directly instead of as part of an object. If there is no input element, null is returned. Each returned element is an object with the following properties.
  * 
  * ### For `textInputType`
  * - **text** (string): The text value of the input.
@@ -767,7 +767,7 @@ async function remove(id) {
 }
 
 /**
- * - **id** (string) [optional]: The id of the top level element to accept input from. This ignores validation. If you have a promise for showing `noAccept == true`, then you need to use this function to fulfill the promise. If null, all inputs across all top level elements will be accepted instead.
+ * - **id** (string) [optional]: The id of the top level element to accept input from. This ignores validation. If you want to accept an input with `noAccept == true`, then you need to use this function. If null, all inputs across all top level elements will be accepted instead.
  */
 async function accept(id = null) {
     await requireResponse(acceptEventType, { id });
