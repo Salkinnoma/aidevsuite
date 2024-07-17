@@ -276,8 +276,8 @@ function getHomePage() {
     const pages = localPages.values();
     for (let page of pages) {
         const pageElement = fromHTML(`<a class="giantElement raised xl-font">`);
-        pageElement.setAttribute('href', '#' + page.link);
-        pageElement.textContent = page.name;
+        pageElement.setAttribute('href', '#local/' + page.link);
+        pageElement.textContent = page.name ?? '[unnamed]';
         grid.appendChild(pageElement);
     }
     container.appendChild(grid);
@@ -295,7 +295,7 @@ function getHomePage() {
     for (let page of linkedValues) {
         const pageElement = fromHTML(`<a class="giantElement raised xl-font">`);
         pageElement.setAttribute('href', '#extern?url=' + page.link);
-        pageElement.textContent = page.name;
+        pageElement.textContent = page.name ?? '[unnamed]';
         linkedGrid.appendChild(pageElement);
     }
     if (linkedPages.size == 0) container.appendChild(fromHTML(`<div>No scripts linked yet.`));
@@ -314,7 +314,7 @@ function getHomePage() {
         fetchExternalPage(link).then(page => {
             const pageElement = fromHTML(`<a class="giantElement raised xl-font">`);
             pageElement.setAttribute('href', '#extern?url=' + link);
-            pageElement.textContent = page.name;
+            pageElement.textContent = page.name ?? '[unnamed]';
             samplesGrid.appendChild(pageElement);
         });
     }

@@ -2364,7 +2364,7 @@ class Flow {
 
     static export() {
         const page = Flow.getPage();
-        const item = { securityId: page.securityId, name: page.name, code: page.code, link: page.link };
+        const item = { securityId, name: page.name, code: page.code, link: page.link };
         const json = JSON.stringify(item);
         let name = item.name;
         const url = getHashQueryVariable('url');
