@@ -44,12 +44,15 @@ class Monaco {
         Monaco.updateTheme();
     }
 
+    static currentTheme = null;
     static updateTheme() {
         if (colorScheme == lightColorScheme) {
-            monaco.editor.setTheme('my-light');
+            Monaco.currentTheme = 'my-light';
         } else {
-            monaco.editor.setTheme('my-dark');
+            Monaco.currentTheme = 'my-dark';
         }
+
+        monaco.editor.setTheme(Monaco.currentTheme);
     }
 
     static _tryInitializeMonaco(element) {
@@ -84,7 +87,7 @@ class Monaco {
         options ??= {};
         options.value = content;
         options.language = language;
-        options.theme ??= 'my-dark';
+        options.theme ??= Monaco.currentTheme;
         options.wordWrap ??= 'on';
         options.automaticLayout ??= true;
         options.formatOnPaste ??= true;
