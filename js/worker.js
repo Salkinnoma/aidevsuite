@@ -16,6 +16,7 @@ const removeEventType = "removeEventType";
 const acceptEventType = "acceptEventType";
 const validateInputEventType = "validateInputEventType";
 const delayedValidateInputEventType = "delayedValidateInputEventType";
+const noAcceptShownEventType = "noAcceptShownEventType";
 const clickEventType = "clickEventType";
 const chatEventType = "chatEventType";
 const chatStreamEventType = "chatStreamEventType";
@@ -287,7 +288,7 @@ function createRuler(options = null) {
     return content;
 }
 
-// Create empty placeholder elements. Can for use in navBarLists, as they use `justify-content: space-between;`. Can also `hide` them to use them as an anchor for `insertBefore` and `insertAfter`.
+// Create empty placeholder elements. Can for use in navBarLists, as they use `justify-content: space-between;`.
 function createEmpty(options = null) {
     const content = {
         id: options?.id ?? generateUniqueId(),
@@ -295,6 +296,13 @@ function createEmpty(options = null) {
         options,
     };
     return content;
+}
+
+// Use as an invisible anchor for `insertBefore` and `insertAfter`.
+function createAnchor(options = null) {
+    options ??= {};
+    options.hide = true;
+    return createEmpty(options);
 }
 
 /**
@@ -451,7 +459,7 @@ function createContainer(type, elements, options = null) {
 }
 
 /**
- * Use this for grouping elements without affecting their appearance.
+ * Use this for grouping element(s) without affecting their appearance.
  */
 function createGroup(elements, options = null) {
     return createContainer(verticalType, elements, options);
@@ -588,7 +596,7 @@ function _extractElements(group) {
     const elements = [];
     let unprocessedElements = [group];
     if (group.acceptButtonContent != null) unprocessedElements = unprocessedElements.concat(group.acceptButtonContent);
-    while (unprocessedElements.length !== 0) {
+    while (unprocessedElements.length != 0) {
         let newUnprocessedElements = [];
         for (let element of unprocessedElements) {
             if (containerTypes.has(element.type)) newUnprocessedElements = newUnprocessedElements.concat(element.elements);
@@ -618,7 +626,7 @@ function _mapElements(elements) {
  * - **element** (object): The `element` parameter accepts an element created via any of the create functions.
  * - **options** (object) [optional]: An object that can have the following properties:
  *     - **acceptButtonContent** (object) [optional]: An element to be shown within the default accept button. Default is a paragraph with `Accept`.
- *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If an input can be accepted multiple times, add a custom button that uses the `read` function to read the input values `onClick`. If you add your own custom accept button (instead of modifying `acceptButtonContent`), you must set this to true. If true, you CANNOT await this, or the script will never continue. Default is `false`.
+ *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If an input can be accepted multiple times, add a custom button that uses the `read` function to read the input values `onClick`. If you add your own custom accept button (instead of modifying `acceptButtonContent`), you must set this to true. Default is `false`.
  *     - **location** (string) [optional]: The location of element. Default is `mainLocation`. The following values are supported:
  *         - `mainLocation`: The default location.
  *         - `stickyLocation`: The element will stick to the top of the page.
@@ -631,7 +639,7 @@ function _mapElements(elements) {
  *     - **noCloseOnOverlay** (bool) [optional]: This is exclusive to dialogs with `noAccept == true`. This requires implementing custom closing logic. Default is `false`.
  *
  * ## Return value when awaited
- *  When this function is awaited, it waits until it the user presses the accept button (which cannot happen if `noAccept == true`), or the `accept` function is called on the input. Therefore, NEVER await this if `noAccept == true`, otherwise the script will never continue. Then it returns an object that contains each input element (only input elements), including all nested input elements, from the element parameter with their id as a key. If there is only a single input element, then the element is returned directly instead of as part of an object. If there is no input element, null is returned. Each returned element is an object with the following properties.
+ *  When this function is awaited, it waits until it the user presses the accept button, or the `accept` function is called on the input. If `noAccept == true`, awaiting it returns an async function that resolves when `accept` is called. Then it returns an object that contains each input element (only input elements), including all nested input elements, from the element parameter with their id as a key. If there is only a single input element, then the element is returned directly instead of as part of an object. If there is no input element, null is returned. Each returned element is an object with the following properties.
  * 
  * ### For `textInputType`
  * - **text** (string): The text value of the input.
@@ -718,18 +726,31 @@ async function show(element, options = null) {
         requireResponse(clickEventType, element.id, _ => onClickMap.get(element.id)()); // Don't await
     }
 
-    const response = await requireResponse(showEventType, { element, options }, async (content, event) => {
+    let finishedShowingPromiseResolver;
+    const finishedShowingPromise = new Promise(resolve => finishedShowingPromiseResolver = resolve);
+    const promise = requireResponse(showEventType, { element, options }, async (content, event) => {
         let map = null;
         if (event.type == validateInputEventType) {
             map = onValidateMap;
         } else if (event.type == delayedValidateInputEventType) {
             map = onDelayedValidateMap;
+        } else if (event.type == noAcceptShownEventType) {
+            finishedShowingPromiseResolver();
+            return;
         }
         return await map.get(content.input.id)(content.input, _mapElements(content.allInputs));
     });
 
-    if (options.noAccept) return null;
-    else return inputs.length == 1 ? response[0] : (inputs.length == 0 ? null : _mapElements(response));
+    if (options.noAccept) {
+        await finishedShowingPromise;
+        return async () => {
+            await promise;
+        };
+    }
+    else {
+        const response = await promise;
+        return inputs.length == 1 ? response[0] : (inputs.length == 0 ? null : _mapElements(response));
+    }
 }
 
 /**
@@ -810,31 +831,23 @@ async function setStatus(status) {
 }
 
 // Storage that persists across sessions. Useful for inputs that become repetitive for the user.
-class Storage {
+class Store {
     // Returns false if the script doesn't have access to a storage.
     static async exists() {
-        await requireResponse(storageEventType, { exists: true });
+        return await requireResponse(storageEventType, { exists: true });
     }
 
-    static async set(key, string) {
-        await requireResponse(storageEventType, { set: { key, value: string } });
+    static async set(key, object) {
+        await requireResponse(storageEventType, { set: { key, value: object } });
     }
 
-    // Returns null if the script doesn't have access to a storage.
+    // Returns null if the script doesn't have access to a storage. Otherwise the object associated with the key.
     static async get(key) {
         return await requireResponse(storageEventType, { get: key });
     }
 
     static async delete(key) {
         await requireResponse(storageEventType, { delete: key });
-    }
-
-    static async setObject(key, object) {
-        await this.set(key, JSON.stringify(object));
-    }
-
-    static async getObject(key) {
-        return JSON.parse(await get(key));
     }
 }
 

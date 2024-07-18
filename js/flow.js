@@ -427,6 +427,7 @@ class Flow {
     static acceptEventType = "acceptEventType";
     static validateInputEventType = "validateInputEventType";
     static delayedValidateInputEventType = "delayedValidateInputEventType";
+    static noAcceptShownEventType = "noAcceptShownEventType";
     static clickEventType = "clickEventType";
     static chatEventType = "chatEventType";
     static chatStreamEventType = "chatStreamEventType";
@@ -665,11 +666,18 @@ class Flow {
         const e = event;
         const content = event.content;
         const page = Flow.getPage();
+        const id = page.id;
         let exists = false;
-        if (page.id) exists = true;
+        if (id) exists = true;
 
         if (content.exists) Flow.postSuccessResponse(e, exists);
-        else if (content.set != null) {
+
+        if (!exists) {
+            Flow.postErrorResponse('script does not qualify for storage, as it is not a local script.');
+            return;
+        }
+
+        if (content.set != null) {
             const scriptStorage = JSON.parse(localStorage.getItem('scriptStorage')) ?? {};
             scriptStorage[id] ??= {};
             scriptStorage[id][content.set.key] = content.set.value;
@@ -880,7 +888,6 @@ class Flow {
         const options = group.options;
         const element = group.element;
         const settings = {};
-        settings.hide = options.hide ?? false;
         settings.id = element.id;
         Flow.groupById.set(settings.id, settings);
         settings.element = Flow.extractSettingsFromElement(element, settings);
@@ -1657,7 +1664,7 @@ class Flow {
 
     static fromGroupSettings(settings) {
         const container = fromHTML(`<div class="w-100 divList gap-2">`);
-        if (settings.hide) container.classList.add('hide');
+        if (settings.element.hide) container.classList.add('hide');
         settings.htmlElement = container;
 
         let element = container;
@@ -1803,8 +1810,10 @@ class Flow {
                 // Insert into the mainParent
                 if (mainInsertIndex < mainParent.children.length) {
                     mainParent.insertBefore(element, mainParent.children[mainInsertIndex]);
+                    console.log('insert before', mainInsertIndex);
                 } else {
                     mainParent.appendChild(element);
+                    console.log('append', mainInsertIndex);
                 }
                 mainInsertIndex++;
             }
@@ -1830,16 +1839,17 @@ class Flow {
         if (options.insertAfter != null) insertAt = Flow.output.findIndex(s => s.id == options.insertAfter) + 1;
 
         const settings = Flow.extractSettingsFromGroup(content);
-        console.log(settings);
         settings.event = e;
 
         const inputs = Flow.extractInputElements(settings);
 
         await Flow.spliceOutput(insertAt, options.deleteAfter, settings);
+        console.log(Flow.output[Flow.output.length - 1]);
         if (options.deleteBefore > 0) {
             await Flow.spliceOutput(insertAt - options.deleteBefore, options.deleteBefore);
         }
 
+        if (options.noAccept) await Flow.requireResponse(Flow.noAcceptShownEventType, null, null, e);
         if (inputs.length == 0) Flow.postSuccessResponse(e);
     }
 
@@ -2059,7 +2069,7 @@ class Flow {
         }
         const options = content.options ?? {};
         const chatOptions = { model: options.model, seed: options.seed };
-        const settings = Flow.elementById.get(options.id);
+        let settings = Flow.elementById.get(options.id);
 
         let result = '';
         try {
@@ -2084,6 +2094,7 @@ class Flow {
                         const transformed = await Flow.requireResponse(Flow.chatStreamEventType, text, null, e);
                         if (transformed != null) text = transformed;
                     }
+                    settings = Flow.elementById.get(options.id);
                     if (settings != null) {
                         // Update the string value of the element based on its type
                         if (settings.type === Flow.paragraphType) {
@@ -2140,6 +2151,7 @@ class Flow {
                     }
                 }, chatOptions);
 
+                settings = Flow.elementById.get(options.id);
                 if (settings != null && (Flow.inputTypes.has(settings.type) || settings.type == Flow.codeType)) {
                     if (settings.type == Flow.imageInputType) {
                         settings.captionCodeEditor.classList.remove('hide');
@@ -2684,13 +2696,6 @@ class Flow {
     }
 }
 
-window.addEventListener('load', e => {
-    new ResizeSensor(document.querySelector('.container'), e => Flow.adjustContentHeight());
-});
-window.addEventListener('resize', e => Flow.adjustContentHeight());
-
-window.addEventListener('load', e => Flow.setupDialogs());
-
 function getFlowPage() {
     const name = getPathPartFromHash(0);
     const page = Flow.getPage();
@@ -2910,3 +2915,12 @@ function getFlowPage() {
 
 window.addEventListener('pageloaded', e => Flow.onPageLoaded());
 window.addEventListener('message', e => Flow.setupMessageChannel(e));
+
+
+window.addEventListener('load', e => {
+    new ResizeSensor(document.querySelector('.container'), e => Flow.adjustContentHeight());
+});
+window.addEventListener('resize', e => Flow.adjustContentHeight());
+window.addEventListener('pageloaded', e => Flow.adjustContentHeight());
+
+window.addEventListener('load', e => Flow.setupDialogs());
