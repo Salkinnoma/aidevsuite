@@ -310,8 +310,9 @@ function createAnchor(options = null) {
  * - **options** (object): An object that can have the following properties depending on its `type`:
  * 
  * ## All Types
- *     - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
- *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
+ * - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
+ * - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
+ * - **placeholder** (string) [optional]: The placeholder text that appears when the text is empty.
  */
 function createText(type, text, options = null) {
     const content = {
@@ -340,6 +341,7 @@ function createSubTitle(text, options = null) {
  *     - **language** (string) [optional]: The language of the code.
  *     - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
  *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
+ *     - **placeholder** (string) [optional]: The placeholder text that appears when the code is empty.
  */
 function createCode(code, options = null) {
     const content = {
@@ -353,6 +355,7 @@ function createCode(code, options = null) {
 
 /**
  * - **options** (object): An object that can have the following properties:
+ *     - **placeholder** (string) [optional]: The placeholder text that appears when the markdown is empty.
  *     - **katex** (bool) [optional]: Whether to render katex. Default is `true`.
  *     - **katexDelimiters** (array) [optional]: The delimiters to use to find find math equations. Default:
  *         [

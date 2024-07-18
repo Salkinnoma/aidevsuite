@@ -771,6 +771,7 @@ class Flow {
             settings.text = element.text ?? '';
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
+            settings.placeholder = options.placeholder;
         } else if (type === Flow.emptyType) {
             // Do nothing
         } else if (type === Flow.breakType) {
@@ -780,11 +781,13 @@ class Flow {
         } else if (type === Flow.codeType) {
             settings.code = element.code ?? '';
             settings.language = options.language;
+            settings.placeholder = options.placeholder;
         } else if (type === Flow.markdownType) {
             settings.markdown = element.markdown ?? '';
             settings.katex = options.katex ?? true;
             settings.katexDelimiters = options.katexDelimiters;
             settings.noHighlight = options.noHighlight;
+            settings.placeholder = options.placeholder;
         } else if (type === Flow.imageType) {
             settings.url = element.url ?? '';
             settings.caption = options.caption;
@@ -1109,6 +1112,7 @@ class Flow {
             element.classList.add('fixText');
             element.textContent = settings.text;
             settings.textElement = element;
+            if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.titleType) {
             Flow.tryAddTitle(element, settings);
             element.classList.add('w-100');
@@ -1117,6 +1121,7 @@ class Flow {
             titleElement.textContent = settings.text;
             element.appendChild(titleElement);
             settings.textElement = titleElement;
+            if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.subTitleType) {
             Flow.tryAddTitle(element, settings);
             element.classList.add('w-100');
@@ -1125,6 +1130,7 @@ class Flow {
             subTitleElement.textContent = settings.text;
             element.appendChild(subTitleElement);
             settings.textElement = subTitleElement;
+            if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.codeType) {
             Flow.tryAddTitle(element, settings);
             const codeEditorResult = CodeHelpers.createCodeEditor({
@@ -1140,13 +1146,16 @@ class Flow {
             const streamTarget = fromHTML(`<div contenteditable="false" class="w-100 fixText hide scroll-y codeBlock">`);
             if (settings.language != null) streamTarget.classList.add('language-' + settings.language);
             if (settings.maxHeight > 0) streamTarget.classList.add("maxHeight-" + settings.maxHeight);
+            if (settings.placeholder != null) streamTarget.setAttribute('placeholder', settings.placeholder);
             settings.streamTarget = streamTarget;
             element.appendChild(streamTarget);
         } else if (type == Flow.markdownType) {
             const markdownContainer = fromHTML(`<div class="w-100">`);
+            if (settings.placeholder != null) markdownContainer.setAttribute('placeholder', settings.placeholder);
             renderMarkdown(markdownContainer, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
             settings.markdownElement = markdownContainer;
             const rawTextElement = fromHTML(`<div class="w-100 markdownRawText hide language-markdown">`);
+            if (settings.placeholder != null) rawTextElement.setAttribute('placeholder', settings.placeholder);
             rawTextElement.textContent = settings.markdown;
             highlightCode(rawTextElement);
             settings.rawTextElement = rawTextElement;
@@ -1239,6 +1248,7 @@ class Flow {
             element.appendChild(textEditorResult.codeEditorContainer);
 
             const streamTarget = fromHTML(`<div class="w-100 largeElement fixText hide scroll-y">`);
+            if (settings.placeholder != null) streamTarget.setAttribute('placeholder', settings.placeholder);
             if (settings.maxHeight > 0) streamTarget.classList.add("maxHeight-" + settings.maxHeight);
             settings.streamTarget = streamTarget;
             element.appendChild(streamTarget);
@@ -1275,6 +1285,7 @@ class Flow {
             element.appendChild(codeEditorResult.codeEditorContainer);
 
             const streamTarget = fromHTML(`<code contenteditable="false" class="w-100 largeElement fixText hide scroll-y codeBlock">`);
+            if (settings.placeholder != null) streamTarget.setAttribute('placeholder', settings.placeholder);
             if (settings.maxHeight > 0) streamTarget.classList.add("maxHeight-" + settings.maxHeight);
             settings.streamTarget = streamTarget;
             element.appendChild(streamTarget);
@@ -1302,6 +1313,7 @@ class Flow {
 
             // Stream target
             const streamTarget = fromHTML(`<div contenteditable="false" class="w-100 fixText hide scroll-y">`);
+            if (settings.placeholder != null) streamTarget.setAttribute('placeholder', settings.placeholder);
             if (settings.maxHeight > 0) streamTarget.classList.add("maxHeight-" + settings.maxHeight);
             settings.streamTarget = streamTarget;
             contentContainer.appendChild(streamTarget);
@@ -1316,6 +1328,7 @@ class Flow {
 
             // Markdown output
             const markdownElement = fromHTML(`<div class="w-100 markdownPreview scroll-y" placeholder="Markdown Output">`);
+            if (settings.placeholder != null) markdownElement.setAttribute('placeholder', settings.placeholder);
             if (settings.maxHeight > 0) markdownElement.classList.add("maxHeight-" + settings.maxHeight);
             renderMarkdown(markdownElement, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
             settings.markdownElement = markdownElement;
