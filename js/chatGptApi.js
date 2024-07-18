@@ -39,11 +39,13 @@ class ChatGptApi {
     }
 
     static gpt4OmniName = "GPT-4 Omni";
+    static gpt4OmniMiniName = "GPT-4 Omni Mini";
     static gpt4TurboName = "GPT-4 Turbo";
     static gpt4Name = "GPT-4";
     static gpt3_5TurboName = "GPT-3.5 Turbo";
 
     static gpt4OmniIdentifier = "gpt-4o";
+    static gpt4OmniMiniIdentifier = "gpt-4o-mini";
     static gpt4TurboIdentifier = "gpt-4-turbo";
     static gpt4Identifier = "gpt-4";
     static gpt3_5TurboIdentifier = "gpt-3.5-turbo";
@@ -52,6 +54,7 @@ class ChatGptApi {
 
     static gptModelNamesByIdentifier = {
         [ChatGptApi.gpt4OmniIdentifier]: ChatGptApi.gpt4OmniName,
+        [ChatGptApi.gpt4OmniMiniIdentifier]: ChatGptApi.gpt4OmniMiniName,
         [ChatGptApi.gpt4TurboIdentifier]: ChatGptApi.gpt4TurboName,
         [ChatGptApi.gpt4Identifier]: ChatGptApi.gpt4Name,
         [ChatGptApi.gpt3_5TurboIdentifier]: ChatGptApi.gpt3_5TurboName
@@ -61,6 +64,7 @@ class ChatGptApi {
 
     static gptModelsThatAllowImages = new Set([
         ChatGptApi.gpt4OmniIdentifier,
+        ChatGptApi.gpt4OmniMiniIdentifier,
         ChatGptApi.gpt4TurboIdentifier
     ]);
 
@@ -237,6 +241,7 @@ class ChatGptApi {
     static async streamChat(messages, onUpdate, options) {
         options ??= {};
         options.continueAfterMaxTokens ??= true;
+        console.log("Chat Model:", options.model ?? ChatGptApi.defaultModel);
 
         const messagesCopy = [...messages];
         let response;

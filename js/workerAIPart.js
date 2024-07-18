@@ -35,11 +35,13 @@ class ChatHelpers {
     }
 
     static gpt4OmniName = "GPT-4 Omni";
+    static gpt4OmniMiniName = "GPT-4 Omni Mini";
     static gpt4TurboName = "GPT-4 Turbo";
     static gpt4Name = "GPT-4";
     static gpt3_5TurboName = "GPT-3.5 Turbo";
 
     static gpt4OmniIdentifier = "gpt-4o";
+    static gpt4OmniMiniIdentifier = "gpt-4o-mini";
     static gpt4TurboIdentifier = "gpt-4-turbo";
     static gpt4Identifier = "gpt-4";
     static gpt3_5TurboIdentifier = "gpt-3.5-turbo";
@@ -48,6 +50,7 @@ class ChatHelpers {
 
     static gptModelNames = {
         [this.gpt4OmniIdentifier]: this.gpt4OmniName,
+        [this.gpt4OmniMiniIdentifier]: this.gpt4OmniMiniName,
         [this.gpt4TurboIdentifier]: this.gpt4TurboName,
         [this.gpt4Identifier]: this.gpt4Name,
         [this.gpt3_5TurboIdentifier]: this.gpt3_5TurboName
