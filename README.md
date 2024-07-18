@@ -15,7 +15,7 @@ _Result:_
 const urlInput = createInput(textInputType, {
     placeholder: "Enter the URL here..."
 });
-show(urlInput, { noAccept: true });
+await show(urlInput, { noAccept: true });
 
 const resultElement = createMarkdown("");
 await show(resultElement);
