@@ -1873,6 +1873,9 @@ class Flow {
             }
         }
 
+        const retainSelection = properties.retainSelection ?? false;
+        let selection;
+
         // Update settings and corresponding elements
         if (properties.hide !== undefined) {
             settings.hide = content.hide;
@@ -1887,20 +1890,26 @@ class Flow {
         if (properties.text !== undefined) {
             settings.text = properties.text;
             if (settings.type === Flow.textInputType) {
+                if (retainSelection) selection = settings.textEditor?.getPosition();
                 settings.textEditor?.setValue(settings.text);
+                if (retainSelection) settings.textEditor?.setPosition(selection);
             } else {
                 settings.textElement.textContent = settings.text;
             }
         }
         if (properties.code !== undefined) {
             settings.code = properties.code;
+            if (retainSelection) selection = settings.codeEditor?.getPosition();
             settings.codeEditor?.setValue(settings.code);
+            if (retainSelection) settings.codeEditor?.setPosition(selection);
         }
         if (properties.markdown !== undefined) {
             settings.markdown = properties.markdown;
             if (settings.type === Flow.markdownInputType) {
                 rerenderMarkdown = true;
+                if (retainSelection) selection = settings.markdownEditor?.getPosition();
                 settings.markdownEditor?.setValue(settings.markdown);
+                if (retainSelection) settings.markdownEditor?.setPosition(selection);
 
             } else {
                 rerenderMarkdown = true;
