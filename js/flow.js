@@ -684,7 +684,7 @@ class Flow {
             const jsonStorage = JSON.stringify(scriptStorage);
             const targetSize = getStringByteSize(JSON.stringify(scriptStorage[id]));
             const totalSize = getStringByteSize(jsonStorage);
-            if (totalSize > megabyte * 3 || targetSize > kilobyte * 50) {
+            if (totalSize > megabyte * 3 || targetSize > kilobyte * 100) {
                 Flow.postErrorResponse(e, new Error("Not enough storage."));
             } else {
                 localStorage.setItem('scriptStorage', jsonStorage);
