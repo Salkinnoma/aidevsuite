@@ -280,7 +280,8 @@ function getHomePage() {
         pageElement.textContent = page.name ?? '[unnamed]';
         grid.appendChild(pageElement);
     }
-    container.appendChild(grid);
+    if (localPages.size == 0) container.appendChild(fromHTML(`<div>No scripts created yet.`));
+    else container.appendChild(grid);
     container.appendChild(hb(4));
 
     // Linked pages title bar
