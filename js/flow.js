@@ -57,11 +57,10 @@ class Flow {
 
         Flow.mode = getHashQueryVariable('mode') ?? Flow.editMode;
         const locked = getHashQueryVariable('locked') ?? false;
-        if (locked) Flow.mode = Flow.runMode;
 
         Flow.setupMonacoContext();
 
-        if (Flow.mode == Flow.runMode) {
+        if (locked || isUser || Flow.mode == Flow.runMode) {
             Flow.run();
         }
     }
@@ -225,6 +224,7 @@ class Flow {
     }
 
     static async run() {
+        console.log("fmlkadsjhfkuhsdkjfhbdsj,fbkdsjhfjkdshfjkd,shfkjdshf,sdgfmn,dsbgfbvsd", Flow.mode);
         if (Flow.mode != Flow.runMode) {
             goToUrl(getUrlWithChangedHashParam('mode', Flow.runMode));
             return;
@@ -2728,32 +2728,34 @@ function getFlowPage() {
     const leftBarList = fromHTML(`<div class="listHorizontal">`);
     bar.appendChild(leftBarList);
 
-    // Top left buttons
-    const importButton = fromHTML(`<button tooltip="Import Code from JSON" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
-    importButton.addEventListener('click', e => Flow.openImportDialog());
-    importButton.appendChild(icons.upload());
-    leftBarList.appendChild(importButton);
-    const exportButton = fromHTML(`<button tooltip="Export Code to JSON" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
-    exportButton.addEventListener('click', e => Flow.export());
-    exportButton.appendChild(icons.download());
-    leftBarList.appendChild(exportButton);
-    const starButton = fromHTML(`<button class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
-    starButton.setAttribute('tooltip', (specialFlowPages.has(name)) ? 'Bookmark for Easy Access' : 'Edit Bookmark');
-    starButton.addEventListener('click', e => Flow.openStarDialog());
-    const starIcon = (specialFlowPages.has(name) && !isLinked) ? icons.star() : icons.starFilled();
-    starButton.appendChild(starIcon);
-    leftBarList.appendChild(starButton);
-    if (!locked) {
-        const editButton = fromHTML(`<button tooltip="Edit Code" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
-        editButton.addEventListener('click', e => Flow.edit());
-        editButton.appendChild(icons.edit());
-        if (mode == Flow.editMode) editButton.setAttribute('disabled', '');
-        leftBarList.appendChild(editButton);
+    if (!isUser) {
+        // Top left buttons
+        const importButton = fromHTML(`<button tooltip="Import Code from JSON" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
+        importButton.addEventListener('click', e => Flow.openImportDialog());
+        importButton.appendChild(icons.upload());
+        leftBarList.appendChild(importButton);
+        const exportButton = fromHTML(`<button tooltip="Export Code to JSON" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
+        exportButton.addEventListener('click', e => Flow.export());
+        exportButton.appendChild(icons.download());
+        leftBarList.appendChild(exportButton);
+        const starButton = fromHTML(`<button class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
+        starButton.setAttribute('tooltip', (specialFlowPages.has(name)) ? 'Bookmark for Easy Access' : 'Edit Bookmark');
+        starButton.addEventListener('click', e => Flow.openStarDialog());
+        const starIcon = (specialFlowPages.has(name) && !isLinked) ? icons.star() : icons.starFilled();
+        starButton.appendChild(starIcon);
+        leftBarList.appendChild(starButton);
+        if (!locked) {
+            const editButton = fromHTML(`<button tooltip="Edit Code" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
+            editButton.addEventListener('click', e => Flow.edit());
+            editButton.appendChild(icons.edit());
+            if (mode == Flow.editMode) editButton.setAttribute('disabled', '');
+            leftBarList.appendChild(editButton);
+        }
+        const runButton = fromHTML(`<button tooltip="Execute Code" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
+        runButton.addEventListener('click', e => Flow.run());
+        runButton.appendChild(icons.play());
+        leftBarList.appendChild(runButton);
     }
-    const runButton = fromHTML(`<button tooltip="Execute Code" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
-    runButton.addEventListener('click', e => Flow.run());
-    runButton.appendChild(icons.play());
-    leftBarList.appendChild(runButton);
 
     // Progress and status
     sticky.appendChild(bar);

@@ -25,6 +25,8 @@ let linkedPages = new Map();
 
 const samples = ['data/Fetch.json', 'data/Simple Chat.json', 'data/Chat.json'];
 
+let isUser = false;
+
 const pageLoadedEvent = new CustomEvent("pageloaded");
 function loadLocalPages() {
     const localPagesJSON = localStorage.getItem('pages');
@@ -169,14 +171,17 @@ function getValidHashUrls() {
 
 function updatePagesSidebar() {
     const name = getPathFromHash();
-    const url = getHashQueryVariable('url');
 
     // Local pages
     const localPagesList = document.getElementById('localPagesList');
     localPagesList.innerHTML = '';
     localPages.values().forEach(p => {
         let link = '#local/' + p.link;
-        if (p.autoRun) link += '?mode=run';
+        const params = [];
+        if (p.autoRun) params.push('mode=run');
+        if (isUser) params.push('user=true');
+        if (params.length != 0) link += '?' + params[0];
+        params.forEach(p => link += p);
 
         const element = fromHTML(`<a class="element sidebarElement hoverable">`);
         element.textContent = p.name;
@@ -197,6 +202,7 @@ function updatePagesSidebar() {
     linkedPages.values().forEach(p => {
         let link = '#extern?url=' + p.link;
         if (p.autoRun) link += '&mode=run';
+        if (isUser) link += '&user=true';
 
         const element = fromHTML(`<a class="element sidebarElement hoverable">`);
         element.textContent = p.name;
@@ -214,7 +220,27 @@ function updatePagesSidebar() {
 
 // Function to handle hash changes
 function loadPage() {
-    const hash = getHashUrl();
+    isUser = getHashQueryVariable('user') ?? false;
+    ['homeButton', 'flowButton', 'externButton', 'helpButton'].forEach(id => {
+        const element = document.getElementById(id);
+        let href = element.getAttribute('href');
+        if (isUser) {
+            if (!href.endsWith('?user=true')) href += '?user=true';
+        } else {
+            if (href.endsWith('?user=true')) href = href.replace('?user=true', '');
+        }
+        element.setAttribute('href', href);
+    });
+    ['workerButton'].forEach(id => {
+        const element = document.getElementById(id);
+        if (isUser) {
+            element.classList.add('hide');
+        } else {
+            element.classList.remove('hide');
+        }
+    });
+
+    const hash = getHash();
     loadLocalPages();
     loadLinkedPages();
     const topPath = getPathPartFromHash(0);
@@ -228,6 +254,8 @@ function loadPage() {
     let isFlow = false;
     if (hash == '' || hash == '#' || hash == '#home') {
         removeHash();
+        newPage = getHomePage();
+    } else if (hash.startsWith('#?')) {
         newPage = getHomePage();
     } else if (topPath == 'local' ||
         link == 'flow' ||
@@ -254,7 +282,9 @@ function loadPage() {
 }
 
 function openPage(page = null) {
-    window.location.href = page == null ? '#' : '#' + page;
+    let href = page == null ? '#' : '#' + page;
+    if (isUser) href += "?user=true";
+    window.location.href = href;
 }
 
 function getHomePage() {
@@ -276,7 +306,9 @@ function getHomePage() {
     const pages = localPages.values();
     for (let page of pages) {
         const pageElement = fromHTML(`<a class="giantElement raised xl-font">`);
-        pageElement.setAttribute('href', '#local/' + page.link);
+        let href = '#local/' + page.link;
+        if (isUser) href += '?user=true';
+        pageElement.setAttribute('href', href);
         pageElement.textContent = page.name ?? '[unnamed]';
         grid.appendChild(pageElement);
     }
@@ -295,7 +327,9 @@ function getHomePage() {
     const linkedValues = linkedPages.values();
     for (let page of linkedValues) {
         const pageElement = fromHTML(`<a class="giantElement raised xl-font">`);
-        pageElement.setAttribute('href', '#extern?url=' + page.link);
+        let href = '#extern?url=' + page.link;
+        if (isUser) href += '&user=true';
+        pageElement.setAttribute('href', href);
         pageElement.textContent = page.name ?? '[unnamed]';
         linkedGrid.appendChild(pageElement);
     }
@@ -314,7 +348,9 @@ function getHomePage() {
     for (let link of samples) {
         fetchExternalPage(link).then(page => {
             const pageElement = fromHTML(`<a class="giantElement raised xl-font">`);
-            pageElement.setAttribute('href', '#extern?url=' + link);
+            let href = '#extern?url=' + link;
+            if (isUser) href += '&user=true';
+            pageElement.setAttribute('href', href);
             pageElement.textContent = page.name ?? '[unnamed]';
             samplesGrid.appendChild(pageElement);
         });

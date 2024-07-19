@@ -20,6 +20,10 @@ function getHashParams() {
     return hashSearchParams;
 }
 
+function getHash() {
+    return window.location.hash;
+}
+
 function getHashUrl() {
     let hashParts = window.location.hash.split("?");
     return hashParts[0];
