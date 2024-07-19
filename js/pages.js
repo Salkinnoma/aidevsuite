@@ -360,33 +360,6 @@ function getHomePage() {
     return container;
 }
 
-class WorkerPage {
-    static workerEditor = null;
-}
-function getWorkerPage() {
-    const element = fromHTML(`<div>`);
-    const title = fromHTML(`<h1>Worker Script`);
-    element.appendChild(title);
-    const paragraph = fromHTML(`<div>This script is where all of your code is executed.`);
-    element.appendChild(paragraph);
-    element.appendChild(hb(4));
-    Flow.clearMonacoContext();
-    const codeResult = CodeHelpers.createCodeEditor({
-        placeholder: "Loading...",
-        readOnly: true,
-        language: 'javascript',
-        showMinimap: true,
-    });
-    codeResult.codeEditorPromise.then(e => WorkerPage.workerEditor = e);
-    element.appendChild(codeResult.codeEditorContainer);
-    Flow.getWorkerScript().then(async code => {
-        const editor = await codeResult.codeEditorPromise;
-        editor.setValue(code);
-        editor.update();
-    });
-    return element;
-}
-
 function getHelpPage() {
     return 'This is very helpful help.';
 }

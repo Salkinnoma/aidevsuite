@@ -126,9 +126,10 @@ class Monaco {
 
         if (options.expand) {
             let ignoreEvent = false;
-            editor.maxHeight = options.maxHeight;
+            editor.maxHeight = options.maxHeight ?? 800;
+            editor.originalMaxHeight = editor.maxHeight;
             function updateHeight() {
-                const contentHeight = editor.maxHeight == 0 ? editor.getContentHeight() : Math.min(editor.maxHeight ?? 800, editor.getContentHeight());
+                const contentHeight = editor.maxHeight == 0 ? editor.getContentHeight() : Math.min(editor.maxHeight, editor.getContentHeight());
                 const contentWidth = containerElement.parentElement.offsetWidth;
                 containerElement.style.width = `${contentWidth}px`;
                 containerElement.style.height = `${contentHeight}px`;

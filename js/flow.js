@@ -2681,11 +2681,15 @@ class Flow {
     }
 
     static adjustContentHeight() {
-        if (!Flow.codeEditor || !flowPages.has(getPathPartFromHash(0))) return;
+        const name = getPathPartFromHash(0);
+        if ((
+            (!Flow.codeEditor && (name == 'local' || name == 'flow')) ||
+            (!Flow.externTargetElement && (name == 'extern'))) ||
+            !flowPages.has(name)) return;
 
         const innerContainer = document.getElementById('pages');
         const stickyElement = innerContainer.querySelector('.sticky');
-        const contentElement = innerContainer.querySelector('.promptContainer');
+        const contentElement = name == 'extern' ? Flow.loadContainer : Flow.promptEditorContainerElement;
         const fillerElement = innerContainer.querySelector('.contentContainer');
 
         if (Flow.mode != Flow.editMode) {
@@ -2701,9 +2705,20 @@ class Flow {
         const newHeight = remainingHeight > 400 ? remainingHeight : 400;
         fillerElement.style.height = `${newHeight}px`;
 
-        const codeBarHeight = Flow.codeEditorContainerElement.querySelector('.codeBar').clientHeight;
-        Flow.codeEditor.maxHeight = newHeight - codeBarHeight - 16;
-        Flow.codeEditor.update();
+        if (name == 'extern') {
+            const codeBarHeight = Flow.externContainerElement.querySelector('.codeBar').clientHeight;
+            const originalMaxHeight = Flow.externTargetElement.originalMaxHeight;
+            const maxHeight = newHeight - codeBarHeight - 16;
+            Flow.externTargetElement.maxHeight = originalMaxHeight == 0 ? originalMaxHeight : Math.min(originalMaxHeight, maxHeight);
+            Flow.externTargetElement.update();
+        } else {
+            const codeBarHeight = Flow.codeEditorContainerElement.querySelector('.codeBar').clientHeight;
+            const originalMaxHeight = Flow.codeEditor.originalMaxHeight;
+            const maxHeight = newHeight - codeBarHeight - 16;
+            Flow.codeEditor.maxHeight = originalMaxHeight == 0 ? originalMaxHeight : Math.min(originalMaxHeight, maxHeight);
+            Flow.codeEditor.update();
+        }
+
 
         doScrollTick();
     }
@@ -2778,14 +2793,14 @@ function getFlowPage() {
     sticky.appendChild(stickyOutputContainer);
     elements.push(sticky);
 
-    const contentContainer = fromHTML(`<div class="contentContainer">`);
-    elements.push(contentContainer);
+    const newUrl = url ?? localStorage.getItem('externUrl');
     if (mode == Flow.editMode) {
+        const loadContainer = fromHTML(`<div>`);
+        Flow.loadContainer = loadContainer;
         // Extern url editor
         const urlEditorContainer = fromHTML(`<div class="contenteditableContainer">`);
         if (name != 'extern') urlEditorContainer.classList.add('hide');
         const urlEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="fixText" placeholder="Enter url here...">`);
-        const newUrl = url ?? localStorage.getItem('externUrl');
         urlEditor.textContent = newUrl;
         urlEditor.setAttribute('spellcheck', false);
         urlEditor.addEventListener('input', e => Flow.updateUrl(urlEditor.textContent));
@@ -2793,8 +2808,8 @@ function getFlowPage() {
         Flow.urlEditorElement = urlEditor;
         urlEditorContainer.appendChild(urlEditor);
         Flow.urlEditorContainerElement = urlEditorContainer;
-        contentContainer.appendChild(urlEditorContainer);
-        if (name == 'extern') contentContainer.appendChild(hb(2));
+        loadContainer.appendChild(urlEditorContainer);
+        if (name == 'extern') loadContainer.appendChild(hb(2));
         const externTopList = fromHTML(`<div class="listContainerHorizontal">`);
         externTopList.appendChild(fromHTML(`<div>`));
         const rightExternTopList = fromHTML(`<div class="listHorizontal">`);
@@ -2813,8 +2828,14 @@ function getFlowPage() {
         loadButton.addEventListener('click', e => Flow.loadScript());
         rightExternTopList.appendChild(loadButton);
         externTopList.appendChild(rightExternTopList);
-        contentContainer.appendChild(externTopList);
+        loadContainer.appendChild(externTopList);
 
+        elements.push(loadContainer);
+    }
+
+    const contentContainer = fromHTML(`<div class="contentContainer">`);
+    elements.push(contentContainer);
+    if (mode == Flow.editMode) {
         // Code editor
         if (name != 'extern') {
             const codeEditorResult = CodeHelpers.createCodeEditor({
@@ -2851,7 +2872,7 @@ function getFlowPage() {
             Flow.externContainerElement = externCodeResult.codeEditorContainer;
             externCodeResult.codeEditorPromise.then(e => Flow.externTargetElement = e);
             Flow.externCodeEditorPromise = externCodeResult.codeEditorPromise;
-            contentContainer.appendChild(hb(7));
+            contentContainer.appendChild(hb(4));
         }
 
         // Prompt editor
