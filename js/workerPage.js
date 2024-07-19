@@ -60,8 +60,6 @@ function getWorkerPage() {
 
 window.addEventListener('load', e => {
     new ResizeSensor(document.querySelector('.container'), e => WorkerPage.adjustContentHeight());
-    const observer = new ResizeObserver(e => console.log(1));
-    observer.observe(document.documentElement);
 });
 window.addEventListener('resize', e => WorkerPage.adjustContentHeight());
 window.addEventListener('pageloaded', e => WorkerPage.adjustContentHeight());
