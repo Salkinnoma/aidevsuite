@@ -40,6 +40,7 @@ class ChatApi {
 
     static gptEndpoint = "https://api.openai.com/v1/chat/completions";
     static groqEndpoint = "https://api.groq.com/openai/v1/chat/completions";
+    static anthropicEndpoint = "https://api.anthropic.com/v1/messages";
 
     static gpt4OmniName = "GPT-4 Omni";
     static gpt4OmniMiniName = "GPT-4 Omni Mini";
@@ -49,6 +50,7 @@ class ChatApi {
     static llama3_1_405bName = "Llama 3.1 405b";
     static llama3_1_70bName = "Llama 3.1 70b";
     static llama3_1_8bName = "Llama 3.1 8b";
+    static claude3_5SonnetName = "Claude 3.5 Sonnet";
 
     static gpt4OmniIdentifier = "gpt-4o";
     static gpt4OmniMiniIdentifier = "gpt-4o-mini";
@@ -58,9 +60,11 @@ class ChatApi {
     static llama3_1_405bIdentifier = "llama-3.1-405b-reasoning";
     static llama3_1_70bIdentifier = "llama-3.1-70b-versatile";
     static llama3_1_8bIdentifier = "llama-3.1-8b-instant";
+    static claude3_5SonnetIdentifier = "claude-3-5-sonnet-20240620";
 
     static defaultGptModel = ChatApi.gpt4OmniIdentifier;
     static defaultGroqModel = ChatApi.llama3_1_70bIdentifier;
+    static defaultAnthropicModel = ChatApi.claude3_5SonnetIdentifier;
 
     static chatModelNames = {
         [ChatApi.gpt4OmniIdentifier]: ChatApi.gpt4OmniName,
@@ -71,6 +75,7 @@ class ChatApi {
         //[ChatApi.llama3_1_405bIdentifier]: ChatApi.llama3_1_405bName, // Disabled
         [ChatApi.llama3_1_70bIdentifier]: ChatApi.llama3_1_70bName,
         [ChatApi.llama3_1_8bIdentifier]: ChatApi.llama3_1_8bName,
+        // [ChatApi.claude3_5SonnetIdentifier]: ChatApi.claude3_5SonnetName, // Cors
     }
 
     static chatModels = new Set(Object.keys(ChatApi.chatModelNames));
@@ -78,7 +83,8 @@ class ChatApi {
     static chatModelsThatAllowImages = new Set([
         ChatApi.gpt4OmniIdentifier,
         ChatApi.gpt4OmniMiniIdentifier,
-        ChatApi.gpt4TurboIdentifier
+        ChatApi.gpt4TurboIdentifier,
+        ChatApi.claude3_5SonnetIdentifier,
     ]);
 
     static gptModels = new Set([
@@ -95,28 +101,57 @@ class ChatApi {
         ChatApi.llama3_1_8bIdentifier,
     ]);
 
+    static anthropicModels = new Set([
+        //ChatApi.claude3_5SonnetIdentifier, // Cors
+    ]);
+
     static getModelName(model) {
         return ChatApi.chatModelNames.get(model) ?? ChatApi.chatModelNames.get(ChatApi.getDefaultModel());
     }
 
     static getDefaultModel() {
         if (settings.openAIApiKey) return ChatApi.defaultGptModel;
+        else if (settings.anthropicApiKey) return ChatApi.defaultAnthropicModel;
         else if (settings.groqApiKey) return ChatApi.defaultGroqModel;
     }
 
-    static getApiKeyForModelFromSettings(model) {
+    static getApiKey(model) {
+        model ??= ChatApi.getDefaultModel();
         if (ChatApi.gptModels.has(model)) return settings.openAIApiKey;
+        else if (ChatApi.anthropicModels.has(model)) return settings.anthropicApiKey;
         else if (ChatApi.groqModels.has(model)) return settings.groqApiKey;
     }
 
     static getEndpoint(model) {
         if (ChatApi.gptModels.has(model)) return ChatApi.gptEndpoint;
+        else if (ChatApi.anthropicModels.has(model)) return ChatApi.anthropicEndpoint;
         else if (ChatApi.groqModels.has(model)) return ChatApi.groqEndpoint;
     }
 
     static getMaxTokens(model) {
         if (ChatApi.groqModels.has(model)) return 8000;
         else return 4096;
+    }
+
+    static getAvailableModels() {
+        let models = [];
+        if (settings.openAIApiKey) models = [...models, ...ChatApi.gptModels.values()];
+        if (settings.groqApiKey) models = [...models, ...ChatApi.groqModels.values()];
+        if (settings.anthropicApiKey) models = [...models, ...ChatApi.anthropicModels.values()];
+        return models;
+    }
+
+    static getSortedModels(models = null) {
+        models ??= [...ChatApi.chatModels.values()];
+        const modelSet = new Set(models);
+        let sortedModels = [];
+        if (modelSet.delete(ChatApi.gpt4OmniIdentifier)) sortedModels.push(ChatApi.gpt4OmniIdentifier);
+        if (modelSet.delete(ChatApi.gpt4OmniMiniIdentifier)) sortedModels.push(ChatApi.gpt4OmniMiniIdentifier);
+        if (modelSet.delete(ChatApi.claude3_5SonnetIdentifier)) sortedModels.push(ChatApi.claude3_5SonnetIdentifier);
+        if (modelSet.delete(ChatApi.llama3_1_70bIdentifier)) sortedModels.push(ChatApi.llama3_1_70bIdentifier);
+        if (modelSet.delete(ChatApi.llama3_1_8bIdentifier)) sortedModels.push(ChatApi.llama3_1_8bIdentifier);
+        sortedModels = [...sortedModels, ...modelSet.values()];
+        return sortedModels;
     }
 
     /**
@@ -144,7 +179,7 @@ class ChatApi {
     static async _internalGetChatResponse(messages, options = null) {
         options ??= {};
         const model = options.model ?? ChatApi.getDefaultModel();
-        const apiKey = options.apiKey ?? ChatApi.getApiKeyForModelFromSettings(model);
+        const apiKey = options.apiKey ?? ChatApi.getApiKey(model);
         if (!apiKey) throw new Error('Required OpenAI Api Key was missing.');
         const endpoint = ChatApi.getEndpoint(model);
         if (!endpoint) throw new Error('Chat model is not supported.');
@@ -217,7 +252,7 @@ class ChatApi {
     static async getChatStream(messages, options = null) {
         options ??= {};
         const model = options.model ?? ChatApi.getDefaultModel();
-        const apiKey = options.apiKey ?? ChatApi.getApiKeyForModelFromSettings(model);
+        const apiKey = options.apiKey ?? ChatApi.getApiKey(model);
         if (!apiKey) throw new Error('Required OpenAI Api Key was missing.');
         const endpoint = ChatApi.getEndpoint(model);
         if (!endpoint) throw new Error('Chat model is not supported.');

@@ -5,7 +5,7 @@
  *     - **id** (string) [optional]: Allows streaming to an element. If streaming to an input, it will be disabled for user input while streaming. This only works on elements with a string value, such as text, caption, code etc..
  *     - **onUpdate** (function) [optional]: Allows streaming to a callback function. The function can optionally return a string to update the value to e.g. extract code blocks. The function takes in the following parameters:
  *         - **response** (string): The newly streamed tokens concatenated with the previous response text.
- *     - **model** (string) [optional]: The model to be used. Default is `ChatHelpers.gpt4OmniIdentifier`.
+ *     - **model** (string) [optional]: The model to be used. Default is the best available.
  *     - **seed** (number) [optional]: The seed to be used. Very unreliable.
  */
 async function chat(context, options = null) {
@@ -39,6 +39,7 @@ class ChatHelpers {
     static gpt4TurboName = "GPT-4 Turbo";
     static gpt4Name = "GPT-4";
     static gpt3_5TurboName = "GPT-3.5 Turbo";
+    static llama3_1_405bName = "Llama 3.1 405b";
     static llama3_1_70bName = "Llama 3.1 70b";
     static llama3_1_8bName = "Llama 3.1 8b";
 
@@ -47,10 +48,9 @@ class ChatHelpers {
     static gpt4TurboIdentifier = "gpt-4-turbo";
     static gpt4Identifier = "gpt-4";
     static gpt3_5TurboIdentifier = "gpt-3.5-turbo";
+    static llama3_1_405bIdentifier = "llama-3.1-405b-reasoning";
     static llama3_1_70bIdentifier = "llama-3.1-70b-versatile";
     static llama3_1_8bIdentifier = "llama-3.1-8b-instant";
-
-    static defaultModel = this.gpt4OmniIdentifier;
 
     static chatModelNames = {
         [this.gpt4OmniIdentifier]: this.gpt4OmniName,
@@ -66,8 +66,13 @@ class ChatHelpers {
 
     static chatModelsThatAllowImages = new Set([
         this.gpt4OmniIdentifier,
-        this.gpt4TurboIdentifier
+        this.gpt4OmniMiniIdentifier,
+        this.gpt4TurboIdentifier,
     ]);
+
+    static async getAvailableModels() {
+        return requireResponse(chatEventType, { get: 'availableModels' });
+    }
 }
 
 function toMessage(role, prompt, url = null) {

@@ -2065,13 +2065,22 @@ class Flow {
 
     static async onChat(event) {
         const e = event;
-        if (!window.settings.openAIApiKey) {
-            Flow.setStatus('Required OpenAI Api Key was missing.', true);
+        const content = e.content;
+
+        if (content.get != null) {
+            if (content.get == 'availableModels') {
+                const models = ChatApi.getSortedModels(ChatApi.getAvailableModels());
+                Flow.postSuccessResponse(e, models);
+            }
+            return;
+        }
+
+        if (!ChatApi.getApiKey(content.options?.model)) {
+            Flow.setStatus('Required Api Key was missing.', true);
             Flow.postErrorResponse(e, 'api_key_missing');
             return;
         }
 
-        const content = e.content;
         const context = [];
         for (let message of content.context) {
             if (message.url) context.push(ChatApi.ToImageMessage(message.prompt, message.url));

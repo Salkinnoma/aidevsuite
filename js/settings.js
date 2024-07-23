@@ -17,7 +17,7 @@ class Settings {
     static chatbotPage = 'chatbot';
 
     static checkHasApiKey() {
-        if (settings.openAIApiKey || settings.groqApiKey) {
+        if (ChatApi.getDefaultModel()) {
             Flow.rewriteScriptButton?.removeAttribute('disabled');
             Flow.generateScriptButton?.removeAttribute('disabled');
         } else {
@@ -71,6 +71,19 @@ class Settings {
         });
         groqApiKeySetting.appendChild(groqApiKeyElement);
         chatbotPage.appendChild(groqApiKeySetting);
+
+        // // Anthropic Api key
+        // const anthropicApiKeySetting = fromHTML(`<div class="listHorizontal">`);
+        // const anthropicApiKeyLabel = fromHTML(`<div>Anthropic Api Key`);
+        // anthropicApiKeySetting.appendChild(anthropicApiKeyLabel);
+        // const anthropicApiKeyElement = fromHTML(`<input type="password" placeholder="Enter api key...">`);
+        // anthropicApiKeyElement.value = settings.anthropicApiKey;
+        // anthropicApiKeyElement.addEventListener('input', e => {
+        //     settings.anthropicApiKey = anthropicApiKeyElement.value;
+        //     Settings.checkHasApiKey();
+        // });
+        // anthropicApiKeySetting.appendChild(anthropicApiKeyElement);
+        // chatbotPage.appendChild(anthropicApiKeySetting);
 
         return chatbotPage;
     }
