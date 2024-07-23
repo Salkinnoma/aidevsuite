@@ -1,4 +1,4 @@
-class ChatGptApi {
+class ChatApi {
     static systemRole = "system";
     static userRole = "user";
     static assistantRole = "assistant";
@@ -8,19 +8,19 @@ class ChatGptApi {
     }
 
     static toSystemMessage(prompt) {
-        return ChatGptApi.toMessage(ChatGptApi.systemRole, prompt);
+        return ChatApi.toMessage(ChatApi.systemRole, prompt);
     }
 
     static toUserMessage(prompt) {
-        return ChatGptApi.toMessage(ChatGptApi.userRole, prompt);
+        return ChatApi.toMessage(ChatApi.userRole, prompt);
     }
 
     static toAssistantMessage(prompt) {
-        return ChatGptApi.toMessage(ChatGptApi.assistantRole, prompt);
+        return ChatApi.toMessage(ChatApi.assistantRole, prompt);
     }
 
     static toImageMessage(prompt, url) {
-        return ChatGptApi.toMessage(ChatGptApi.userRole, [
+        return ChatApi.toMessage(ChatApi.userRole, [
             {
                 "type": "text",
                 "text": prompt
@@ -38,44 +38,90 @@ class ChatGptApi {
         console.log(message.role + ":", message.content);
     }
 
+    static gptEndpoint = "https://api.openai.com/v1/chat/completions";
+    static groqEndpoint = "https://api.groq.com/openai/v1/chat/completions";
+
     static gpt4OmniName = "GPT-4 Omni";
     static gpt4OmniMiniName = "GPT-4 Omni Mini";
     static gpt4TurboName = "GPT-4 Turbo";
     static gpt4Name = "GPT-4";
     static gpt3_5TurboName = "GPT-3.5 Turbo";
+    static llama3_1_405bName = "Llama 3.1 405b";
+    static llama3_1_70bName = "Llama 3.1 70b";
+    static llama3_1_8bName = "Llama 3.1 8b";
 
     static gpt4OmniIdentifier = "gpt-4o";
     static gpt4OmniMiniIdentifier = "gpt-4o-mini";
     static gpt4TurboIdentifier = "gpt-4-turbo";
     static gpt4Identifier = "gpt-4";
     static gpt3_5TurboIdentifier = "gpt-3.5-turbo";
+    static llama3_1_405bIdentifier = "llama-3.1-405b-reasoning";
+    static llama3_1_70bIdentifier = "llama-3.1-70b-versatile";
+    static llama3_1_8bIdentifier = "llama-3.1-8b-instant";
 
-    static defaultModel = ChatGptApi.gpt4OmniIdentifier;
+    static defaultGptModel = ChatApi.gpt4OmniIdentifier;
+    static defaultGroqModel = ChatApi.llama3_1_70bIdentifier;
 
-    static gptModelNamesByIdentifier = {
-        [ChatGptApi.gpt4OmniIdentifier]: ChatGptApi.gpt4OmniName,
-        [ChatGptApi.gpt4OmniMiniIdentifier]: ChatGptApi.gpt4OmniMiniName,
-        [ChatGptApi.gpt4TurboIdentifier]: ChatGptApi.gpt4TurboName,
-        [ChatGptApi.gpt4Identifier]: ChatGptApi.gpt4Name,
-        [ChatGptApi.gpt3_5TurboIdentifier]: ChatGptApi.gpt3_5TurboName
+    static chatModelNames = {
+        [ChatApi.gpt4OmniIdentifier]: ChatApi.gpt4OmniName,
+        [ChatApi.gpt4OmniMiniIdentifier]: ChatApi.gpt4OmniMiniName,
+        [ChatApi.gpt4TurboIdentifier]: ChatApi.gpt4TurboName,
+        [ChatApi.gpt4Identifier]: ChatApi.gpt4Name,
+        [ChatApi.gpt3_5TurboIdentifier]: ChatApi.gpt3_5TurboName,
+        //[ChatApi.llama3_1_405bIdentifier]: ChatApi.llama3_1_405bName, // Disabled
+        [ChatApi.llama3_1_70bIdentifier]: ChatApi.llama3_1_70bName,
+        [ChatApi.llama3_1_8bIdentifier]: ChatApi.llama3_1_8bName,
     }
 
-    static gptModels = new Set(Object.keys(ChatGptApi.gptModelNamesByIdentifier));
+    static chatModels = new Set(Object.keys(ChatApi.chatModelNames));
 
-    static gptModelsThatAllowImages = new Set([
-        ChatGptApi.gpt4OmniIdentifier,
-        ChatGptApi.gpt4OmniMiniIdentifier,
-        ChatGptApi.gpt4TurboIdentifier
+    static chatModelsThatAllowImages = new Set([
+        ChatApi.gpt4OmniIdentifier,
+        ChatApi.gpt4OmniMiniIdentifier,
+        ChatApi.gpt4TurboIdentifier
     ]);
 
-    static getModelName(gptModel) {
-        let model = ChatGptApi.gptModelNamesByIdentifier.get(gptModel) ?? ChatGptApi.gptModelNamesByIdentifier.get(ChatGptApi.defaultModel);
-        return model;
+    static gptModels = new Set([
+        ChatApi.gpt4OmniIdentifier,
+        ChatApi.gpt4OmniMiniIdentifier,
+        ChatApi.gpt4TurboIdentifier,
+        ChatApi.gpt4Identifier,
+        ChatApi.gpt3_5TurboIdentifier,
+    ]);
+
+    static groqModels = new Set([
+        //ChatApi.llama3_1_405bIdentifier, // Disabled
+        ChatApi.llama3_1_70bIdentifier,
+        ChatApi.llama3_1_8bIdentifier,
+    ]);
+
+    static getModelName(model) {
+        return ChatApi.chatModelNames.get(model) ?? ChatApi.chatModelNames.get(ChatApi.getDefaultModel());
+    }
+
+    static getDefaultModel() {
+        if (settings.openAIApiKey) return ChatApi.defaultGptModel;
+        else if (settings.groqApiKey) return ChatApi.defaultGroqModel;
+    }
+
+    static getApiKeyForModelFromSettings(model) {
+        if (ChatApi.gptModels.has(model)) return settings.openAIApiKey;
+        else if (ChatApi.groqModels.has(model)) return settings.groqApiKey;
+    }
+
+    static getEndpoint(model) {
+        if (ChatApi.gptModels.has(model)) return ChatApi.gptEndpoint;
+        else if (ChatApi.groqModels.has(model)) return ChatApi.groqEndpoint;
+    }
+
+    static getMaxTokens(model) {
+        if (ChatApi.groqModels.has(model)) return 8000;
+        else return 4096;
     }
 
     /**
      * options:
-     * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null, continueAfterMaxTokens = true, maxTokens = 4096
+     * model = null, seed = null, apiKey = null, continueAfterMaxTokens = true, maxTokens = null
      * 
      * Returns the full response string.
      */
@@ -87,9 +133,9 @@ class ChatGptApi {
         let response;
         let result = '';
         do {
-            response = await ChatGptApi._internalGetChatResponse(messages, options);
+            response = await ChatApi._internalGetChatResponse(messages, options);
             result += response.response;
-            messagesCopy.push(ChatGptApi.toAssistantMessage(response.response));
+            messagesCopy.push(ChatApi.toAssistantMessage(response.response));
         } while (options.continueAfterMaxTokens && response.finish_reason == 'length');
 
         return result;
@@ -97,15 +143,17 @@ class ChatGptApi {
 
     static async _internalGetChatResponse(messages, options = null) {
         options ??= {};
-        const model = options.gptModel ?? ChatGptApi.defaultModel;
-        const apiKey = options.apiKey ?? settings.openAIApiKey;
+        const model = options.model ?? ChatApi.getDefaultModel();
+        const apiKey = options.apiKey ?? ChatApi.getApiKeyForModelFromSettings(model);
         if (!apiKey) throw new Error('Required OpenAI Api Key was missing.');
+        const endpoint = ChatApi.getEndpoint(model);
+        if (!endpoint) throw new Error('Chat model is not supported.');
 
         const messagesCopy = [...messages];
 
         let body = {
             model: model,
-            max_tokens: options.maxTokens ?? 4096,
+            max_tokens: options.maxTokens ?? ChatApi.getMaxTokens(model),
             messages: messagesCopy,
         };
         if (options.seed != null) {
@@ -121,7 +169,7 @@ class ChatGptApi {
             let json = null;
             let error = "";
             try {
-                json = await fetch('https://api.openai.com/v1/chat/completions', {
+                json = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -154,7 +202,7 @@ class ChatGptApi {
                 retries -= 0.9;
             }
             let errorMessage = error.length > 0 ? error : json?.error?.code;
-            console.warn('ChatGptApi.getChatResponse ERROR Try Again', retries, errorMessage);
+            console.warn('ChatApi.getChatResponse ERROR Try Again', retries, errorMessage);
             lastError = errorMessage;
 
             if (retries < maxRetries) {
@@ -164,19 +212,21 @@ class ChatGptApi {
     }
     /**
      * options:
-     * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null, maxTokens = 4096
+     * model = null, seed = null, apiKey = null, maxTokens = null
      */
     static async getChatStream(messages, options = null) {
         options ??= {};
-        const model = options.gptModel ?? ChatGptApi.defaultModel;
-        const apiKey = options.apiKey ?? settings.openAIApiKey;
+        const model = options.model ?? ChatApi.getDefaultModel();
+        const apiKey = options.apiKey ?? ChatApi.getApiKeyForModelFromSettings(model);
         if (!apiKey) throw new Error('Required OpenAI Api Key was missing.');
+        const endpoint = ChatApi.getEndpoint(model);
+        if (!endpoint) throw new Error('Chat model is not supported.');
 
         const messagesCopy = [...messages];
 
         let body = {
             model: model,
-            max_tokens: options.maxTokens ?? 4096,
+            max_tokens: options.maxTokens ?? ChatApi.getMaxTokens(model),
             messages: messagesCopy,
             stream: true
         };
@@ -193,7 +243,7 @@ class ChatGptApi {
             let response = null;
             let error = "";
             try {
-                response = await fetch('https://api.openai.com/v1/chat/completions', {
+                response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -221,7 +271,7 @@ class ChatGptApi {
 
 
             let errorMessage = error.length > 0 ? error : response?.statusText;
-            console.warn('ChatGptApi.getChatResponse ERROR Try Again', retries, errorMessage);
+            console.warn('ChatApi.getChatResponse ERROR Try Again', retries, errorMessage);
             lastError = errorMessage;
 
             if (retries < maxRetries) {
@@ -234,22 +284,22 @@ class ChatGptApi {
      * Fetches and reads a stream. The onUpdate parameter is a function that is called whenever the stream updates. This function has a string parameter of the updated full response string.
      * 
      * options:
-     * gptModel = ChatGptApi.defaultModel, seed = null, apiKey = null, stopStream = false, continueAfterMaxTokens = true, maxTokens = 4096
+     * model = null, seed = null, apiKey = null, stopStream = false, continueAfterMaxTokens = true, maxTokens = null
      * 
      * Returns the full response string.
      */
     static async streamChat(messages, onUpdate, options) {
         options ??= {};
         options.continueAfterMaxTokens ??= true;
-        console.log("Chat Model:", options.model ?? ChatGptApi.defaultModel);
+        console.log("Chat Model:", options.model ?? ChatApi.getDefaultModel());
 
         const messagesCopy = [...messages];
         let response;
         let result = '';
         do {
-            response = await ChatGptApi._internalStreamChat(messagesCopy, onUpdate, options);
+            response = await ChatApi._internalStreamChat(messagesCopy, onUpdate, options);
             result = response.response;
-            messagesCopy.push(ChatGptApi.toAssistantMessage(response.response));
+            messagesCopy.push(ChatApi.toAssistantMessage(response.response));
         } while (options.continueAfterMaxTokens && response.finish_reason == 'length');
 
         return result;
@@ -257,8 +307,8 @@ class ChatGptApi {
 
     static async _internalStreamChat(messages, onUpdate, options, previousResponse = null) {
         options ??= {};
-        const streamOptions = { gptModel: options.gptModel, seed: options.seed, apiKey: options.apiKey };
-        let reader = await ChatGptApi.getChatStream(messages, streamOptions);
+        const streamOptions = { model: options.model, seed: options.seed, apiKey: options.apiKey };
+        let reader = await ChatApi.getChatStream(messages, streamOptions);
 
         let fullResponse = previousResponse ?? '';
         const textDecoder = new TextDecoder("utf-8");
@@ -277,7 +327,7 @@ class ChatGptApi {
                 console.log("Error reading stream:", e.message);
                 if (e.message === "network error") {
                     await sleep((1 + Math.random()) * 1000);
-                    reader = await ChatGptApi.getChatStream(messages, streamOptions);
+                    reader = await ChatApi.getChatStream(messages, streamOptions);
                     fullResponse = previousResponse ?? '';
                     onUpdate('');
                     continue;

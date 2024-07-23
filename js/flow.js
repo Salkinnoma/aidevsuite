@@ -224,7 +224,6 @@ class Flow {
     }
 
     static async run() {
-        console.log("fmlkadsjhfkuhsdkjfhbdsj,fbkdsjhfjkdshfjkd,shfkjdshf,sdgfmn,dsbgfbvsd", Flow.mode);
         if (Flow.mode != Flow.runMode) {
             goToUrl(getUrlWithChangedHashParam('mode', Flow.runMode));
             return;
@@ -264,16 +263,16 @@ class Flow {
         const systemPrompt = await Flow.getWorkerScript() + `\n\nThe user will ask you to write a script for a custom interactive tool that clearly communicates with the user.${storageAddendum} Your script will be evaluated in the eval part of onmessage on a worker. Above is the worker script that will eval your script. All code you write will be executed within an async function within eval. Write the whole script and only the script within a single code block (use \`\`\`code here\`\`\`), such that it can be easily parsed.`;
         const secondSystemPrompt = Flow.getCode() + `Above is the existing code written by the user that needs to be changed and adjusted according to the user's wishes.`;
         const prompt = Flow.getPrompt();
-        const systemMessage = ChatGptApi.toSystemMessage(systemPrompt);
-        const secondSystemMessage = ChatGptApi.toSystemMessage(secondSystemPrompt);
-        const userMessage = ChatGptApi.toUserMessage(prompt);
+        const systemMessage = ChatApi.toSystemMessage(systemPrompt);
+        const secondSystemMessage = ChatApi.toSystemMessage(secondSystemPrompt);
+        const userMessage = ChatApi.toUserMessage(prompt);
         const context = rewrite ? [systemMessage, secondSystemMessage, userMessage] : [systemMessage, userMessage];
 
         Flow.streamTargetElement.textContent = "";
         Flow.codeEditorContainerElement.classList.add('hide');
         Flow.streamContainerElement.classList.remove('hide');
 
-        const result = await ChatGptApi.streamChat(context, t => {
+        const result = await ChatApi.streamChat(context, t => {
             const code = ParsingHelpers.extractCode(t);
             Flow.streamTargetElement.textContent = code;
             highlightCode(Flow.streamTargetElement);
@@ -1823,10 +1822,8 @@ class Flow {
                 // Insert into the mainParent
                 if (mainInsertIndex < mainParent.children.length) {
                     mainParent.insertBefore(element, mainParent.children[mainInsertIndex]);
-                    console.log('insert before', mainInsertIndex);
                 } else {
                     mainParent.appendChild(element);
-                    console.log('append', mainInsertIndex);
                 }
                 mainInsertIndex++;
             }
@@ -2077,8 +2074,8 @@ class Flow {
         const content = e.content;
         const context = [];
         for (let message of content.context) {
-            if (message.url) context.push(ChatGptApi.ToImageMessage(message.prompt, message.url));
-            else context.push(ChatGptApi.toMessage(message.role, message.prompt));
+            if (message.url) context.push(ChatApi.ToImageMessage(message.prompt, message.url));
+            else context.push(ChatApi.toMessage(message.role, message.prompt));
         }
         const options = content.options ?? {};
         const chatOptions = { model: options.model, seed: options.seed };
@@ -2102,7 +2099,7 @@ class Flow {
                 }
 
                 // Stream
-                result = await ChatGptApi.streamChat(context, async text => {
+                result = await ChatApi.streamChat(context, async text => {
                     if (options.hasOnUpdate) {
                         const transformed = await Flow.requireResponse(Flow.chatStreamEventType, text, null, e);
                         if (transformed != null) text = transformed;
@@ -2189,7 +2186,7 @@ class Flow {
                 }
             } else {
                 // Don't stream if no id and no onUpdate
-                result = await ChatGptApi.chat(context, chatOptions);
+                result = await ChatApi.chat(context, chatOptions);
             }
 
             Flow.postSuccessResponse(e, result);

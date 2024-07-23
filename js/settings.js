@@ -16,6 +16,16 @@ class Settings {
 
     static chatbotPage = 'chatbot';
 
+    static checkHasApiKey() {
+        if (settings.openAIApiKey || settings.groqApiKey) {
+            Flow.rewriteScriptButton?.removeAttribute('disabled');
+            Flow.generateScriptButton?.removeAttribute('disabled');
+        } else {
+            Flow.rewriteScriptButton?.setAttribute('disabled', '');
+            Flow.generateScriptButton?.setAttribute('disabled', '');
+        }
+    }
+
     static getChatbotPage() {
         const chatbotPage = fromHTML(`<div class="hide">`);
         chatbotPage.setAttribute('settings-page', Settings.chatbotPage);
@@ -44,17 +54,24 @@ class Settings {
         openAIApiKeyElement.value = settings.openAIApiKey;
         openAIApiKeyElement.addEventListener('input', e => {
             settings.openAIApiKey = openAIApiKeyElement.value;
-
-            if (settings.openAIApiKey) {
-                Flow.rewriteScriptButton?.removeAttribute('disabled');
-                Flow.generateScriptButton?.removeAttribute('disabled');
-            } else {
-                Flow.rewriteScriptButton?.setAttribute('disabled', '');
-                Flow.generateScriptButton?.setAttribute('disabled', '');
-            }
+            Settings.checkHasApiKey();
         });
         openAIApiKeySetting.appendChild(openAIApiKeyElement);
         chatbotPage.appendChild(openAIApiKeySetting);
+
+        // Groq Api key
+        const groqApiKeySetting = fromHTML(`<div class="listHorizontal">`);
+        const groqApiKeyLabel = fromHTML(`<div>Groq Api Key`);
+        groqApiKeySetting.appendChild(groqApiKeyLabel);
+        const groqApiKeyElement = fromHTML(`<input type="password" placeholder="Enter api key...">`);
+        groqApiKeyElement.value = settings.groqApiKey;
+        groqApiKeyElement.addEventListener('input', e => {
+            settings.groqApiKey = groqApiKeyElement.value;
+            Settings.checkHasApiKey();
+        });
+        groqApiKeySetting.appendChild(groqApiKeyElement);
+        chatbotPage.appendChild(groqApiKeySetting);
+
         return chatbotPage;
     }
 
