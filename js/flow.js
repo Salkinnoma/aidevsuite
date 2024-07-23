@@ -316,7 +316,7 @@ class Flow {
         }
 
         Flow.showProgress();
-        Flow.progress = Math.max(100, Math.min(0, value));
+        Flow.progress = clamp(value, 0, 100);
         Flow.progressBar.value = Flow.progress;
     }
 
@@ -445,6 +445,7 @@ class Flow {
     static paragraphType = "paragraphType";
     static titleType = "titleType";
     static subTitleType = "subTitleType";
+    static infoType = "infoType";
     static imageType = "imageType";
     static iconType = "iconType";
 
@@ -486,6 +487,7 @@ class Flow {
         Flow.paragraphType,
         Flow.titleType,
         Flow.subTitleType,
+        Flow.infoType,
         Flow.codeType,
         Flow.imageType,
         Flow.iconType,
@@ -514,6 +516,7 @@ class Flow {
         Flow.paragraphType,
         Flow.titleType,
         Flow.subTitleType,
+        Flow.infoType,
     ]);
 
     static inputTypes = new Set([
@@ -771,6 +774,9 @@ class Flow {
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
             settings.placeholder = options.placeholder;
+            if (type == Flow.infoType) {
+                settings.mode = options.mode;
+            }
         } else if (type === Flow.emptyType) {
             // Do nothing
         } else if (type === Flow.breakType) {
@@ -1129,6 +1135,15 @@ class Flow {
             subTitleElement.textContent = settings.text;
             element.appendChild(subTitleElement);
             settings.textElement = subTitleElement;
+            if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
+        } else if (type == Flow.infoType) {
+            Flow.tryAddTitle(element, settings);
+            element.classList.add('w-100');
+            element.classList.add('fixText');
+            element.classList.add('info');
+            if (settings.mode != null) element.classList.add(settings.mode + '-text');
+            element.textContent = settings.text;
+            settings.textElement = element;
             if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.codeType) {
             Flow.tryAddTitle(element, settings);

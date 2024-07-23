@@ -35,6 +35,7 @@ const markdownType = "markdownType"; // Includes Katex math parser.
 const paragraphType = "paragraphType";
 const titleType = "titleType";
 const subTitleType = "subTitleType";
+const infoType = "infoType";
 const codeType = "codeType";
 const imageType = "imageType";
 const iconType = "iconType";
@@ -77,6 +78,7 @@ const allTypes = new Set([
     paragraphType,
     titleType,
     subTitleType,
+    infoType,
     codeType,
     imageType,
     iconType,
@@ -104,6 +106,7 @@ const textTypes = new Set([
     paragraphType,
     titleType,
     subTitleType,
+    infoType,
 ]);
 
 const inputTypes = new Set([
@@ -136,7 +139,7 @@ function generateUniqueId() {
     return Date.now() + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
 }
 
-// If you use buttons with `noAccept`, there's a very high chance you will want to await this at the end of your script.
+// If you show stuff with `noAccept`, there's a very high chance you will want to await this at the end of your script.
 async function forever() {
     await new Promise(() => { });
     log('This will never run!');
@@ -313,6 +316,12 @@ function createAnchor(options = null) {
  * - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
  * - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
  * - **placeholder** (string) [optional]: The placeholder text that appears when the text is empty.
+ * 
+ * ## `infoType`
+ * - **mode** (string) [optional]: Whether to highlight the text in a special way. Valid values are:
+ *     - `"danger"`
+ *     - `"warning"`
+ *     - `"success"`
  */
 function createText(type, text, options = null) {
     const content = {
@@ -335,6 +344,11 @@ function createTitle(text, options = null) {
 function createSubTitle(text, options = null) {
     return createText(subTitleType, text, options);
 }
+
+function createInfo(text, options = null) {
+    return createText(infoType, text, options);
+}
+
 
 /**
  * - **options** (object): An object that can have the following properties:
@@ -629,7 +643,7 @@ function _mapElements(elements) {
  * - **element** (object): The `element` parameter accepts an element created via any of the create functions.
  * - **options** (object) [optional]: An object that can have the following properties:
  *     - **acceptButtonContent** (object) [optional]: An element to be shown within the default accept button. Default is a paragraph with `Accept`.
- *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If an input can be accepted multiple times, add a custom button that uses the `read` function to read the input values `onClick`. If you add your own custom accept button (instead of modifying `acceptButtonContent`), you must set this to true. Default is `false`.
+ *     - **noAccept** (bool) [optional]: Whether the input can be accepted via a default accept button. If an input can be accepted multiple times, add a custom button that uses the `read` function to read the input values `onClick`. If you add your own custom accept button (instead of modifying `acceptButtonContent`), you must set this to true. If you show an input and do not use the result, you probably want to set this to true. Default is `false`.
  *     - **location** (string) [optional]: The location of element. Default is `mainLocation`. The following values are supported:
  *         - `mainLocation`: The default location.
  *         - `stickyLocation`: The element will stick to the top of the page.
@@ -955,6 +969,10 @@ function unescapeHTML(str) {
             return entity;
         }
     });
+}
+
+function clamp(number, min, max) {
+    return Math.max(min, Math.min(number, max));
 }
 
 const second = 1000;

@@ -176,3 +176,7 @@ function replaceElementWithClone(element) {
     element.parentNode.replaceChild(clone, element);
     return clone;
 }
+
+function clamp(number, min, max) {
+    return Math.max(min, Math.min(number, max));
+}
