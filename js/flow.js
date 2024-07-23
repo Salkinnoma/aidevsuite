@@ -2472,6 +2472,7 @@ class Flow {
                 if (Flow.starData.link.trim() != '') {
                     // Add bookmark
                     addLocalPage(Flow.starData.name, Flow.starData.link, page.code, { autoRun });
+                    openPage("local/" + Flow.starData.link);
                 }
             } else {
                 if (Flow.starData.link.trim() == '') {

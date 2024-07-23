@@ -23,7 +23,7 @@ const flowPages = new Set([
 let localPages = new Map();
 let linkedPages = new Map();
 
-const samples = ['data/Fetch.json', 'data/Simple Chat.json', 'data/Chat.json'];
+const samples = ['data/Fetch.json', 'data/Simple Chat.json', 'data/Chat.json', 'data/Encoder.json'];
 
 let isUser = false;
 
@@ -181,7 +181,9 @@ function updatePagesSidebar() {
         if (p.autoRun) params.push('mode=run');
         if (isUser) params.push('user=true');
         if (params.length != 0) link += '?' + params[0];
-        params.forEach(p => link += p);
+        for (let i = 1; i < params.length; i++) {
+            link += params[i];
+        }
 
         const element = fromHTML(`<a class="element sidebarElement hoverable">`);
         element.textContent = p.name;

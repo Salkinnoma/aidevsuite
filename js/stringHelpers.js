@@ -86,6 +86,10 @@ function escapeRegex(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
 
+function unescapeRegex(string) {
+    return string.replace(/\\([.*+?^${}()|[\]\\])/g, '$1');  // $1 refers to the captured group
+}
+
 function escapeReplacement(string) {
     return string.replace(/\$/g, '$$$$');
 }

@@ -517,10 +517,10 @@ function createSimpleButton(elements, onClick, options = null) {
  * - **disabled** (bool) [optional]: Whether user input is disabled. Default is `false`.
  *
  * ### All Input Types
- * - **onValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called whenever the value of an input changes. Its parameters are allInputs, input. The return value of onValidate must be an object with the following properties:
+ * - **onValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called whenever the value of an input changes, including directly after the element is first shown. Its parameters are allInputs, input. No return value means the current input is valid. To invalidate, the return value of onValidate must be an object with the following properties:
  *     - **valid** (bool): Whether the value is valid.
  *     - **message** (string) [optional]: An error message. Defaults to `'Invalid value. Please choose a different value.'`.
- * - **onDelayedValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called only when a user wants to accept input. This doesn't work in combination with `noAccept`. Its parameters are group, element. The return value of onValidate must be an object with the following properties:
+ * - **onDelayedValidate** (function) [optional]: A callback function that can be used for custom validation logic. It is called only when a user wants to accept input. This doesn't work in combination with `noAccept`. Its parameters are group, element. No return value means the current input is valid. To invalidate, the return value of onDelayedValidate must be an object with the following properties:
  *     - **valid** (bool): Whether the value is valid.
  *     - **message** (string) [optional]: An error message. Defaults to `'Invalid value. Please choose a different value.'`.
  *
@@ -927,6 +927,10 @@ function escapeFileNameMinimal(name) {
 
 function escapeRegex(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
+function unescapeRegex(string) {
+    return string.replace(/\\([.*+?^${}()|[\]\\])/g, '$1');  // $1 refers to the captured group
 }
 
 function escapeHTML(str) {
