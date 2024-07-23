@@ -73,7 +73,7 @@ Then you can export your favorite scripts, throw them into the project, and voil
 
 A very simple and straightforward input/ouput syntax even for complex inputs allows AI to effortlessly write your tools. AI is tightly integrated into the core, allowing you to quickly generate or rewrite tools.
 
-This uses OpenAI ChatGPT and requires an API key to work. If you don’t like AI or don’t have an API key, you can simply disable it in the settings.
+This uses chatbots like OpenAI ChatGPT or Llama using groq.com (Claude doesn't work due to cors) and requires API keys to work. If you don’t like AI or don’t have an API key, you can simply disable it in the settings. However, it seems as though groq.com currently (23.07.2024) allows [creating API keys for free](https://console.groq.com/keys).
 
 ## Safe Execution
 
