@@ -85,6 +85,7 @@ Follow these steps to get started with creating and customizing your own tools:
 6. **Modify the Script:**
    - Click "edit" to open the script editor.
    - Try adding a delete button with a close icon to the right of each message. This button should remove the message both visually and from the context.
+   - Compare your results with the "Chat" sample.
 
 7. **Explore More Features:**
    For advanced functionalities such as saving (exclusive to local scripts), exporting, and importing the current chat, check out the "Chat" sample and the "Worker" page (bottom of sidebar). Experiment to your heart's content to create your ultimate chatbot.
