@@ -23,7 +23,7 @@ const flowPages = new Set([
 let localPages = new Map();
 let linkedPages = new Map();
 
-const samples = ['data/Fetch.json', 'data/Simple Chat.json', 'data/Chat.json', 'data/Encoder.json', 'data/Word Counter.json'];
+const samples = ['data/CorsFetch.json', 'data/Simple Chat.json', 'data/Chat.json', 'data/Encoder.json', 'data/Word Counter.json'];
 
 let isUser = false;
 
