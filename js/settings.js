@@ -30,6 +30,10 @@ class Settings {
         const chatbotPage = fromHTML(`<div class="hide">`);
         chatbotPage.setAttribute('settings-page', Settings.chatbotPage);
 
+        const groqNote = fromHTML(`<div>`);
+        renderMarkdown(groqNote, '_Note: Groq currently (23.07.2024) allows [creating API keys for free](https://console.groq.com/keys)._');
+        chatbotPage.appendChild(groqNote);
+
         // Disable AI
         const disableAISetting = fromHTML(`<div tooltip="Disables all AI functionality." class="listHorizontal">`);
         const disableAILabel = fromHTML(`<div>Disable AI`);
@@ -51,7 +55,7 @@ class Settings {
         const openAIApiKeyLabel = fromHTML(`<div>OpenAI Api Key`);
         openAIApiKeySetting.appendChild(openAIApiKeyLabel);
         const openAIApiKeyElement = fromHTML(`<input type="password" placeholder="Enter api key...">`);
-        openAIApiKeyElement.value = settings.openAIApiKey;
+        openAIApiKeyElement.value = settings.openAIApiKey ?? '';
         openAIApiKeyElement.addEventListener('input', e => {
             settings.openAIApiKey = openAIApiKeyElement.value;
             Settings.checkHasApiKey();
@@ -64,7 +68,7 @@ class Settings {
         const groqApiKeyLabel = fromHTML(`<div>Groq Api Key`);
         groqApiKeySetting.appendChild(groqApiKeyLabel);
         const groqApiKeyElement = fromHTML(`<input type="password" placeholder="Enter api key...">`);
-        groqApiKeyElement.value = settings.groqApiKey;
+        groqApiKeyElement.value = settings.groqApiKey ?? '';
         groqApiKeyElement.addEventListener('input', e => {
             settings.groqApiKey = groqApiKeyElement.value;
             Settings.checkHasApiKey();
@@ -90,6 +94,7 @@ class Settings {
 
     static changePage(page) {
         [...Settings.pagesElement.children].forEach(e => e.getAttribute('settings-page') == page ? e.classList.remove('hide') : e.classList.add('hide'));
+        [...Settings.pageBar.children].forEach(e => e.getAttribute('settings-button') == page ? e.setAttribute('disabled', '') : e.removeAttribute('disabled'));
     }
 
     static open(page = null) {
@@ -110,12 +115,16 @@ class Settings {
         titleBar.appendChild(closeButton);
         element.appendChild(titleBar);
         element.appendChild(hb(2));
-        const pageBar = fromHTML(`<div class="listHorizontal">`);
-        const chatbotPageButton = fromHTML(`<button class="largeElement complexButton raised">`);
+
+        // Page bar
+        const pageBar = fromHTML(`<div class="listHorizontal hide">`);
+        const chatbotPageButton = fromHTML(`<button class="largeElement complexButton raised" disabled>`);
+        Settings.pageBar = pageBar;
+        chatbotPageButton.setAttribute('settings-button', Settings.chatbotPage);
         chatbotPageButton.textContent = 'chatbot';
         pageBar.appendChild(chatbotPageButton);
         element.appendChild(pageBar);
-        element.appendChild(hb(6));
+        //element.appendChild(hb(6));
         const pagesElement = fromHTML(`<div>`);
 
         // Settings pages

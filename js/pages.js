@@ -251,7 +251,6 @@ function loadPage() {
 
     // Show the section corresponding to the hash
     let newPage;
-    console.log("Page loaded:", hash);
     const link = getPathFromHash();
     let isFlow = false;
     if (hash == '' || hash == '#' || hash == '#home') {
@@ -280,7 +279,13 @@ function loadPage() {
     updatePagesSidebar();
     updateSidebar();
 
+    console.log("Page loaded:", hash);
     window.dispatchEvent(pageLoadedEvent);
+
+    if (!localStorage.getItem('has_init')) {
+        Settings.open();
+        localStorage.setItem('has_init', true);
+    }
 }
 
 function openPage(page = null) {

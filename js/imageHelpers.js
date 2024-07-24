@@ -1,6 +1,6 @@
 class ImageHelpers {
     static setupEventListeners() {
-        document.querySelectorAll('img').forEach(observeImage);
+        document.querySelectorAll('img').forEach(ImageHelpers.observeImage);
 
         // Use MutationObserver to monitor the DOM for added images
         const observer = new MutationObserver((mutations) => {

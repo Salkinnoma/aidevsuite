@@ -1,3 +1,16 @@
+function _tryRemoveIndexHtml() {
+    let pathname = window.location.pathname;
+    const search = window.location.search;
+    const hash = window.location.hash;
+
+    if (pathname.endsWith('index.html')) {
+        pathname = pathname.substring(0, pathname.length - 'index.html'.length);
+        const newUrl = `${pathname}${search}${hash}`;
+        window.history.replaceState(null, "", newUrl);
+    }
+}
+_tryRemoveIndexHtml();
+
 
 pressedKeys = {};
 function onKeyDown(event) {
