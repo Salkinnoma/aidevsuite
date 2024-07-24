@@ -1122,14 +1122,12 @@ class Flow {
             // Do nothing
         } else if (type == Flow.paragraphType) {
             Flow.tryAddTitle(element, settings);
-            element.classList.add('w-100');
             element.classList.add('fixText');
             element.textContent = settings.text;
             settings.textElement = element;
             if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.titleType) {
             Flow.tryAddTitle(element, settings);
-            element.classList.add('w-100');
             element.classList.add('fixText');
             const titleElement = fromHTML(`<h1>`);
             titleElement.textContent = settings.text;
@@ -1138,7 +1136,6 @@ class Flow {
             if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.subTitleType) {
             Flow.tryAddTitle(element, settings);
-            element.classList.add('w-100');
             element.classList.add('fixText');
             const subTitleElement = fromHTML(`<h2>`);
             subTitleElement.textContent = settings.text;
@@ -1147,7 +1144,6 @@ class Flow {
             if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.infoType) {
             Flow.tryAddTitle(element, settings);
-            element.classList.add('w-100');
             element.classList.add('fixText');
             element.classList.add('info');
             if (settings.mode != null) element.classList.add(settings.mode + '-text');
