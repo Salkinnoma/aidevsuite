@@ -271,11 +271,13 @@ class Flow {
         Flow.streamTargetElement.textContent = "";
         Flow.codeEditorContainerElement.classList.add('hide');
         Flow.streamContainerElement.classList.remove('hide');
+        doScrollTick();
 
         const result = await ChatApi.streamChat(context, t => {
             const code = ParsingHelpers.extractCode(t);
             Flow.streamTargetElement.textContent = code;
             highlightCode(Flow.streamTargetElement);
+            doScrollTick();
         });
         const code = ParsingHelpers.extractCode(result);
 
@@ -1313,6 +1315,7 @@ class Flow {
                 onInput: e => {
                     Flow.processMonacoInput(settings, 'markdown');
                     renderMarkdown(settings.markdownElement, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
+                    doScrollTick();
                 },
                 text: true,
                 placeholder: settings.placeholder,
@@ -1846,6 +1849,8 @@ class Flow {
         if (stickyInsertIndex == 0) Flow.stickyOutputContainer.classList.add('hide');
 
         if (Flow.output.length == 0) Flow.mainLocation.textContent = Flow.noOutputMessage;
+
+        doScrollTick();
     }
 
     static async onShowRequest(event) {
@@ -2034,7 +2039,7 @@ class Flow {
             });
         }
 
-
+        doScrollTick();
         Flow.postSuccessResponse(e);
     }
 

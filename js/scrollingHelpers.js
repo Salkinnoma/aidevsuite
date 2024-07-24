@@ -4,6 +4,19 @@ class ScrollingHelpers {
     static autoScrollBotom = true;
     static pageLoaded = true;
 
+    static setupEventListeners() {
+        // Use MutationObserver to monitor the DOM for added images
+        const observer = new MutationObserver((mutations) => {
+            doScrollTick();
+        });
+
+        // Observe the document body for changes
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+
     static injectScrollTopButton() {
         const scrollButtons = document.getElementById('scrollButtons');
         const topButton = fromHTML(`<button class="largeElement complexButton scrollButtonTop" title="Scroll to the top of the page">`);
@@ -91,3 +104,4 @@ async function doScrollTick() {
 })();
 
 ScrollingHelpers.injectScrollButtons();
+window.addEventListener('load', e => ScrollingHelpers.setupEventListeners());
