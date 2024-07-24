@@ -88,7 +88,7 @@ Follow these steps to get started with creating and customizing your own tools:
    - Compare your results with the "Chat" sample.
 
 7. **Explore More Features:**
-   For advanced functionalities such as saving (exclusive to local scripts), exporting, and importing the current chat, check out the "Chat" sample and the "Worker" page (bottom of sidebar). Experiment to your heart's content to create your ultimate chatbot.
+   For advanced functionalities such as saving (exclusive to local scripts), exporting, and importing the current chat, check out the "Chat" sample and the [Worker page](https://deadlyartist.github.io/aidevsuite/#worker). Experiment to your heart's content to create your ultimate chatbot.
 
 8. **Share Your Chatbot:**
     - Download the script
@@ -98,6 +98,76 @@ Follow these steps to get started with creating and customizing your own tools:
 ## Samples
 
 This project is currently deployed using GitHub Pages to https://deadlyartist.github.io/aidevsuite/. Check out the samples to see how everything works, or browse the repo. The project is still in very early stages, so there are still a lot of bugs and no documentation.
+
+## Overview of Key Functions
+
+This is a small overview of key functions. It is highly recommended that you check out the [Worker page](https://deadlyartist.github.io/aidevsuite/#worker) to view all the functions and their available options.
+
+### 1. **Element Creation Functions**
+These functions help you create various types of UI elements.
+
+- **createBreak(size, options = null)**: Creates a break element with an optional size.
+- **createRuler(options = null)**: Creates a horizontal or vertical ruler (hr).
+- **createAnchor(options = null)**: Creates a hidden empty element to help with inserting at the right position.
+- **createCode(code, options = null)**: Creates an element to display code with optional language highlighting.
+- **createMarkdown(markdown, options = null)**: Creates a markdown element that can also handle math via Katex. This is excellent for chatbot outputs.
+- **createImage(url, options = null)**: Creates an image element with optional caption.
+- **createPresetIcon(name, options = null)**: Creates an icon element from a set of predefined names, such as `"close"`.
+
+### 2. **Input Creation Functions**
+These functions help you create various types of user input elements.
+
+- **createInput(type, options = null)**: Creates a generic input element of a specified type.
+
+  Examples for specific types:
+  ```javascript
+  createInput(textInputType, options);  // Creates a text input
+  createInput(codeInputType, options);  // Creates a code input
+  createInput(numberInputType, options); // Creates a number input
+  ```
+
+  Important options:
+  - `onValidate` (can be used to call a function whenever input changes)
+  - `defaultValue`
+
+### 3. **Container and Button Creation Functions**
+These functions help you group elements and create buttons.
+
+- **createGroup(elements, options = null)**: Group elements without affecting their appearance.
+- **createNavBar(type, elements, options = null)**: Creates a horizontal list of spaced out elements.
+- **createHorizontalList(type, elements, options = null)**: Creates a horizontal list of elements.
+- **createButton(elements, onClick, options = null)**: Creates a button with specific elements inside it and an `onClick` callback.
+
+### 4. **Display Functions**
+These functions help you show, update, and remove elements on the screen.
+
+- **show(element, options = null)**: Displays an element on the screen. Use `noAccept` for custom input handling.
+
+- **update(id, properties)**: Updates properties of an already displayed element.
+- **remove(id)**: Removes an element from the screen.
+
+### 5. **Utility Functions**
+Auxiliary functions to help with various tasks.
+
+- **generateUniqueId()**: Generates a unique ID.
+- **forever()**: A helper function to keep the script running indefinitely.
+- **requireResponse(type, content, onPing = null, pingSourceEvent = null)**: Sends an event request and waits for a response.
+- **sleep(ms)**: Waits before continuing to execute code.
+- **clone(obj)**: Deep clones an object via JSON.
+- **clamp(number, min, max)**: Clamps a number between 2 values.
+- **importCode(code)**: Imports and evaluates a code string.
+- **setProgress(progress)**: Shows a progress bar, useful for long operations.
+- **setStatus(status)**: Sets the current status message of the application.
+
+### 6. **Chat Functions**
+Functions to interact with chatbots.
+
+- **chat(context, options = null)**: Communicate with a chatbot. Supports streaming and callback updates.
+- **toMessage(role, prompt, url = null)**: Creates a chat message.
+- **toUserMessage(prompt, url = null)**: Creates a user chat message.
+- **toSystemMessage(prompt, url = null)**: Creates a system chat message.
+- **toAssistantMessage(prompt)**: Creates an assistant chat message.
+- **ChatHelpers.getAvailableModels()**: Gets all models for which the user has input an API key.
 
 ## Branch It!
 
