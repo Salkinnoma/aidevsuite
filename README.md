@@ -139,11 +139,12 @@ These functions help you group elements and create buttons.
 - **createButton(elements, onClick, options = null)**: Creates a button with specific elements inside it and an `onClick` callback.
 
 ### 4. **Display Functions**
-These functions help you show, update, and remove elements on the screen.
+These functions help you show, update, read, and remove elements on the screen.
 
 - **show(element, options = null)**: Displays an element on the screen. Use `noAccept` for custom input handling.
 
 - **update(id, properties)**: Updates properties of an already displayed element.
+- **read(id)**: Reads the current values from an input element.
 - **remove(id)**: Removes an element from the screen.
 
 ### 5. **Utility Functions**
