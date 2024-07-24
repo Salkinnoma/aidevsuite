@@ -145,6 +145,7 @@ These functions help you show, update, read, and remove elements on the screen.
 
 - **update(id, properties)**: Updates properties of an already displayed element.
 - **read(id)**: Reads the current values from an input element.
+- **readAll(id = null)**: Reads the current values from all input elements.
 - **remove(id)**: Removes an element from the screen.
 
 ### 5. **Utility Functions**
