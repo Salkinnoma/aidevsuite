@@ -741,6 +741,8 @@ class Flow {
             settings.group.validationContainer.classList.add('hide');
             settings.group.acceptButtonElement.removeAttribute('disabled');
         }
+
+        doScrollTick();
     }
 
     static async requestDelayedValidation(settings) {
@@ -921,6 +923,7 @@ class Flow {
 
     static processInput(element, settings, settingsProperty, elementProperty = 'value') {
         settings[settingsProperty] = element[elementProperty];
+        doScrollTick();
 
         // Validation
         Flow.requestValidation(settings);
@@ -934,6 +937,7 @@ class Flow {
 
     static processMonacoInput(settings, settingsProperty) {
         settings[settingsProperty] = settings[settingsProperty + "Editor"].getValue();
+        doScrollTick();
         Flow.requestValidation(settings);
     }
 
@@ -991,6 +995,7 @@ class Flow {
         let files = getFilesFromEvent(e);
         console.log("Files Input:", files.map(f => f.name));
         await Flow.addFiles(files, settings);
+        doScrollTick();
 
         // Validation
         Flow.requestValidation(settings);
@@ -1034,6 +1039,8 @@ class Flow {
             settings.filesDisplayElement.appendChild(filesContainer);
             settings.filesDisplayElement.classList.remove('hide');
         } else settings.filesDisplayElement.classList.add('hide');
+
+        doScrollTick();
 
         // Validation
         Flow.requestValidation(settings);
@@ -1315,7 +1322,6 @@ class Flow {
                 onInput: e => {
                     Flow.processMonacoInput(settings, 'markdown');
                     renderMarkdown(settings.markdownElement, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
-                    doScrollTick();
                 },
                 text: true,
                 placeholder: settings.placeholder,
