@@ -27,7 +27,7 @@ class Settings {
     }
 
     static getChatbotPage() {
-        const chatbotPage = fromHTML(`<div class="hide">`);
+        const chatbotPage = fromHTML(`<div class="divList gap-2 hide">`);
         chatbotPage.setAttribute('settings-page', Settings.chatbotPage);
 
         const groqNote = fromHTML(`<div>`);
