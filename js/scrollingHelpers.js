@@ -49,7 +49,7 @@ function isScrolledBottom() {
 
 function scrollToBottom() {
     let scrollingElement = getScrollingElement();
-    scrollingElement.scroll({top: scrollingElement.scrollHeight});
+    scrollingElement.scroll({ top: scrollingElement.scrollHeight });
 }
 
 function isScrolledTop() {
@@ -59,7 +59,7 @@ function isScrolledTop() {
 
 function scrollToTop() {
     let scrollingElement = getScrollingElement();
-    scrollingElement.scroll({top: 0});
+    scrollingElement.scroll({ top: 0 });
 }
 
 getScrollingElement().addEventListener('scroll', () => {
@@ -68,7 +68,7 @@ getScrollingElement().addEventListener('scroll', () => {
 
 window.addEventListener('pageloaded', e => ScrollingHelpers.pageLoaded = true);
 
-async function doScrollTick(){
+async function doScrollTick() {
     if (isScrolledBottom()) {
         ScrollingHelpers.scrolledBottomLastFrame = true;
     } else if (ScrollingHelpers.userHasScrolled || ScrollingHelpers.pageLoaded) {
@@ -84,7 +84,7 @@ async function doScrollTick(){
 }
 
 // Check scroll periodically
-(async function() {
+(async function () {
     while (true) {
         await doScrollTick();
     }

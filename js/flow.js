@@ -2121,6 +2121,7 @@ class Flow {
 
                     settings.streamTarget.classList.remove('hide');
                 }
+                doScrollTick();
 
                 // Stream
                 result = await ChatApi.streamChat(context, async text => {
@@ -2183,6 +2184,8 @@ class Flow {
                             console.warn(`Unsupported type for streaming updates: ${settings.type}`);
                         }
                     }
+
+                    doScrollTick();
                 }, chatOptions);
 
                 settings = Flow.elementById.get(options.id);
@@ -2213,6 +2216,7 @@ class Flow {
                 result = await ChatApi.chat(context, chatOptions);
             }
 
+            doScrollTick();
             Flow.postSuccessResponse(e, result);
         } catch (error) {
             console.log(error.stack);
