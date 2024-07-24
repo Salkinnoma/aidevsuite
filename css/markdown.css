@@ -1,4 +1,4 @@
-.markdown p, .markdownRawText {
+.markdown>p, .markdownRawText {
     margin-bottom: 16px;
 }
 

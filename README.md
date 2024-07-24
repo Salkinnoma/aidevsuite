@@ -60,7 +60,42 @@ _**For devs that want to develop in the future.**_
 
 Welcome to **aidevsuite**! This project empowers developers to create and share simple JavaScript tools on demand. Most programs are about input/output, so this project takes that to heart and streamlines this as much as possible. For example, you can simply await any input, such as text, file upload, code, markdown and many more. Essentially, this is a tool to create tools.
 
+## Getting Started
+
+Follow these steps to get started with creating and customizing your own tools:
+
+1. **Open the Website:**
+   Navigate to https://deadlyartist.github.io/aidevsuite/.
+
+2. **Enter API Key:**
+   Enter at least one API key to enable AI integration. If you don't have one, head over to https://console.groq.com/keys to create one.
+
+3. **Open the Simple Chat Sample:**
+   Click on the "Simple Chat" sample to open it.
+
+4. **Edit the Script:**
+   - Click on the "star" icon.
+   - Uncheck "Link to External Url" to enable editing.
+   - Click "Save" to confirm changes.
+   - Press "Play" to run the script.
+
+5. **Interact with AI:**
+   Ask the AI something to ensure it is working correctly.
+
+6. **Modify the Script:**
+   - Click "edit" to open the script editor.
+   - Try adding a delete button with a close icon to the right of each message. This button should remove the message both visually and from the context.
+
+7. **Explore More Features:**
+   For advanced functionalities such as saving (exclusive to local scripts), exporting, and importing the current chat, check out the "Chat" sample. Experiment to your heart's content to create your ultimate chatbot.
+
+8. **Share Your Chatbot:**
+    - Download the script
+    - Either send the file to others so they can import it, or branch the repo (see the "Branch It!" section further below) and add the file into the data folder before deploying it via GitHub Pages.
+    - If you chose to deploy, others can access it by pasting [your github pages website name]/data/[your file name] into the "Extern" page and pressing "Load Script".
+
 ## Samples
+
 This project is currently deployed using GitHub Pages to https://deadlyartist.github.io/aidevsuite/. Check out the samples to see how everything works, or browse the repo. The project is still in very early stages, so there are still a lot of bugs and no documentation.
 
 ## Branch It!
