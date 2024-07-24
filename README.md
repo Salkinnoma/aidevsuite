@@ -92,7 +92,7 @@ Follow these steps to get started with creating and customizing your own tools:
 
 8. **Share Your Chatbot:**
     - Download the script
-    - Either send the file to others so they can import it, or branch the repo (see the "Branch It!" section further below) and add the file into the data folder before deploying it via GitHub Pages.
+    - Either send the file to others so they can import it, or fork the repo (see the "Fork It!" section further below) and add the file into the data folder before deploying it via GitHub Pages.
     - If you chose to deploy, others can access it by pasting [your github pages website name]/data/[your file name] into the "Extern" page and pressing "Load Script".
 
 ## Samples
@@ -171,9 +171,9 @@ Functions to interact with chatbots.
 - **toAssistantMessage(prompt)**: Creates an assistant chat message.
 - **ChatHelpers.getAvailableModels()**: Gets all models for which the user has input an API key.
 
-## Branch It!
+## Fork It!
 
-This tool is primarily targeted towards devs. As it is serverless and written in vanilla js without any dependencies or build steps, you can easily branch this on github and one click setup github pages ([just like this repo](https://deadlyartist.github.io/aidevsuite/)), or throw them into just about any web project, **whether public or private**. 
+This tool is primarily targeted towards devs. As it is serverless and written in vanilla js without any dependencies or build steps, you can easily fork this on github and one click setup github pages ([just like this repo](https://deadlyartist.github.io/aidevsuite/)), or throw them into just about any web project, **whether public or private**. 
 
 Then you can export your favorite scripts, throw them into the project, and voila, everyone with the link can access the script.
 
