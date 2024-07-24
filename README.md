@@ -93,7 +93,7 @@ Follow these steps to get started with creating and customizing your own tools:
 8. **Share Your Chatbot:**
     - Download the script
     - Either send the file to others so they can import it, or fork the repo (see the "Fork It!" section further below) and add the file into the data folder before deploying it via GitHub Pages.
-    - If you chose to deploy, others can access it by pasting [your github pages website name]/data/[your file name] into the "Extern" page and pressing "Load Script".
+    - If you chose to deploy, others can access it by pasting [your github pages website name]/data/[your file name] into the "Extern" page and pressing "Load Script". If you want to add it to your Home page as a sample, you can add it to the `const samples` array in the `js/pages.js` file.
 
 ## Samples
 
