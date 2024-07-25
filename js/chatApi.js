@@ -154,6 +154,24 @@ class ChatApi {
         return sortedModels;
     }
 
+    static tryReplaceImagePrompts(messages, model) {
+        if (ChatApi.chatModelsThatAllowImages.has(model)) return messages;
+
+        const newMessages = [];
+        messages.forEach(m => {
+            if (Array.isArray(m.content)) {
+                m.content = m.content[0].text;
+
+                if (m.content) newMessages.push(m);
+            } else {
+                newMessages.push(m);
+            }
+
+        });
+
+        return newMessages;
+    }
+
     /**
      * options:
      * model = null, seed = null, apiKey = null, continueAfterMaxTokens = true, maxTokens = null
@@ -184,7 +202,7 @@ class ChatApi {
         const endpoint = ChatApi.getEndpoint(model);
         if (!endpoint) throw new Error('Chat model is not supported.');
 
-        const messagesCopy = [...messages];
+        const messagesCopy = ChatApi.tryReplaceImagePrompts([...messages], model);
 
         let body = {
             model: model,
@@ -257,7 +275,7 @@ class ChatApi {
         const endpoint = ChatApi.getEndpoint(model);
         if (!endpoint) throw new Error('Chat model is not supported.');
 
-        const messagesCopy = [...messages];
+        const messagesCopy = ChatApi.tryReplaceImagePrompts([...messages], model);
 
         let body = {
             model: model,
