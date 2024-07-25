@@ -2191,7 +2191,12 @@ class Flow {
         Flow.postSuccessResponse(e);
     }
 
-    static remove(id) {
+    static remove(id = null) {
+        if (id == null) {
+            Flow.output.forEach(s => Flow.remove(s.id));
+            return;
+        }
+
         if (Flow.groupById.has(id)) {
             const start = Flow.output.findIndex(s => s.id == id);
             Flow.spliceOutput(start, 1);

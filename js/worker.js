@@ -824,9 +824,9 @@ async function update(id, properties) {
 }
 
 /**
- * - **id** (string) [optional]: The id of the element to delete. All nested elements are also deleted.
+ * - **id** (string) [optional]: The id of the element to delete. All nested elements are also deleted. If null, all elements will be deleted instead.
  */
-async function remove(id) {
+async function remove(id = null) {
     await requireResponse(removeEventType, { id });
 }
 
