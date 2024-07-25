@@ -39,6 +39,7 @@ const titleType = "titleType";
 const subTitleType = "subTitleType";
 const infoType = "infoType";
 const codeType = "codeType";
+const htmlType = "htmlType";
 const imageType = "imageType";
 const iconType = "iconType";
 
@@ -82,6 +83,7 @@ const allTypes = new Set([
     subTitleType,
     infoType,
     codeType,
+    htmlType,
     imageType,
     iconType,
     barType,
@@ -318,6 +320,7 @@ function createAnchor(options = null) {
  * - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
  * - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
  * - **placeholder** (string) [optional]: The placeholder text that appears when the text is empty.
+ * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
  * 
  * ## `infoType`
  * - **mode** (string) [optional]: Whether to highlight the text in a special way. Valid values are:
@@ -358,6 +361,7 @@ function createInfo(text, options = null) {
  *     - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
  *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
  *     - **placeholder** (string) [optional]: The placeholder text that appears when the code is empty.
+ *     - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
  */
 function createCode(code, options = null) {
     const content = {
@@ -372,6 +376,7 @@ function createCode(code, options = null) {
 /**
  * - **options** (object): An object that can have the following properties:
  *     - **placeholder** (string) [optional]: The placeholder text that appears when the markdown is empty.
+ *     - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
  *     - **katex** (bool) [optional]: Whether to render katex. Default is `true`.
  *     - **katexDelimiters** (array) [optional]: The delimiters to use to find find math equations. Default:
  *         [
@@ -398,9 +403,27 @@ function createMarkdown(markdown, options = null) {
 
 /**
  * - **options** (object): An object that can have the following properties:
+ *     - **allowScripts** (bool) [optional]: Whether to allow scripts. Default is `true`, as the html is sandboxed anyways.
+ *     - **placeholder** (string) [optional]: The placeholder text that appears when the code is empty.
+ *     - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
+ */
+function createHtml(html, options = null) {
+    const content = {
+        id: options?.id ?? generateUniqueId(),
+        type: htmlType,
+        html,
+        options,
+    };
+    return content;
+}
+
+/**
+ * - **options** (object): An object that can have the following properties:
  *     - **caption** (string) [optional]: The caption for the image.
  *     - **title** (string) [optional]: The title to be shown on hover.
  *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
+ *     - **imageMaxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
+ *     - **captionMaxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
  */
 function createImage(url, options = null) {
     const content = {
@@ -585,6 +608,7 @@ function createSimpleButton(elements, onClick, options = null) {
  * - **captionPlaceholder** (string) [optional]: The placeholder text that appears when the caption input is empty. Default is `"Enter caption here..."`.
  * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
  * - **captionMaxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
+ * - **imageMaxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
  *
  * ### `fileInputType`
  * - **allowedMimeTypes** (array of strings) [optional]: Specifies the mime types (e.g application/json) that are allowed. Wildcards are supported. Default is an empty array `[]`.

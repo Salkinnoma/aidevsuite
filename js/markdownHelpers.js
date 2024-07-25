@@ -31,10 +31,10 @@ class MarkdownHelpers {
             const match = rule.exec(src);
             if (match) {
                 return {
-                type: 'highlight',
-                raw: match[0],
-                text: match[1].trim(),
-                tokens: this.lexer.inlineTokens(match[1].trim()) // Parse internal inline tokens
+                    type: 'highlight',
+                    raw: match[0],
+                    text: match[1].trim(),
+                    tokens: this.lexer.inlineTokens(match[1].trim()) // Parse internal inline tokens
                 };
             }
         },
@@ -69,7 +69,7 @@ class MarkdownHelpers {
 
         const rightList = fromHTML(`<div class="listHorizontal">`);
         const isText = markdownElement.classList.contains('hide');
-        const toggle = fromHTML(`<button tooltip="${isText ? 'Render Markdown' :'Show Raw Text'}" class="largeElement hoverable">`);
+        const toggle = fromHTML(`<button tooltip="${isText ? 'Render Markdown' : 'Show Raw Text'}" class="largeElement hoverable">`);
         const toggleIcon = icons.retry();
         toggle.addEventListener('click', e => {
             const wasText = markdownElement.classList.contains('hide');
@@ -93,8 +93,8 @@ class MarkdownHelpers {
             copyButton.setAttribute('tooltip', 'Copied!');
             copyTime = Date.now();
             const oldCopyTime = copyTime;
-            window.setTimeout(function() {
-                if (oldCopyTime == copyTime) copyButton.setAttribute('tooltip', 'Copy Code'); // Only update if it hasn't been modified in the meantime.
+            window.setTimeout(function () {
+                if (oldCopyTime == copyTime) copyButton.setAttribute('tooltip', 'Copy Markdown'); // Only update if it hasn't been modified in the meantime.
             }, seconds(3));
         });
         const copyIcon = icons.copy();

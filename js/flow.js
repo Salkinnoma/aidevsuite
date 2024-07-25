@@ -824,8 +824,8 @@ class Flow {
         settings.disabled = options.disabled ?? false;
         settings.stretch = options.stretch ?? false;
         settings.bordered = options.bordered ?? false;
-        settings.breakBefore = Math.min(8, Math.max(0, options.breakBefore ?? 0));
-        settings.breakAfter = Math.min(8, Math.max(0, options.breakAfter ?? 0));
+        settings.breakBefore = clamp(options.breakBefore ?? 0, 0, 8);
+        settings.breakAfter = clamp(options.breakAfter ?? 0, 0, 8);
         Flow.elementById.set(settings.id, settings);
 
         if (Flow.textTypes.has(type)) {
@@ -833,30 +833,40 @@ class Flow {
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
             settings.placeholder = options.placeholder;
+            settings.maxHeight = clamp(options.maxHeight ?? 0, 0, 8);
             if (type == Flow.infoType) {
                 settings.mode = options.mode;
             }
         } else if (type === Flow.emptyType) {
             // Do nothing
         } else if (type === Flow.breakType) {
-            settings.size = Math.min(8, Math.max(0, element.size ?? 4));
+            settings.size = clamp(element.size ?? 4, 0, 8);
         } else if (type === Flow.rulerType) {
             settings.vertical = options.vertical;
         } else if (type === Flow.codeType) {
             settings.code = element.code ?? '';
             settings.language = options.language;
             settings.placeholder = options.placeholder;
+            settings.maxHeight = clamp(options.maxHeight ?? 0, 0, 8);
         } else if (type === Flow.markdownType) {
             settings.markdown = element.markdown ?? '';
             settings.katex = options.katex ?? true;
             settings.katexDelimiters = options.katexDelimiters;
             settings.noHighlight = options.noHighlight;
             settings.placeholder = options.placeholder;
+            settings.maxHeight = clamp(options.maxHeight ?? 0, 0, 8);
+        } else if (type === Flow.htmlType) {
+            settings.html = element.html ?? '';
+            settings.allowScripts = options.allowScripts ?? true;
+            settings.placeholder = options.placeholder;
+            settings.maxHeight = clamp(options.maxHeight ?? 6, 0, 8);
         } else if (type === Flow.imageType) {
             settings.url = element.url ?? '';
             settings.caption = options.caption;
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
+            settings.imageMaxHeight = clamp(options.imageMaxHeight ?? 0, 0, 8);
+            settings.captionMaxHeight = clamp(options.captionMaxHeight ?? 0, 0, 8);
         } else if (type === Flow.iconType) {
             settings.ds = element.ds ?? '';
             settings.iconProvider = element.iconProvider;
@@ -869,7 +879,7 @@ class Flow {
             settings.children.forEach(s => s.parent = settings);
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
-            settings.gap = Math.min(8, Math.max(0, options.gap ?? 2));
+            settings.gap = clamp(options.gap ?? 2, 0, 8);
 
             if (type === Flow.barType) {
                 settings.barSubType = options.barSubType ?? Flow.navBarType;
@@ -890,7 +900,7 @@ class Flow {
                 settings.text = options.defaultValue ?? '';
                 settings.placeholder = options.placeholder ?? 'Enter text here...';
                 settings.spellcheck = options.spellcheck ?? false;
-                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
+                settings.maxHeight = clamp(options.maxHeight ?? 6, 0, 8);
                 settings.minimal = options.minimal ?? false;
             } else if (type === Flow.numberInputType) {
                 settings.number = options.defaultValue ?? 0;
@@ -902,7 +912,7 @@ class Flow {
                 settings.language = options.language;
                 settings.context = options.context;
                 settings.placeholder = options.placeholder ?? 'Enter code here...';
-                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
+                settings.maxHeight = clamp(options.maxHeight ?? 6, 0, 8);
             } else if (type === Flow.markdownInputType) {
                 settings.markdown = options.defaultValue ?? '';
                 settings.placeholder = options.placeholder ?? 'Enter markdown here...';
@@ -910,7 +920,7 @@ class Flow {
                 settings.katex = options.katex ?? true;
                 settings.katexDelimiters = options.katexDelimiters;
                 settings.noHighlight = options.noHighlight;
-                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 8));
+                settings.maxHeight = clamp(options.maxHeight ?? 6, 0, 8);
             } else if (type === Flow.checkboxInputType) {
                 settings.checked = options.defaultValue ?? false;
                 settings.description = options.description ?? '';
@@ -928,8 +938,9 @@ class Flow {
                 settings.placeholder = options.placeholder ?? 'Enter url here...';
                 settings.captionPlaceholder = options.captionPlaceholder ?? 'Enter caption here...';
                 settings.spellcheck = options.spellcheck ?? false;
-                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
-                settings.captionMaxHeight = Math.min(8, Math.max(0, options.captionMaxHeight ?? 6));
+                settings.maxHeight = clamp(options.maxHeight ?? 6, 0, 8);
+                settings.imageMaxHeight = clamp(options.imageMaxHeight ?? 0, 0, 8);
+                settings.captionMaxHeight = clamp(options.captionMaxHeight ?? 6, 0, 8);
             } else if (type === Flow.fileInputType) {
                 settings.files = [];
                 settings.allowedMimeTypes = options.allowedMimeTypes ?? [];
@@ -1178,13 +1189,17 @@ class Flow {
             // Do nothing
         } else if (type == Flow.paragraphType) {
             Flow.tryAddTitle(element, settings);
+            if (settings.maxHeight > 0) element.classList.add("maxHeight-" + settings.maxHeight);
             element.classList.add('fixText');
+            element.classList.add('scroll-y');
             element.textContent = settings.text;
             settings.textElement = element;
             if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.titleType) {
             Flow.tryAddTitle(element, settings);
+            if (settings.maxHeight > 0) element.classList.add("maxHeight-" + settings.maxHeight);
             element.classList.add('fixText');
+            element.classList.add('scroll-y');
             const titleElement = fromHTML(`<h1>`);
             titleElement.textContent = settings.text;
             element.appendChild(titleElement);
@@ -1192,7 +1207,9 @@ class Flow {
             if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.subTitleType) {
             Flow.tryAddTitle(element, settings);
+            if (settings.maxHeight > 0) element.classList.add("maxHeight-" + settings.maxHeight);
             element.classList.add('fixText');
+            element.classList.add('scroll-y');
             const subTitleElement = fromHTML(`<h2>`);
             subTitleElement.textContent = settings.text;
             element.appendChild(subTitleElement);
@@ -1200,8 +1217,10 @@ class Flow {
             if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.infoType) {
             Flow.tryAddTitle(element, settings);
+            if (settings.maxHeight > 0) element.classList.add("maxHeight-" + settings.maxHeight);
             element.classList.add('fixText');
             element.classList.add('info');
+            element.classList.add('scroll-y');
             if (settings.mode != null) element.classList.add(settings.mode + '-text');
             element.textContent = settings.text;
             settings.textElement = element;
@@ -1225,11 +1244,13 @@ class Flow {
             settings.streamTarget = streamTarget;
             element.appendChild(streamTarget);
         } else if (type == Flow.markdownType) {
-            const markdownContainer = fromHTML(`<div class="w-100">`);
+            const markdownContainer = fromHTML(`<div class="w-100 scroll-y">`);
+            if (settings.maxHeight > 0) markdownContainer.classList.add("maxHeight-" + settings.maxHeight);
             if (settings.placeholder != null) markdownContainer.setAttribute('placeholder', settings.placeholder);
             renderMarkdown(markdownContainer, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
             settings.markdownElement = markdownContainer;
-            const rawTextElement = fromHTML(`<div class="w-100 markdownRawText hide language-markdown">`);
+            const rawTextElement = fromHTML(`<div class="w-100 markdownRawText hide language-markdown scroll-y">`);
+            if (settings.maxHeight > 0) rawTextElement.classList.add("maxHeight-" + settings.maxHeight);
             if (settings.placeholder != null) rawTextElement.setAttribute('placeholder', settings.placeholder);
             rawTextElement.textContent = settings.markdown;
             highlightCode(rawTextElement);
@@ -1242,16 +1263,40 @@ class Flow {
             element.appendChild(rawTextElement);
             element.appendChild(bottomBar);
         } else if (type == Flow.htmlType) {
-            const iframe = fromHTML(`<iframe sandbox="" src="iframe.html" style="display:none;">`);
+            settings.url = settings.html ? createObjectUrl(settings.html, { type: commonMimeTypes.html }) : null;
+            const iframe = fromHTML(`<iframe sandbox="" class="scroll-y">`);
             if (settings.allowScripts) iframe.setAttribute('sandbox', 'allow-scripts');
+            if (settings.maxHeight > 0) {
+                iframe.classList.add("maxHeight-" + settings.maxHeight);
+                iframe.classList.add("height-" + settings.maxHeight);
+            }
+            if (settings.url) iframe.setAttribute('src', settings.url);
+            settings.iframe = iframe;
+            element.appendChild(iframe);
+
+            const rawTextElement = fromHTML(`<div class="w-100 htmlRawText hide language-html scroll-y">`);
+            if (settings.maxHeight > 0) rawTextElement.classList.add("maxHeight-" + settings.maxHeight);
+            if (settings.placeholder != null) rawTextElement.setAttribute('placeholder', settings.placeholder);
+            rawTextElement.textContent = settings.html;
+            highlightCode(rawTextElement);
+            settings.rawTextElement = rawTextElement;
+
+            const topBar = HtmlHelpers.createBar(iframe, rawTextElement);
+            const bottomBar = HtmlHelpers.createBar(iframe, rawTextElement, true);
+            element.appendChild(topBar);
+            element.appendChild(iframe);
+            element.appendChild(rawTextElement);
+            element.appendChild(bottomBar);
         } else if (type == Flow.imageType) {
             Flow.tryAddTitle(element, settings);
             const figureElement = fromHTML(`<figure>`);
             const imgElement = fromHTML(`<img class="rounded-xl">`);
+            if (settings.imageMaxHeight > 0) imgElement.classList.add("maxHeight-" + settings.imageMaxHeight);
             imgElement.setAttribute('src', settings.url);
             imgElement.setAttribute('alt', settings.caption ?? "");
             figureElement.appendChild(imgElement);
-            const captionElement = fromHTML(`<figcaption>`);
+            const captionElement = fromHTML(`<figcaption class="scroll-y">`);
+            if (settings.captionMaxHeight > 0) captionElement.classList.add("maxHeight-" + settings.captionMaxHeight);
             figureElement.appendChild(captionElement);
             settings.captionElement = captionElement;
             if (settings.caption) {
@@ -1423,7 +1468,7 @@ class Flow {
 
             // Markdown output
             const markdownElement = fromHTML(`<div class="w-100 markdownPreview scroll-y" placeholder="Markdown Output">`);
-            if (settings.placeholder != null) markdownElement.setAttribute('placeholder', settings.placeholder);
+            markdownElement.setAttribute('placeholder', "The Markdown will be rendered here.");
             if (settings.maxHeight > 0) markdownElement.classList.add("maxHeight-" + settings.maxHeight);
             renderMarkdown(markdownElement, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
             settings.markdownElement = markdownElement;
@@ -1470,6 +1515,7 @@ class Flow {
 
             const figureElement = fromHTML(`<figure class="contenteditableContainerContent">`);
             const imgElement = fromHTML(`<img class="rounded-xl">`);
+            if (settings.imageMaxHeight > 0) imgElement.classList.add("maxHeight-" + settings.imageMaxHeight);
             imgElement.setAttribute('src', settings.url);
             imgElement.setAttribute('alt', settings.caption ?? "");
             figureElement.appendChild(imgElement);
@@ -1576,6 +1622,24 @@ class Flow {
         return container;
     }
 
+    static extractElements(settings) {
+        let isGroup = false;
+        if (settings.element) isGroup = true;
+
+        const elements = [];
+        let unprocessed = [isGroup ? settings.element : settings];
+        if (settings.acceptButtonContent != null) unprocessed = unprocessed.concat(settings.acceptButtonContent);
+        while (unprocessed.length != 0) {
+            let newUnprocessed = [];
+            for (let element of unprocessed) {
+                elements.push(element);
+                if (element.children != null) newUnprocessed = newUnprocessed.concat(element.children);
+            }
+            unprocessed = newUnprocessed;
+        }
+
+        return elements;
+    }
 
     static extractInputElements(groupSettings) {
         const inputs = [];
@@ -1839,6 +1903,10 @@ class Flow {
 
         // Splice settings
         const deleted = Flow.output.splice(start, deleteCount, ...insertGroupSettings);
+        const htmlElements = deleted.map(s => Flow.extractElements(s)).flat().filter(s => s.type == Flow.htmlType);
+        htmlElements.forEach(s => {
+            if (s.url != null) URL.revokeObjectURL(s.url);
+        });
 
         // Validate inputs before showing (but after creating)
         for (let groupSettings of insertGroupSettings) {
@@ -1963,10 +2031,9 @@ class Flow {
 
     static async onUpdate(event) {
         const e = event;
-        const content = e.content;
-        const properties = content.properties;
+        const properties = e.content.properties;
 
-        const settings = Flow.elementById.get(content.id);
+        const settings = Flow.elementById.get(e.content.id);
         let rerenderMarkdown = false;
         if (Flow.inputTypes.has(settings.type) && settings.group.accepted) return;
 
@@ -1981,9 +2048,14 @@ class Flow {
 
         // Update settings and corresponding elements
         if (properties.hide !== undefined) {
-            settings.hide = content.hide;
-            if (content.hide) settings.htmlElement.classList.add('hide');
+            settings.hide = properties.hide;
+            if (settings.hide) settings.htmlElement.classList.add('hide');
             else settings.htmlElement.classList.remove('hide');
+
+            if (settings.group.element == settings) {
+                if (settings.hide) settings.group.htmlElement.classList.add('hide');
+                else settings.group.htmlElement.classList.remove('hide');
+            }
         }
         if (properties.disabled !== undefined) {
             settings.disabled = properties.disabled;
@@ -2023,6 +2095,15 @@ class Flow {
                 settings.rawTextElement.textContent = settings.markdown;
                 highlightCode(settings.rawTextElement);
             }
+        }
+        if (properties.html !== undefined) {
+            settings.html = properties.html;
+            if (settings.url) URL.revokeObjectURL(settings.url);
+            settings.url = settings.html ? createObjectUrl(settings.html, { type: commonMimeTypes.html }) : null;
+            if (settings.url) settings.iframe.setAttribute('src', settings.url);
+
+            settings.rawTextElement.textContent = settings.html;
+            highlightCode(settings.rawTextElement);
         }
         if (properties.url !== undefined) {
             settings.url = properties.url;
@@ -2120,6 +2201,11 @@ class Flow {
             const start = settings.parent.children.findIndex(s => s.id == id); // Has definitely a parent since it can no longer be a top level element.
             settings.parent.children.splice(start, 1);
             settings.htmlElement.remove();
+
+            const htmlElements = Flow.extractElements(settings).filter(s => s.type == Flow.htmlType);
+            htmlElements.forEach(s => {
+                if (s.url != null) URL.revokeObjectURL(s.url);
+            });
         }
     }
 

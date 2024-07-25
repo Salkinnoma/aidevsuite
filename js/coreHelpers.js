@@ -197,3 +197,9 @@ function clamp(number, min, max) {
 function getUrlBase() {
     return window.location.href.split('?')[0].split('#')[0];
 }
+
+function createObjectUrl(object, options = undefined) {
+    const blob = new Blob([object], options);
+    const blobUrl = URL.createObjectURL(blob);
+    return blobUrl;
+}

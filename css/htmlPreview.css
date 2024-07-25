@@ -1,36 +1,23 @@
-.markdown>p {
-    margin-bottom: 16px;
-}
-
-.markdown {
-    padding-top: 10px;
-}
-
-.markdownRawText {
+.htmlRawText {
     white-space: pre-wrap;
     word-break: break-word;
     padding-top: 10px;
     padding-bottom: 16px;
 }
 
-.markdown table {
-    margin-bottom: 16px;
-}
-
-.markdownTopBar, .markdownBottomBar {
+.htmlTopBar, .htmlBottomBar {
     background-color: var(--code-bar-background-color);
     color: var(--codeblock-color);
 }
 
-.markdownTopBar {
+.htmlTopBar {
     border-radius: 8px 8px 0 0;
 }
 
-.markdownBottomBar {
+.htmlBottomBar {
     border-radius: 0 0 8px 8px;
 }
 
-.markdownPreview {
+.htmlPreview {
     padding: 10px 16px;
-    padding-top: 20px;
 }
