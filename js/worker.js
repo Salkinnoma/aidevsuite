@@ -25,6 +25,8 @@ const dataURLDownloadEventType = "dataURLDownloadEventType";
 const setProgressEventType = "setProgressEventType";
 const setStatusEventType = "setStatusEventType";
 const storageEventType = "storageEventType";
+const urlEventType = "urlEventType";
+const fetchInternalEventType = "fetchInternalEventType";
 
 // Element types
 const breakType = "breakType";
@@ -37,6 +39,7 @@ const titleType = "titleType";
 const subTitleType = "subTitleType";
 const infoType = "infoType";
 const codeType = "codeType";
+const htmlType = "htmlType";
 const imageType = "imageType";
 const iconType = "iconType";
 
@@ -80,6 +83,7 @@ const allTypes = new Set([
     subTitleType,
     infoType,
     codeType,
+    htmlType,
     imageType,
     iconType,
     barType,
@@ -316,6 +320,7 @@ function createAnchor(options = null) {
  * - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
  * - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
  * - **placeholder** (string) [optional]: The placeholder text that appears when the text is empty.
+ * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
  * 
  * ## `infoType`
  * - **mode** (string) [optional]: Whether to highlight the text in a special way. Valid values are:
@@ -356,6 +361,7 @@ function createInfo(text, options = null) {
  *     - **title** (string) [optional]: The title to be shown on hover. *Only* use for small labels with size constraints.
  *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
  *     - **placeholder** (string) [optional]: The placeholder text that appears when the code is empty.
+ *     - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
  */
 function createCode(code, options = null) {
     const content = {
@@ -370,6 +376,7 @@ function createCode(code, options = null) {
 /**
  * - **options** (object): An object that can have the following properties:
  *     - **placeholder** (string) [optional]: The placeholder text that appears when the markdown is empty.
+ *     - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
  *     - **katex** (bool) [optional]: Whether to render katex. Default is `true`.
  *     - **katexDelimiters** (array) [optional]: The delimiters to use to find find math equations. Default:
  *         [
@@ -396,9 +403,27 @@ function createMarkdown(markdown, options = null) {
 
 /**
  * - **options** (object): An object that can have the following properties:
+ *     - **allowScripts** (bool) [optional]: Whether to allow scripts. Default is `true`, as the html is sandboxed anyways.
+ *     - **placeholder** (string) [optional]: The placeholder text that appears when the code is empty.
+ *     - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
+ */
+function createHtml(html, options = null) {
+    const content = {
+        id: options?.id ?? generateUniqueId(),
+        type: htmlType,
+        html,
+        options,
+    };
+    return content;
+}
+
+/**
+ * - **options** (object): An object that can have the following properties:
  *     - **caption** (string) [optional]: The caption for the image.
  *     - **title** (string) [optional]: The title to be shown on hover.
  *     - **useTooltipInstead** (bool) [optional]: Whether to show the title using a custom tooltip instead of the inbuilt title property. Default is `true`.
+ *     - **imageMaxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
+ *     - **captionMaxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
  */
 function createImage(url, options = null) {
     const content = {
@@ -542,6 +567,7 @@ function createSimpleButton(elements, onClick, options = null) {
  * - **defaultValue** (string) [optional]: The default text value for the input. Default is an empty string `''`.
  * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter text here..."`.
  * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
+ * - **minimal** (bool) [optional]: Whether to show a minimal text editor instead of Monaco. Default is `false`.
  *
  * ### `numberInputType`
  * - **defaultValue** (number) [optional]: The default number value for the input. Default is `0`.
@@ -582,6 +608,7 @@ function createSimpleButton(elements, onClick, options = null) {
  * - **captionPlaceholder** (string) [optional]: The placeholder text that appears when the caption input is empty. Default is `"Enter caption here..."`.
  * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
  * - **captionMaxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
+ * - **imageMaxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `0`.
  *
  * ### `fileInputType`
  * - **allowedMimeTypes** (array of strings) [optional]: Specifies the mime types (e.g application/json) that are allowed. Wildcards are supported. Default is an empty array `[]`.
@@ -797,9 +824,9 @@ async function update(id, properties) {
 }
 
 /**
- * - **id** (string) [optional]: The id of the element to delete. All nested elements are also deleted.
+ * - **id** (string) [optional]: The id of the element to delete. All nested elements are also deleted. If null, all elements will be deleted instead.
  */
-async function remove(id) {
+async function remove(id = null) {
     await requireResponse(removeEventType, { id });
 }
 
@@ -868,6 +895,14 @@ class Store {
     }
 }
 
+async function getUrl() {
+    const url = await requireResponse(urlEventType);
+    return url.base;
+}
+
+async function fetchTextInternal(path) {
+    return await requireResponse(fetchInternalEventType, { path });
+}
 
 // Internal helper functions
 const _helpers = {
@@ -973,6 +1008,19 @@ function unescapeHTML(str) {
 
 function clamp(number, min, max) {
     return Math.max(min, Math.min(number, max));
+}
+
+function intDivision(a, b) {
+    return Math.floor(a / b);
+}
+
+async function fetchText(url) {
+    const response = await fetch(url);
+    return await response.text();
+}
+
+async function fetchJson(url) {
+    return JSON.parse(await fetchText(url));
 }
 
 const second = 1000;

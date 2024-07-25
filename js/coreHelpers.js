@@ -160,16 +160,16 @@ function onBodyCreated(callback) {
 
 const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
 
-function intDivision(a, b) {
-    return Math.floor(a / b);
-}
-
 // Stop save events
 document.addEventListener('keydown', function (event) {
     if (event.ctrlKey && event.key === 's') {
         event.preventDefault();
     }
 });
+
+function intDivision(a, b) {
+    return Math.floor(a / b);
+}
 
 async function fetchText(url) {
     const response = await fetch(url);
@@ -192,4 +192,14 @@ function replaceElementWithClone(element) {
 
 function clamp(number, min, max) {
     return Math.max(min, Math.min(number, max));
+}
+
+function getUrlBase() {
+    return window.location.href.split('?')[0].split('#')[0];
+}
+
+function createObjectUrl(object, options = undefined) {
+    const blob = new Blob([object], options);
+    const blobUrl = URL.createObjectURL(blob);
+    return blobUrl;
 }

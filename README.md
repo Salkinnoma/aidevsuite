@@ -51,7 +51,7 @@ await forever();
 
 _Test url:_ https://example.com/?data=%7B%22name%22%3A%22aidevsuite%22%2C%22value%22%3A%229999%22%7D
 
-_Try it out:_ https://deadlyartist.github.io/aidevsuite/#flow
+_Try it out:_ https://deadlyartist.github.io/aidevsuite/#local
 
 
 _**For devs that want to develop in the future.**_
@@ -93,11 +93,15 @@ Follow these steps to get started with creating and customizing your own tools:
 8. **Share Your Chatbot:**
     - Download the script
     - Either send the file to others so they can import it, or fork the repo (see the "Fork It!" section further below) and add the file into the data folder before deploying it via GitHub Pages.
-    - If you chose to deploy, others can access it by pasting [your github pages website name]/data/[your file name] into the "Extern" page and pressing "Load Script".
+    - If you chose to deploy, others can access it by pasting [your github pages website name]/data/[your file name] into the "Extern" page and pressing "Load Script". If you want to add it to your Home page as a sample, you can add it to the `const samples` array in the `js/pages.js` file.
 
 ## Samples
 
 This project is currently deployed using GitHub Pages to https://deadlyartist.github.io/aidevsuite/. Check out the samples to see how everything works, or browse the repo. The project is still in very early stages, so there are still a lot of bugs and no documentation.
+
+## Help plz
+
+Once you have input at least one API key, you can open the [Help page](https://deadlyartist.github.io/aidevsuite/#help) and ask any questions to the friendly AI helper, who has a solid understanding of the website and how to make tools.
 
 ## Overview of Key Functions
 
@@ -146,7 +150,7 @@ These functions help you show, update, read, and remove elements on the screen.
 - **update(id, properties)**: Updates properties of an already displayed element.
 - **read(id)**: Reads the current values from an input element.
 - **readAll(id = null)**: Reads the current values from all input elements.
-- **remove(id)**: Removes an element from the screen.
+- **remove(id = null)**: Removes an element from the screen.
 
 ### 5. **Utility Functions**
 Auxiliary functions to help with various tasks.

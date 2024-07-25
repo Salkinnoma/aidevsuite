@@ -14,7 +14,8 @@ function escapeFileNameMinimal(name) {
 let commonMimeTypes = {
     plainText: "text/plain",
     json: "application/json",
-    csv: "text/csv"
+    csv: "text/csv",
+    html: "text/html",
 }
 
 function downloadFile(name, contents, mime_type) {

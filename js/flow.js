@@ -53,14 +53,14 @@ class Flow {
 
     static onPageLoaded() {
         const name = getPathFromHash();
-        if (name !== 'flow' && name !== 'extern' && !localPages.has(getPathPartFromHash(1))) return;
+        if (!flowPages.has(name) && !localPages.has(getPathPartFromHash(1))) return;
 
         Flow.mode = getHashQueryVariable('mode') ?? Flow.editMode;
         const locked = getHashQueryVariable('locked') ?? false;
 
         Flow.setupMonacoContext();
 
-        if (locked || isUser || Flow.mode == Flow.runMode) {
+        if (locked || isUser || Flow.mode == Flow.runMode || name == 'help') {
             Flow.run();
         }
     }
@@ -129,7 +129,7 @@ class Flow {
 
     static updateCode(code) {
         const name = getPathFromHash();
-        if (name == 'flow') {
+        if (name == 'local') {
             Flow.updateDefaultCode(code);
         } else if (name == 'extern') {
             return;
@@ -148,7 +148,7 @@ class Flow {
 
     static getPage() {
         const name = getPathFromHash();
-        if (name == 'flow') {
+        if (name == 'local') {
             const item = {
                 prompt: localStorage.getItem('lastPrompt'),
                 code: localStorage.getItem('lastCode'),
@@ -156,6 +156,8 @@ class Flow {
             return item;
         } else if (name == 'extern') {
             return (Flow.loadedExternPage?.url == getHashQueryVariable('url') && Flow.loadedExternPage?.url != null) ? Flow.loadedExternPage : { code: '' };
+        } else if (name == 'help') {
+            return (Flow.loadedHelpPage != null) ? Flow.loadedHelpPage : { code: '' };
         } else {
             return localPages.get(getPathPartFromHash(1));
         }
@@ -170,13 +172,17 @@ class Flow {
         const url = Flow.urlEditorElement.textContent;
         Flow.setStatus('Loading external script...');
 
-        await Flow.externCodeEditorPromise;
-        Flow.externContainerElement.classList.remove('hide');
-        Flow.externTargetElement.updatePlaceholder('Loading...');
-        Flow.externTargetElement.update();
-        doScrollTick();
+        Flow.externCodeEditorPromise.then(e => {
+            Flow.externContainerElement.classList.remove('hide');
+            Flow.externTargetElement.updatePlaceholder('Loading...');
+            Flow.externTargetElement.update();
+            doScrollTick();
+        });
+
         try {
-            const page = await fetchExternalPage(url);
+            const promise = fetchExternalPage(url)
+            Flow.loadScriptPromise = promise;
+            const page = await promise;
             page.url = url;
             Flow.loadedExternPage = page;
             if (page.code.length == 0) Flow.externTargetElement.updatePlaceholder('Loaded script seems to be empty...');
@@ -192,6 +198,25 @@ class Flow {
         doScrollTick();
     }
 
+    static async loadHelp() {
+        if (Flow.loadedHelpPage != null) return;
+
+        const url = 'data/Help Chat.json';
+        Flow.setStatus('Loading help chat...');
+        try {
+            const promise = fetchExternalPage(url)
+            Flow.loadHelpPromise = promise;
+            const page = await promise;
+            page.url = url;
+            Flow.loadedHelpPage = page;
+            Flow.setStatus('Finished loading help chat.');
+        } catch (e) {
+            console.log(e);
+            Flow.setStatus('Error: Failed loading help chat: ' + e.message, true);
+        }
+        doScrollTick();
+    }
+
     static async wrapPageInStaticFunction(page) {
         return `static async ${escapeCamelCase(page.name)}() {\n${addIndent(page.code)}\n}`;
     }
@@ -203,7 +228,7 @@ class Flow {
 
     static updatePrompt(prompt) {
         const name = getPathFromHash();
-        if (name == 'flow') {
+        if (name == 'local') {
             localStorage.setItem('lastPrompt', prompt);
         } else if (name == 'extern') {
             return;
@@ -225,8 +250,11 @@ class Flow {
 
     static async run() {
         if (Flow.mode != Flow.runMode) {
-            goToUrl(getUrlWithChangedHashParam('mode', Flow.runMode));
-            return;
+            Flow.mode = Flow.runMode;
+            if (getPathFromHash() != 'help') {
+                goToUrl(getUrlWithChangedHashParam('mode', Flow.runMode));
+                return;
+            }
         }
 
         if (Flow.isRunning) {
@@ -338,6 +366,7 @@ class Flow {
 
     static async executeCode() {
         Flow.isRunning = true;
+        const name = getPathFromHash();
 
         Flow.setStatus("Running...");
         console.log(Flow.status);
@@ -349,16 +378,12 @@ class Flow {
         await Flow.createWorker();
         let error = false;
         try {
-            let code = Flow.getCode();
-            let url = getHashQueryVariable('url');
-            if (getPathFromHash() == 'extern' && Flow.loadedExternPage?.url != getHashQueryVariable('url')) {
-                Flow.setStatus("Fetching...");
-                const page = await fetchExternalPage(url);
-                page.url = url;
-                Flow.loadedExternPage = page;
-                code = page.code;
-                Flow.setStatus("Running...");
+            if (name == 'extern') {
+                await Flow.loadScriptPromise;
+            } else if (name == 'help') {
+                await Flow.loadHelpPromise;
             }
+            const code = Flow.getCode();
             await Flow.evalOnWorker(code);
         } catch (e) {
             error = e;
@@ -437,6 +462,8 @@ class Flow {
     static setProgressEventType = "setProgressEventType";
     static setStatusEventType = "setStatusEventType";
     static storageEventType = "storageEventType";
+    static urlEventType = "urlEventType";
+    static fetchInternalEventType = "fetchInternalEventType";
 
     // Element types
     static breakType = "breakType";
@@ -448,6 +475,7 @@ class Flow {
     static titleType = "titleType";
     static subTitleType = "subTitleType";
     static infoType = "infoType";
+    static htmlType = "htmlType";
     static imageType = "imageType";
     static iconType = "iconType";
 
@@ -629,6 +657,10 @@ class Flow {
                 Flow.onSetStatusRequest(e);
             } else if (type === Flow.storageEventType) {
                 Flow.onStorageRequest(e);
+            } else if (type === Flow.urlEventType) {
+                Flow.onUrlRequest(e);
+            } else if (type === Flow.fetchInternalEventType) {
+                Flow.onFetchInternalRequest(e);
             }
         } catch (error) {
             console.error("Error while executing worker request:", error.stack);
@@ -708,6 +740,29 @@ class Flow {
         }
     }
 
+    static async onUrlRequest(event) {
+        const e = event;
+        Flow.postSuccessResponse(e, { base: getUrlBase() });
+    }
+
+    static async onFetchInternalRequest(event) {
+        const e = event;
+        const excludedFolders = ['safe', 'private'];
+
+        const path = e.content.path;
+        const parts = path.split('?')[0].split('#')[0].split('/');
+        parts.pop();
+        let url = getUrlBase().split('/');
+        url.pop();
+        url = url.join('/') + '/' + path;
+
+        if (parts.some(p => excludedFolders.includes(p))) {
+            Flow.postErrorResponse(e, "request_denied");
+        } else {
+            Flow.postSuccessResponse(e, await fetchText(url));
+        }
+    }
+
     // Validation
     static async requestValidation(settings, delayed = false) {
         if ((delayed && !settings.hasDelayedValidation) || (!delayed && !settings.hasValidation)) return;
@@ -769,8 +824,8 @@ class Flow {
         settings.disabled = options.disabled ?? false;
         settings.stretch = options.stretch ?? false;
         settings.bordered = options.bordered ?? false;
-        settings.breakBefore = Math.min(8, Math.max(0, options.breakBefore ?? 0));
-        settings.breakAfter = Math.min(8, Math.max(0, options.breakAfter ?? 0));
+        settings.breakBefore = clamp(options.breakBefore ?? 0, 0, 8);
+        settings.breakAfter = clamp(options.breakAfter ?? 0, 0, 8);
         Flow.elementById.set(settings.id, settings);
 
         if (Flow.textTypes.has(type)) {
@@ -778,30 +833,40 @@ class Flow {
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
             settings.placeholder = options.placeholder;
+            settings.maxHeight = clamp(options.maxHeight ?? 0, 0, 8);
             if (type == Flow.infoType) {
                 settings.mode = options.mode;
             }
         } else if (type === Flow.emptyType) {
             // Do nothing
         } else if (type === Flow.breakType) {
-            settings.size = Math.min(8, Math.max(0, element.size ?? 4));
+            settings.size = clamp(element.size ?? 4, 0, 8);
         } else if (type === Flow.rulerType) {
             settings.vertical = options.vertical;
         } else if (type === Flow.codeType) {
             settings.code = element.code ?? '';
             settings.language = options.language;
             settings.placeholder = options.placeholder;
+            settings.maxHeight = clamp(options.maxHeight ?? 0, 0, 8);
         } else if (type === Flow.markdownType) {
             settings.markdown = element.markdown ?? '';
             settings.katex = options.katex ?? true;
             settings.katexDelimiters = options.katexDelimiters;
             settings.noHighlight = options.noHighlight;
             settings.placeholder = options.placeholder;
+            settings.maxHeight = clamp(options.maxHeight ?? 0, 0, 8);
+        } else if (type === Flow.htmlType) {
+            settings.html = element.html ?? '';
+            settings.allowScripts = options.allowScripts ?? true;
+            settings.placeholder = options.placeholder;
+            settings.maxHeight = clamp(options.maxHeight ?? 6, 0, 8);
         } else if (type === Flow.imageType) {
             settings.url = element.url ?? '';
             settings.caption = options.caption;
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
+            settings.imageMaxHeight = clamp(options.imageMaxHeight ?? 0, 0, 8);
+            settings.captionMaxHeight = clamp(options.captionMaxHeight ?? 0, 0, 8);
         } else if (type === Flow.iconType) {
             settings.ds = element.ds ?? '';
             settings.iconProvider = element.iconProvider;
@@ -814,7 +879,7 @@ class Flow {
             settings.children.forEach(s => s.parent = settings);
             settings.title = options.title;
             settings.useTooltipInstead = options.useTooltipInstead ?? true;
-            settings.gap = Math.min(8, Math.max(0, options.gap ?? 2));
+            settings.gap = clamp(options.gap ?? 2, 0, 8);
 
             if (type === Flow.barType) {
                 settings.barSubType = options.barSubType ?? Flow.navBarType;
@@ -835,7 +900,8 @@ class Flow {
                 settings.text = options.defaultValue ?? '';
                 settings.placeholder = options.placeholder ?? 'Enter text here...';
                 settings.spellcheck = options.spellcheck ?? false;
-                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
+                settings.maxHeight = clamp(options.maxHeight ?? 6, 0, 8);
+                settings.minimal = options.minimal ?? false;
             } else if (type === Flow.numberInputType) {
                 settings.number = options.defaultValue ?? 0;
             } else if (type === Flow.passwordInputType) {
@@ -846,7 +912,7 @@ class Flow {
                 settings.language = options.language;
                 settings.context = options.context;
                 settings.placeholder = options.placeholder ?? 'Enter code here...';
-                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
+                settings.maxHeight = clamp(options.maxHeight ?? 6, 0, 8);
             } else if (type === Flow.markdownInputType) {
                 settings.markdown = options.defaultValue ?? '';
                 settings.placeholder = options.placeholder ?? 'Enter markdown here...';
@@ -854,7 +920,7 @@ class Flow {
                 settings.katex = options.katex ?? true;
                 settings.katexDelimiters = options.katexDelimiters;
                 settings.noHighlight = options.noHighlight;
-                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 8));
+                settings.maxHeight = clamp(options.maxHeight ?? 6, 0, 8);
             } else if (type === Flow.checkboxInputType) {
                 settings.checked = options.defaultValue ?? false;
                 settings.description = options.description ?? '';
@@ -872,8 +938,9 @@ class Flow {
                 settings.placeholder = options.placeholder ?? 'Enter url here...';
                 settings.captionPlaceholder = options.captionPlaceholder ?? 'Enter caption here...';
                 settings.spellcheck = options.spellcheck ?? false;
-                settings.maxHeight = Math.min(8, Math.max(0, options.maxHeight ?? 6));
-                settings.captionMaxHeight = Math.min(8, Math.max(0, options.captionMaxHeight ?? 6));
+                settings.maxHeight = clamp(options.maxHeight ?? 6, 0, 8);
+                settings.imageMaxHeight = clamp(options.imageMaxHeight ?? 0, 0, 8);
+                settings.captionMaxHeight = clamp(options.captionMaxHeight ?? 6, 0, 8);
             } else if (type === Flow.fileInputType) {
                 settings.files = [];
                 settings.allowedMimeTypes = options.allowedMimeTypes ?? [];
@@ -1122,15 +1189,17 @@ class Flow {
             // Do nothing
         } else if (type == Flow.paragraphType) {
             Flow.tryAddTitle(element, settings);
-            element.classList.add('w-100');
+            if (settings.maxHeight > 0) element.classList.add("maxHeight-" + settings.maxHeight);
             element.classList.add('fixText');
+            element.classList.add('scroll-y');
             element.textContent = settings.text;
             settings.textElement = element;
             if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.titleType) {
             Flow.tryAddTitle(element, settings);
-            element.classList.add('w-100');
+            if (settings.maxHeight > 0) element.classList.add("maxHeight-" + settings.maxHeight);
             element.classList.add('fixText');
+            element.classList.add('scroll-y');
             const titleElement = fromHTML(`<h1>`);
             titleElement.textContent = settings.text;
             element.appendChild(titleElement);
@@ -1138,8 +1207,9 @@ class Flow {
             if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.subTitleType) {
             Flow.tryAddTitle(element, settings);
-            element.classList.add('w-100');
+            if (settings.maxHeight > 0) element.classList.add("maxHeight-" + settings.maxHeight);
             element.classList.add('fixText');
+            element.classList.add('scroll-y');
             const subTitleElement = fromHTML(`<h2>`);
             subTitleElement.textContent = settings.text;
             element.appendChild(subTitleElement);
@@ -1147,9 +1217,10 @@ class Flow {
             if (settings.placeholder != null) element.setAttribute('placeholder', settings.placeholder);
         } else if (type == Flow.infoType) {
             Flow.tryAddTitle(element, settings);
-            element.classList.add('w-100');
+            if (settings.maxHeight > 0) element.classList.add("maxHeight-" + settings.maxHeight);
             element.classList.add('fixText');
             element.classList.add('info');
+            element.classList.add('scroll-y');
             if (settings.mode != null) element.classList.add(settings.mode + '-text');
             element.textContent = settings.text;
             settings.textElement = element;
@@ -1173,11 +1244,13 @@ class Flow {
             settings.streamTarget = streamTarget;
             element.appendChild(streamTarget);
         } else if (type == Flow.markdownType) {
-            const markdownContainer = fromHTML(`<div class="w-100">`);
+            const markdownContainer = fromHTML(`<div class="w-100 scroll-y">`);
+            if (settings.maxHeight > 0) markdownContainer.classList.add("maxHeight-" + settings.maxHeight);
             if (settings.placeholder != null) markdownContainer.setAttribute('placeholder', settings.placeholder);
             renderMarkdown(markdownContainer, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
             settings.markdownElement = markdownContainer;
-            const rawTextElement = fromHTML(`<div class="w-100 markdownRawText hide language-markdown">`);
+            const rawTextElement = fromHTML(`<div class="w-100 markdownRawText hide language-markdown scroll-y">`);
+            if (settings.maxHeight > 0) rawTextElement.classList.add("maxHeight-" + settings.maxHeight);
             if (settings.placeholder != null) rawTextElement.setAttribute('placeholder', settings.placeholder);
             rawTextElement.textContent = settings.markdown;
             highlightCode(rawTextElement);
@@ -1189,14 +1262,41 @@ class Flow {
             element.appendChild(markdownContainer);
             element.appendChild(rawTextElement);
             element.appendChild(bottomBar);
+        } else if (type == Flow.htmlType) {
+            settings.url = settings.html ? createObjectUrl(settings.html, { type: commonMimeTypes.html }) : null;
+            const iframe = fromHTML(`<iframe sandbox="" class="scroll-y">`);
+            if (settings.allowScripts) iframe.setAttribute('sandbox', 'allow-scripts');
+            if (settings.maxHeight > 0) {
+                iframe.classList.add("maxHeight-" + settings.maxHeight);
+                iframe.classList.add("height-" + settings.maxHeight);
+            }
+            if (settings.url) iframe.setAttribute('src', settings.url);
+            settings.iframe = iframe;
+            element.appendChild(iframe);
+
+            const rawTextElement = fromHTML(`<div class="w-100 htmlRawText hide language-html scroll-y">`);
+            if (settings.maxHeight > 0) rawTextElement.classList.add("maxHeight-" + settings.maxHeight);
+            if (settings.placeholder != null) rawTextElement.setAttribute('placeholder', settings.placeholder);
+            rawTextElement.textContent = settings.html;
+            highlightCode(rawTextElement);
+            settings.rawTextElement = rawTextElement;
+
+            const topBar = HtmlHelpers.createBar(iframe, rawTextElement);
+            const bottomBar = HtmlHelpers.createBar(iframe, rawTextElement, true);
+            element.appendChild(topBar);
+            element.appendChild(iframe);
+            element.appendChild(rawTextElement);
+            element.appendChild(bottomBar);
         } else if (type == Flow.imageType) {
             Flow.tryAddTitle(element, settings);
             const figureElement = fromHTML(`<figure>`);
             const imgElement = fromHTML(`<img class="rounded-xl">`);
+            if (settings.imageMaxHeight > 0) imgElement.classList.add("maxHeight-" + settings.imageMaxHeight);
             imgElement.setAttribute('src', settings.url);
             imgElement.setAttribute('alt', settings.caption ?? "");
             figureElement.appendChild(imgElement);
-            const captionElement = fromHTML(`<figcaption>`);
+            const captionElement = fromHTML(`<figcaption class="scroll-y">`);
+            if (settings.captionMaxHeight > 0) captionElement.classList.add("maxHeight-" + settings.captionMaxHeight);
             figureElement.appendChild(captionElement);
             settings.captionElement = captionElement;
             if (settings.caption) {
@@ -1256,19 +1356,36 @@ class Flow {
                 settings.buttonElement = buttonElement;
             }
         } else if (type == Flow.textInputType) {
-            const textEditorResult = CodeHelpers.createCodeEditor({
-                content: settings.text,
-                language: "Text",
-                onInput: e => Flow.processMonacoInput(settings, 'text'),
-                text: true,
-                placeholder: settings.placeholder,
-                maxHeight: settings.maxHeight * 100,
-                readOnly: settings.disabled,
-            });
-            settings.disabledElements.push(textEditorResult.codeEditorContainer);
-            settings.editorContainer = textEditorResult.codeEditorContainer;
-            textEditorResult.codeEditorPromise.then(e => settings.textEditor = e);
-            element.appendChild(textEditorResult.codeEditorContainer);
+            if (settings.minimal) {
+                const editorContainer = fromHTML(`<div class="contenteditableContainer">`);
+                const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText">`);
+                settings.disabledElements.push(codeEditor);
+                if (settings.maxHeight != 0) codeEditor.classList.add('maxHeight-' + settings.maxHeight);
+                codeEditor.setAttribute('placeholder', settings.placeholder);
+                codeEditor.textContent = settings.url;
+                codeEditor.addEventListener('input', e => {
+                    Flow.processContentEditableInput(e.srcElement, settings, 'text');
+                });
+                codeEditor.addEventListener('keydown', e => ContentEditableHelpers.checkForTab(e));
+                settings.textEditor = codeEditor;
+                settings.editorContainer = editorContainer;
+                editorContainer.appendChild(codeEditor);
+                element.appendChild(editorContainer);
+            } else {
+                const textEditorResult = CodeHelpers.createCodeEditor({
+                    content: settings.text,
+                    language: "Text",
+                    onInput: e => Flow.processMonacoInput(settings, 'text'),
+                    text: true,
+                    placeholder: settings.placeholder,
+                    maxHeight: settings.maxHeight * 100,
+                    readOnly: settings.disabled,
+                });
+                settings.disabledElements.push(textEditorResult.codeEditorContainer);
+                settings.editorContainer = textEditorResult.codeEditorContainer;
+                textEditorResult.codeEditorPromise.then(e => settings.textEditor = e);
+                element.appendChild(textEditorResult.codeEditorContainer);
+            }
 
             const streamTarget = fromHTML(`<div class="w-100 largeElement fixText hide scroll-y">`);
             if (settings.placeholder != null) streamTarget.setAttribute('placeholder', settings.placeholder);
@@ -1351,7 +1468,7 @@ class Flow {
 
             // Markdown output
             const markdownElement = fromHTML(`<div class="w-100 markdownPreview scroll-y" placeholder="Markdown Output">`);
-            if (settings.placeholder != null) markdownElement.setAttribute('placeholder', settings.placeholder);
+            markdownElement.setAttribute('placeholder', "The Markdown will be rendered here.");
             if (settings.maxHeight > 0) markdownElement.classList.add("maxHeight-" + settings.maxHeight);
             renderMarkdown(markdownElement, settings.markdown, { delimiters: settings.katexDelimiters, noHighlight: settings.noHighlight, sanitize: true, katex: settings.katex });
             settings.markdownElement = markdownElement;
@@ -1382,9 +1499,6 @@ class Flow {
             settings.selectElement = selectElement;
         } else if (type == Flow.imageInputType) {
             const editorContainer = fromHTML(`<div class="contenteditableContainer">`);
-            if (decorated) {
-                editorContainer.classList.add('decoratedContainer');
-            }
             const contentContainer = fromHTML(`<div>`);
             const codeEditor = fromHTML(`<div contenteditable-type="plainTextOnly" contenteditable="true" class="w-100 fixText">`);
             settings.disabledElements.push(codeEditor);
@@ -1401,6 +1515,7 @@ class Flow {
 
             const figureElement = fromHTML(`<figure class="contenteditableContainerContent">`);
             const imgElement = fromHTML(`<img class="rounded-xl">`);
+            if (settings.imageMaxHeight > 0) imgElement.classList.add("maxHeight-" + settings.imageMaxHeight);
             imgElement.setAttribute('src', settings.url);
             imgElement.setAttribute('alt', settings.caption ?? "");
             figureElement.appendChild(imgElement);
@@ -1428,19 +1543,7 @@ class Flow {
             settings.captionCodeEditor = captionCodeEditor;
             contentContainer.appendChild(captionCodeEditor);
 
-            if (decorated) {
-                codeEditor.style.padding = "10px 12px";
-                captionCodeEditor.style.padding = "10px 12px";
-                const leftElement = contentContainer.appendChild(fromHTML(`<div>`));
-                leftElement.style.margin = "10px 0 0 10px";
-                settings.leftElement = leftElement;
-                editorContainer.appendChild(contentContainer);
-                const rightElement = editorContainer.appendChild(fromHTML(`<div>`));
-                rightElement.style.margin = "10px 10px 0 0";
-                settings.rightElement = rightElement;
-            } else {
-                editorContainer.appendChild(contentContainer);
-            }
+            editorContainer.appendChild(contentContainer);
 
             settings.editorContainer = editorContainer;
             element.appendChild(editorContainer);
@@ -1519,6 +1622,24 @@ class Flow {
         return container;
     }
 
+    static extractElements(settings) {
+        let isGroup = false;
+        if (settings.element) isGroup = true;
+
+        const elements = [];
+        let unprocessed = [isGroup ? settings.element : settings];
+        if (settings.acceptButtonContent != null) unprocessed = unprocessed.concat(settings.acceptButtonContent);
+        while (unprocessed.length != 0) {
+            let newUnprocessed = [];
+            for (let element of unprocessed) {
+                elements.push(element);
+                if (element.children != null) newUnprocessed = newUnprocessed.concat(element.children);
+            }
+            unprocessed = newUnprocessed;
+        }
+
+        return elements;
+    }
 
     static extractInputElements(groupSettings) {
         const inputs = [];
@@ -1782,6 +1903,10 @@ class Flow {
 
         // Splice settings
         const deleted = Flow.output.splice(start, deleteCount, ...insertGroupSettings);
+        const htmlElements = deleted.map(s => Flow.extractElements(s)).flat().filter(s => s.type == Flow.htmlType);
+        htmlElements.forEach(s => {
+            if (s.url != null) URL.revokeObjectURL(s.url);
+        });
 
         // Validate inputs before showing (but after creating)
         for (let groupSettings of insertGroupSettings) {
@@ -1906,10 +2031,9 @@ class Flow {
 
     static async onUpdate(event) {
         const e = event;
-        const content = e.content;
-        const properties = content.properties;
+        const properties = e.content.properties;
 
-        const settings = Flow.elementById.get(content.id);
+        const settings = Flow.elementById.get(e.content.id);
         let rerenderMarkdown = false;
         if (Flow.inputTypes.has(settings.type) && settings.group.accepted) return;
 
@@ -1924,9 +2048,14 @@ class Flow {
 
         // Update settings and corresponding elements
         if (properties.hide !== undefined) {
-            settings.hide = content.hide;
-            if (content.hide) settings.htmlElement.classList.add('hide');
+            settings.hide = properties.hide;
+            if (settings.hide) settings.htmlElement.classList.add('hide');
             else settings.htmlElement.classList.remove('hide');
+
+            if (settings.group.element == settings) {
+                if (settings.hide) settings.group.htmlElement.classList.add('hide');
+                else settings.group.htmlElement.classList.remove('hide');
+            }
         }
         if (properties.disabled !== undefined) {
             settings.disabled = properties.disabled;
@@ -1936,9 +2065,13 @@ class Flow {
         if (properties.text !== undefined) {
             settings.text = properties.text;
             if (settings.type === Flow.textInputType) {
-                if (retainSelection) selection = settings.textEditor?.getPosition();
-                settings.textEditor?.setValue(settings.text);
-                if (retainSelection) settings.textEditor?.setPosition(selection);
+                if (settings.minimal) {
+                    settings.textEditor.textContent = settings.text;
+                } else {
+                    if (retainSelection) selection = settings.textEditor?.getPosition();
+                    settings.textEditor?.setValue(settings.text);
+                    if (retainSelection) settings.textEditor?.setPosition(selection);
+                }
             } else {
                 settings.textElement.textContent = settings.text;
             }
@@ -1962,6 +2095,15 @@ class Flow {
                 settings.rawTextElement.textContent = settings.markdown;
                 highlightCode(settings.rawTextElement);
             }
+        }
+        if (properties.html !== undefined) {
+            settings.html = properties.html;
+            if (settings.url) URL.revokeObjectURL(settings.url);
+            settings.url = settings.html ? createObjectUrl(settings.html, { type: commonMimeTypes.html }) : null;
+            if (settings.url) settings.iframe.setAttribute('src', settings.url);
+
+            settings.rawTextElement.textContent = settings.html;
+            highlightCode(settings.rawTextElement);
         }
         if (properties.url !== undefined) {
             settings.url = properties.url;
@@ -2049,7 +2191,12 @@ class Flow {
         Flow.postSuccessResponse(e);
     }
 
-    static remove(id) {
+    static remove(id = null) {
+        if (id == null) {
+            Flow.output.forEach(s => Flow.remove(s.id));
+            return;
+        }
+
         if (Flow.groupById.has(id)) {
             const start = Flow.output.findIndex(s => s.id == id);
             Flow.spliceOutput(start, 1);
@@ -2059,6 +2206,11 @@ class Flow {
             const start = settings.parent.children.findIndex(s => s.id == id); // Has definitely a parent since it can no longer be a top level element.
             settings.parent.children.splice(start, 1);
             settings.htmlElement.remove();
+
+            const htmlElements = Flow.extractElements(settings).filter(s => s.type == Flow.htmlType);
+            htmlElements.forEach(s => {
+                if (s.url != null) URL.revokeObjectURL(s.url);
+            });
         }
     }
 
@@ -2122,12 +2274,8 @@ class Flow {
                 if (settings != null && (Flow.inputTypes.has(settings.type) || settings.type == Flow.codeType)) {
                     if (settings.type == Flow.imageInputType) {
                         settings.captionCodeEditor.classList.add('hide');
-                    } else if (settings.type == Flow.textInputType) {
-                        settings.textEditor.classList.add('hide');
-                    } else if (settings.type == Flow.codeInputType || settings.type == Flow.codeType) {
-                        settings.codeEditor.classList.add('hide');
-                    } else if (settings.type == Flow.markdownInputType) {
-                        settings.markdownEditor.classList.add('hide');
+                    } else {
+                        settings.editorContainer.classList.add('hide');
                     }
 
                     settings.streamTarget.classList.remove('hide');
@@ -2204,21 +2352,25 @@ class Flow {
                     if (settings.type == Flow.imageInputType) {
                         settings.captionCodeEditor.classList.remove('hide');
                         InputHelpers.replaceTextWithUndo(settings.captionCodeEditor, result);
-                    } else if (settings.type == Flow.textInputType) {
-                        settings.textEditor.classList.remove('hide');
-                        Monaco.replaceCodeWithUndo(settings.textEditor, result);
-                    } else if (settings.type == Flow.codeInputType || settings.type == Flow.codeType) {
+                    } else {
                         settings.codeEditor.classList.remove('hide');
-                        Monaco.replaceCodeWithUndo(settings.codeEditor, result);
-                    } else if (settings.type == Flow.markdownInputType) {
-                        settings.markdownEditor.classList.remove('hide');
-                        Monaco.replaceCodeWithUndo(settings.markdownEditor, result);
-                        renderMarkdown(settings.markdownElement, text, {
-                            delimiters: settings.katexDelimiters,
-                            noHighlight: settings.noHighlight,
-                            sanitize: true,
-                            katex: settings.katex
-                        });
+                        if (settings.type == Flow.textInputType) {
+                            if (settings.minimal) {
+                                InputHelpers.replaceTextWithUndo(settings.textEditor, result);
+                            } else {
+                                Monaco.replaceCodeWithUndo(settings.textEditor, result);
+                            }
+                        } else if (settings.type == Flow.codeInputType || settings.type == Flow.codeType) {
+                            Monaco.replaceCodeWithUndo(settings.codeEditor, result);
+                        } else if (settings.type == Flow.markdownInputType) {
+                            Monaco.replaceCodeWithUndo(settings.markdownEditor, result);
+                            renderMarkdown(settings.markdownElement, text, {
+                                delimiters: settings.katexDelimiters,
+                                noHighlight: settings.noHighlight,
+                                sanitize: true,
+                                katex: settings.katex
+                            });
+                        }
                     }
                     settings.streamTarget.classList.add('hide');
                 }
@@ -2442,7 +2594,7 @@ class Flow {
             name = linkedPages.get(url).name;
         }
 
-        const fileName = name ? escapeFileName(name) : escapeFileName(item.link ?? 'flow');
+        const fileName = name ? escapeFileName(name) : escapeFileName(item.link ?? 'tool');
         downloadJson(fileName, json);
     }
 
@@ -2558,7 +2710,7 @@ class Flow {
                 }
             }
         } else {
-            if ((Flow.starData.link == page.link && Flow.starData.name == page.name && !!page.autoRun == autoRun) || (name == 'flow' && Flow.starData.link.trim() == '')) {
+            if ((Flow.starData.link == page.link && Flow.starData.name == page.name && !!page.autoRun == autoRun) || (name == 'local' && Flow.starData.link.trim() == '')) {
                 disableSave();
             } else {
                 enableSave();
@@ -2718,15 +2870,15 @@ class Flow {
     }
 
     static adjustContentHeight() {
-        const name = getPathPartFromHash(0);
+        const type = getPathPartFromHash(0);
         if ((
-            (!Flow.codeEditor && (name == 'local' || name == 'flow')) ||
-            (!Flow.externTargetElement && (name == 'extern'))) ||
-            !flowPages.has(name)) return;
+            (!Flow.codeEditor && (type == 'local')) ||
+            (!Flow.externTargetElement && (type == 'extern'))) ||
+            !flowPages.has(type)) return;
 
         const innerContainer = document.getElementById('pages');
         const stickyElement = innerContainer.querySelector('.sticky');
-        const contentElement = name == 'extern' ? Flow.loadContainer : Flow.promptEditorContainerElement;
+        const contentElement = type == 'extern' ? Flow.loadContainer : Flow.promptEditorContainerElement;
         const fillerElement = innerContainer.querySelector('.contentContainer');
 
         if (Flow.mode != Flow.editMode) {
@@ -2742,7 +2894,7 @@ class Flow {
         const newHeight = remainingHeight > 400 ? remainingHeight : 400;
         fillerElement.style.height = `${newHeight}px`;
 
-        if (name == 'extern') {
+        if (type == 'extern') {
             const codeBarHeight = Flow.externContainerElement.querySelector('.codeBar').clientHeight;
             const originalMaxHeight = Flow.externTargetElement.originalMaxHeight;
             const maxHeight = newHeight - codeBarHeight - 16;
@@ -2762,7 +2914,7 @@ class Flow {
 }
 
 function getFlowPage() {
-    const name = getPathPartFromHash(0);
+    const name = getPathFromHash();
     const page = Flow.getPage();
     let code = page.code;
     let prompt = page.prompt;
@@ -2773,14 +2925,14 @@ function getFlowPage() {
 
     let mode = getHashQueryVariable('mode') ?? Flow.editMode;
     const locked = getHashQueryVariable('locked') ?? false;
-    if (locked) mode = Flow.runMode;
+    if (locked || name == 'help') mode = Flow.runMode;
 
     const sticky = fromHTML(`<div class="sticky flowStickyContainer">`); // Outline to overshadow input outlines
     const bar = fromHTML(`<div class="listContainerHorizontal">`);
     const leftBarList = fromHTML(`<div class="listHorizontal">`);
     bar.appendChild(leftBarList);
 
-    if (!isUser) {
+    if (!isUser && name != 'help') {
         // Top left buttons
         const importButton = fromHTML(`<button tooltip="Import Code from JSON" class="largeElement dark-only-raised dark-only-hoverable light-only-complexButton">`);
         importButton.addEventListener('click', e => Flow.openImportDialog());
@@ -2973,8 +3125,6 @@ function getFlowPage() {
             footer.appendChild(rightFooterList);
             promptEditorContainer.appendChild(footer);
         }
-
-        if (name == 'extern' && Flow.loadedExternPage?.url != newUrl && newUrl) Flow.loadScript();
     } else {
         // Output container
         const outputContainer = fromHTML(`<div class="divList gap-2">`);
@@ -2982,6 +3132,9 @@ function getFlowPage() {
         outputContainer.textContent = Flow.noOutputMessage;
         contentContainer.appendChild(outputContainer);
     }
+
+    if (name == 'extern' && Flow.loadedExternPage?.url != newUrl && newUrl) Flow.loadScript();
+    else if (name == 'help') Flow.loadHelp();
 
     return elements;
 }

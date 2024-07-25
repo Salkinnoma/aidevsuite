@@ -3,21 +3,22 @@ const securityId = "aidevsuite_a1b2c3";
 const defaultPages = new Set([
     '',
     'home',
-    'flow',
+    'local',
     'extern',
     'worker',
     'help',
 ]);
 
 const specialFlowPages = new Set([
-    'flow',
+    'local',
     'extern',
 ]);
 
 const flowPages = new Set([
-    'flow',
+    'local',
     'extern',
     'local',
+    'help',
 ]);
 
 let localPages = new Map();
@@ -223,7 +224,7 @@ function updatePagesSidebar() {
 // Function to handle hash changes
 function loadPage() {
     isUser = getHashQueryVariable('user') ?? false;
-    ['homeButton', 'flowButton', 'externButton', 'helpButton'].forEach(id => {
+    ['homeButton', 'localButton', 'externButton', 'helpButton'].forEach(id => {
         const element = document.getElementById(id);
         let href = element.getAttribute('href');
         if (isUser) {
@@ -259,14 +260,18 @@ function loadPage() {
     } else if (hash.startsWith('#?')) {
         newPage = getHomePage();
     } else if (topPath == 'local' ||
-        link == 'flow' ||
         link == 'extern') {
         isFlow = true;
         newPage = getFlowPage();
     } else if (link == 'worker') {
         newPage = getWorkerPage();
     } else if (link == 'help') {
-        newPage = getHelpPage();
+        if (settings.disabledAI) {
+            newPage = getHelpPage();
+        } else {
+            isFlow = true;
+            newPage = getFlowPage();
+        }
     } else {
         openPage();
         return;
@@ -303,7 +308,7 @@ function getHomePage() {
     titleBar.appendChild(title);
     const rightTitleList = fromHTML(`<div class="listHorizontal">`);
     const createButton = fromHTML(`<button class="complexButton largeElement">Start Creating`);
-    createButton.addEventListener('click', e => openPage('flow'));
+    createButton.addEventListener('click', e => openPage('local'));
     rightTitleList.appendChild(createButton);
     titleBar.appendChild(rightTitleList);
     container.appendChild(titleBar);
