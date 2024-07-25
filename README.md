@@ -51,7 +51,7 @@ await forever();
 
 _Test url:_ https://example.com/?data=%7B%22name%22%3A%22aidevsuite%22%2C%22value%22%3A%229999%22%7D
 
-_Try it out:_ https://deadlyartist.github.io/aidevsuite/#flow
+_Try it out:_ https://deadlyartist.github.io/aidevsuite/#local
 
 
 _**For devs that want to develop in the future.**_
@@ -98,6 +98,10 @@ Follow these steps to get started with creating and customizing your own tools:
 ## Samples
 
 This project is currently deployed using GitHub Pages to https://deadlyartist.github.io/aidevsuite/. Check out the samples to see how everything works, or browse the repo. The project is still in very early stages, so there are still a lot of bugs and no documentation.
+
+## Help plz
+
+Once you have input at least one API key, you can open the [Help page](https://deadlyartist.github.io/aidevsuite/#help) and ask any questions to the friendly AI helper, who has a solid understanding of the website and how to make tools.
 
 ## Overview of Key Functions
 

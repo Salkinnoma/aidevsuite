@@ -25,6 +25,8 @@ const dataURLDownloadEventType = "dataURLDownloadEventType";
 const setProgressEventType = "setProgressEventType";
 const setStatusEventType = "setStatusEventType";
 const storageEventType = "storageEventType";
+const urlEventType = "urlEventType";
+const fetchInternalEventType = "fetchInternalEventType";
 
 // Element types
 const breakType = "breakType";
@@ -542,6 +544,7 @@ function createSimpleButton(elements, onClick, options = null) {
  * - **defaultValue** (string) [optional]: The default text value for the input. Default is an empty string `''`.
  * - **placeholder** (string) [optional]: The placeholder text that appears when the input is empty. Default is `"Enter text here..."`.
  * - **maxHeight** (number) [optional]: Must be between `0` and `8`. For no max height use `0`. Default is `6`.
+ * - **minimal** (bool) [optional]: Whether to show a minimal text editor instead of Monaco. Default is `false`.
  *
  * ### `numberInputType`
  * - **defaultValue** (number) [optional]: The default number value for the input. Default is `0`.
@@ -868,6 +871,14 @@ class Store {
     }
 }
 
+async function getUrl() {
+    const url = await requireResponse(urlEventType);
+    return url.base;
+}
+
+async function fetchTextInternal(path) {
+    return await requireResponse(fetchInternalEventType, { path });
+}
 
 // Internal helper functions
 const _helpers = {
@@ -973,6 +984,19 @@ function unescapeHTML(str) {
 
 function clamp(number, min, max) {
     return Math.max(min, Math.min(number, max));
+}
+
+function intDivision(a, b) {
+    return Math.floor(a / b);
+}
+
+async function fetchText(url) {
+    const response = await fetch(url);
+    return await response.text();
+}
+
+async function fetchJson(url) {
+    return JSON.parse(await fetchText(url));
 }
 
 const second = 1000;
